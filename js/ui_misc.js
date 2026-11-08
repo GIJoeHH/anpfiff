@@ -202,6 +202,7 @@
       }
     }
     if (tab === 'daten') {
+      h += U.realDbPanel();
       h += '<div class="grid g2"><div class="panel"><h2>Spielerdatenbank</h2><p class="muted small">Datenbanken (Vereine &amp; Spieler) werden getrennt von Spielständen verwaltet. Importierte Daten werden vorher geprüft.</p><div class="grid"><button data-act="dbExport">Gesamtdatenbank als JSON exportieren</button><button data-act="dbImport">Datenbank (JSON) importieren</button><button data-act="csvExport">Alle Spieler als CSV exportieren</button><button data-act="csvImport">Spieler aus CSV importieren (in eigenen Verein)</button></div></div>' +
         '<div class="panel"><h2>Spielstand</h2><div class="grid"><button data-act="exportSave">Spielstand als JSON exportieren</button><button data-act="importSave">Spielstand importieren</button></div><p class="muted small">CSV-Format: Vorname;Nachname;Alter;Position;Stärke;Potenzial (Semikolon-getrennt, erste Zeile = Überschrift).</p></div></div>';
     }
@@ -278,6 +279,81 @@
       U.render();
     });
   };
+  // ---------- Echte Spielerdaten aktualisieren (CSV-Upload) ----------
+  U.pickFiles = function (accept, cb) {
+    var inp = document.createElement('input'); inp.type = 'file'; inp.accept = accept; inp.multiple = true;
+    inp.onchange = function () {
+      var list = Array.prototype.slice.call(inp.files || []), out = [], left = list.length; if (!left) return;
+      list.forEach(function (f, i) { var rd = new FileReader(); rd.onload = function () { out[i] = { name: f.name, text: rd.result }; if (--left === 0) cb(out); }; rd.onerror = function () { if (--left === 0) cb(out.filter(Boolean)); }; rd.readAsText(f, 'utf-8'); });
+    };
+    inp.click();
+  };
+  function fmtStamp(s) { return s ? s.split('-').reverse().join('.') : '–'; }
+  U.realDbPanel = function () {
+    var DI = R.dbimport; if (!DI || !D.real) return '';
+    var ov = DI.hasOverride();
+    return '<div class="panel" style="margin-bottom:14px"><h2>🔄 Echte Spielerdaten aktualisieren</h2>' +
+      '<p class="small">Aktuell: <b>' + D.real.clubs.length + ' Vereine, ' + R.fmtNum(D.real.players.length) + ' Spieler</b>, Datenstand <b>' + fmtStamp(D.real.stamp) + '</b> (' + esc(D.real.source) + ')' + (ov ? ' – <b>hochgeladene Daten</b>' : ' – mitgelieferte Daten') + '.</p>' +
+      '<p class="muted small">Nach einem Transferfenster neue CSV-Dateien wählen: entweder <b>ANPFIFF-Spieler-CSV</b> (gern zusammen mit der Vereins-CSV, beide markieren) oder die <b>Original-EA-Datei players.csv</b> (daraus werden 1. Bundesliga, 2. Bundesliga und 3. Liga übernommen). Vor dem Übernehmen siehst du eine Vorschau mit allen Änderungen.</p>' +
+      '<div class="row"><button class="primary" data-act="realDbPick">📂 CSV-Dateien wählen …</button>' + (ov ? '<button data-act="realDbReset">Mitgelieferte Daten wiederherstellen</button>' : '') + '</div></div>';
+  };
+  U.acts.realDbPick = function () {
+    U.pickFiles('.csv,text/csv,text/plain', function (files) {
+      U.realDbPending = R.dbimport.convert(files);
+      U.showRealDbPreview(U.realDbPending, false);
+    });
+  };
+  // res: Ergebnis von DI.convert; careerOnly: Daten sind schon gespeichert, nur die Karriere abgleichen
+  U.showRealDbPreview = function (res, careerOnly) {
+    var rp = res.report, st = U.st, h = '';
+    if (!careerOnly) {
+      h += '<p class="small">Erkannt: <b>' + esc(rp.format || '–') + '</b></p>';
+      if (rp.errors.length) h += '<div class="help" style="border-color:#ef4444"><b>Nicht übernommen – bitte die Datei prüfen:</b><ul class="small">' + rp.errors.slice(0, 12).map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>';
+      if (res.ok) {
+        var s = rp.stats;
+        h += '<table class="t"><tr><td>Datenstand</td><td class="num"><b>' + fmtStamp(s.stamp) + '</b></td></tr><tr><td>Vereine</td><td class="num">' + s.clubs + ' (1. Liga ' + s.leagues[1] + ' · 2. Liga ' + s.leagues[2] + ' · 3. Liga ' + s.leagues[3] + ')</td></tr><tr><td>Spieler</td><td class="num">' + R.fmtNum(s.players) + '</td></tr></table>';
+      }
+      if (rp.warnings.length) h += '<ul class="small muted" style="margin-top:8px">' + rp.warnings.slice(0, 8).map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + (rp.warnings.length > 8 ? '<li>… und ' + (rp.warnings.length - 8) + ' weitere Hinweise</li>' : '') + '</ul>';
+    }
+    var footer = '<button data-act="closeModal">' + (res.ok ? 'Abbrechen' : 'Schließen') + '</button>';
+    if (res.ok) {
+      var real = st && st.world === 'real';
+      if (real) {
+        var d = R.dbimport.applyToCareer(st, res.db, true);
+        h += '<h3 style="margin-top:12px">Änderungen in Ihrer laufenden Karriere</h3><table class="t"><tr><td>Stärke oder Position geändert</td><td class="num">' + d.updated + '</td></tr><tr><td>Vereinswechsel</td><td class="num">' + d.moved.length + '</td></tr><tr><td>Neue Spieler</td><td class="num">' + d.added + '</td></tr><tr><td>Verlassen die Liga (nicht mehr in den Daten)</td><td class="num">' + d.removed + '</td></tr><tr><td>Eigener Kader (bleibt unverändert)</td><td class="num">' + d.untouchedOwn + ' Spieler</td></tr></table>' +
+          (d.moved.length ? '<div class="small muted" style="margin-top:6px">' + d.moved.slice(0, 12).map(function (m) { return esc(m.name) + ': ' + esc(m.from) + ' → ' + esc(m.to); }).join(' · ') + (d.moved.length > 12 ? ' · …' : '') + '</div>' : '') +
+          (d.ownTargets ? '<p class="small muted">' + d.ownTargets + ' Spieler sind in Wirklichkeit zu Ihrem Verein gewechselt – sie bleiben bei ihrem bisherigen Verein und können auf dem Transfermarkt verpflichtet werden.</p>' : '') +
+          (d.unknownClubs.length ? '<p class="small muted">Vereine, die es in Ihrer Karriere nicht gibt (ihre Spieler werden vertragslos): ' + esc(d.unknownClubs.join(', ')) + '</p>' : '');
+        footer += (careerOnly ? '' : '<button data-act="realDbSaveOnly">Nur für neue Karrieren</button>') + '<button class="primary" data-act="realDbApply">' + (careerOnly ? 'In Karriere übernehmen' : 'Übernehmen (Karriere + neue Karrieren)') + '</button>';
+      } else {
+        h += '<p class="small muted" style="margin-top:10px">' + (st ? 'Ihre laufende Karriere spielt mit fiktiven Vereinen und bleibt unverändert. ' : '') + 'Die Daten gelten für jede <b>neue Karriere</b> auf diesem Gerät.</p>';
+        footer += '<button class="primary" data-act="realDbSaveOnly">Für neue Karrieren speichern</button>';
+      }
+    }
+    U.realDbPending = res;
+    U.modal(careerOnly ? 'Neue Spielerdaten übernehmen' : 'Spielerdaten aktualisieren', h, footer, true);
+  };
+  U.acts.realDbSaveOnly = function () {
+    var res = U.realDbPending; if (!res || !res.ok) return;
+    var stored = R.dbimport.saveOverride(res.db);
+    U.closeModal(); U.render();
+    U.toast(stored ? 'Neue Spielerdaten gespeichert – sie gelten für neue Karrieren.' : 'Daten übernommen, konnten aber nicht dauerhaft gespeichert werden (nur bis zum Neustart).');
+  };
+  U.acts.realDbApply = function () {
+    var res = U.realDbPending; if (!res || !res.ok) return;
+    if (res.db !== D.real) R.dbimport.saveOverride(res.db);
+    var rp = R.dbimport.applyToCareer(U.st, res.db, false);
+    U.closeModal(); if (U.autosave) U.autosave(); U.render();
+    U.toast('Spielerdaten übernommen: ' + rp.moved.length + ' Wechsel, ' + rp.added + ' neue Spieler, ' + rp.updated + ' Stärken angepasst.');
+  };
+  U.acts.realDbCareer = function () {
+    U.showRealDbPreview({ ok: true, db: D.real, report: { format: '', errors: [], warnings: [], stats: {} } }, true);
+  };
+  U.acts.realDbLater = function () { U.realDbLater = true; U.render(); };
+  U.acts.realDbReset = function () {
+    U.confirm('Mitgelieferte Daten wiederherstellen', 'Die hochgeladenen Spielerdaten auf diesem Gerät verwerfen? Neue Karrieren starten dann wieder mit den mitgelieferten Daten. Laufende Karrieren bleiben unverändert.', function () { R.dbimport.clearOverride(); U.render(); U.toast('Mitgelieferte Daten werden wieder verwendet.'); });
+  };
+
   // OCR
   U.acts.ocrPick = function () {
     U.pickFile('image/*', function (url) {

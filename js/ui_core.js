@@ -243,7 +243,7 @@
   U.screens.start = function () {
     return '<div class="title-screen"><div class="title-box"><div class="logo">ANPFIFF!<small>DER FUSSBALL GEHÖRT DIR</small><span class="logo-sub">Vom Bolzplatz zum Fußballimperium</span></div>' +
       '<div class="menu-btns">' + (U.st ? '<button class="primary" data-act="resume">▶ Weiterspielen</button>' : '') +
-      '<button class="' + (U.st ? '' : 'primary') + '" data-act="newCareer">Neue Karriere</button><button data-act="loadScreen">Spielstand laden</button><button data-act="importSave">Spielstand importieren</button></div>' +
+      '<button class="' + (U.st ? '' : 'primary') + '" data-act="newCareer">Neue Karriere</button><button data-act="loadScreen">Spielstand laden</button><button data-act="importSave">Spielstand importieren</button>' + (R.dbimport && D.real ? '<button data-act="realDbPick" title="Neue Spieler-CSV (ANPFIFF-Format oder EA-players.csv) für neue Karrieren übernehmen">🔄 Spielerdaten aktualisieren</button>' : '') + '</div>' +
       '<p class="muted small" style="margin-top:26px" id="storeInfo">' + (R.save.isNative ? '💾 Spielstände werden im iCloud-Sync-Ordner gespeichert.' : '💾 Browser-Modus: Spielstände liegen in diesem Browser. Zum Abgleich mit Mac/iPad: Speichern → „In iCloud sichern“ bzw. „Spielstand importieren“.' + (R.save.lastSync() ? ' Zuletzt in iCloud gesichert: ' + new Date(R.save.lastSync()).toLocaleString('de-DE') + '.' : '')) + '</p>' +
       '<p class="muted small">' + R.versionText(true) + '</p></div></div>';
   };

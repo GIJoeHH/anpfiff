@@ -11,10 +11,11 @@
     var trustF = Math.round(c.fanTrust != null ? c.fanTrust : 60), util = avgAtt ? Math.round(avgAtt / cap * 100) : 0;
     var posHist = U.hist(c, 'pos', 34), cashHist = U.hist(c, 'cash', 34);
     var h = '<h1>Zentrale</h1><div class="grid g4 kpi-row" style="margin-bottom:14px">' +
-      U.ikpi('trophy', 'Tabellenplatz', st.week ? pos + '. <span class="small muted">(' + row.pts + ' Pkt.)</span>' : '–', '', U.lineChart(posHist, { h: 44, color: '#f5c542', invert: true, min: 1, max: 18, empty: 'Verlauf ab dem 2. Spieltag' })) +
+      U.ikpi('trophy', 'Tabellenplatz', st.week ? pos + '. <span class="small muted">(' + row.pts + ' Pkt.)</span>' : '–', '', U.lineChart(posHist, { h: 44, color: '#f5c542', invert: true, min: 1, max: t.length, empty: 'Verlauf ab dem 2. Spieltag' })) +
       U.ikpi('coins', 'Kontostand', money(c.cash), U.moneyCls(c.cash), '<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:flex-end">' + U.moneyArt(c.cash, 76, 44) + '<div style="flex:1;min-width:0">' + U.lineChart(cashHist, { h: 44, color: c.cash < 0 ? '#ef4444' : '#22c55e', empty: '–' }) + '</div></div>') +
       U.ikpi('fans', 'Fanbasis', R.fmtNum(c.fans), '', '<div class="row between small muted"><span>Fanvertrauen</span><b class="mono" style="color:var(--text)">' + trustF + '</b></div>' + U.bar(trustF, 100, trustF < 35 ? '#ef4444' : trustF < 60 ? '#f5b301' : '#22c55e')) +
       U.ikpi('stadium', 'Ø Zuschauer', avgAtt ? R.fmtNum(avgAtt) : '–', '', '<div class="row between small muted"><span>Auslastung</span><b class="mono" style="color:var(--text)">' + (avgAtt ? util + ' %' : '–') + '</b></div>' + U.fillBar(util, util > 90 ? '#22c55e' : util > 60 ? '#f5b301' : '#ef4444')) + '</div>';
+    if (R.dbimport && R.dbimport.careerOutdated(st) && !U.realDbLater) h += '<div class="help" style="margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span>🔄 <b>Neue Spielerdaten verfügbar</b> (Stand ' + esc(D.real.stamp.split('-').reverse().join('.')) + '): Wechsel, neue Spieler und aktuelle Stärken. Ihr eigener Kader bleibt unverändert.</span><span class="tb-spacer"></span><button class="primary sm" data-act="realDbCareer">Ansehen &amp; übernehmen</button><button class="sm" data-act="realDbLater">Später</button></div>';
     h += '<div class="grid g21"><div class="grid">';
     // Posteingang
     var inbox = st.inbox.filter(function (o) { return o.type === 'offer' || o.type === 'sponsor'; });
