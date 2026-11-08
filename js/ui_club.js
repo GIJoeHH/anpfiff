@@ -6,7 +6,7 @@
   // ---------- Vereinsmanagement ----------
   U.screens.verein = function () {
     var st = U.st, c = U.club(), can = U.can('business');
-    var h = '<h1>Vereinsmanagement</h1>' + U.roleNote('business');
+    var h = '<h1 class="row" style="gap:10px">' + U.crest(c, 34) + 'Vereinsmanagement</h1>' + U.roleNote('business');
     // Sponsorenangebote
     var offers = st.inbox.filter(function (o) { return o.type === 'sponsor'; });
     if (offers.length) {
@@ -57,7 +57,7 @@
     var st = U.st, c = U.club(), tab = U.p.tab || 'stadion';
     var parts = E.capacityParts(c), att = E.attractiveness(c), tcap = E.transportCap(c);
     var avg = c.attendanceHist.length ? R.avg(c.attendanceHist) : 0;
-    var h = '<h1>' + esc(c.stadiumName) + '</h1>' + U.roleNote('business');
+    var h = '<h1 class="row" style="gap:10px">' + U.crest(c, 34) + esc(c.stadiumName) + '</h1>' + U.roleNote('business');
     h += '<div class="grid g4" style="margin-bottom:14px">' + U.ikpi('stadium', 'Kapazität', R.fmtNum(E.capacity(c))) + U.ikpi('star', 'Attraktivität', att + '/100', '', U.bar(att, 100, '#fbbf24')) + U.ikpi('traffic', 'Verkehrskapazität', R.fmtNum(tcap) + ' Fans') + U.ikpi('fans', 'Ø Zuschauer', avg ? R.fmtNum(avg) : '–', '', U.fillBar(avg ? avg / E.capacity(c) * 100 : 0)) + '</div>';
     h += '<div class="grid g21"><div>' + U.gfx.stadiumView(c) + '<p class="muted small">Tipp: Klicken Sie auf Tribünen, Flutlicht oder Videowand für Details.</p></div><div class="grid">';
     // Ticketpreise
@@ -86,7 +86,7 @@
     var keys = ['fanshop', 'restaurant', 'cafe', 'hotel', 'museum', 'eventhalle', 'erlebnis', 'gewerbe', 'solar', 'geschaeft'];
     var rev = 0, up = 0;
     keys.forEach(function (k) { rev += E.buildingRevenue(st, c, k); var l = E.level(c, k); up += l ? l.up : 0; });
-    var h = '<h1>Vereinsstadt</h1>' + U.roleNote('business') + '<div class="grid g4" style="margin-bottom:14px">' + U.ikpi('city', 'Einnahmen Betriebe', money(rev) + '/J.') + U.ikpi('debt', 'Betriebskosten', money(up) + '/J.') + U.ikpi('growth', 'Überschuss', money(rev - up) + '/J.', rev - up < 0 ? 'neg' : 'pos') + U.ikpi('energy', 'Energieersparnis', Math.round(E.energySave(c) * 100) + ' %') + '</div>';
+    var h = '<h1 class="row" style="gap:10px">' + U.crest(c, 34) + 'Vereinsstadt</h1>' + U.roleNote('business') + '<div class="grid g4" style="margin-bottom:14px">' + U.ikpi('city', 'Einnahmen Betriebe', money(rev) + '/J.') + U.ikpi('debt', 'Betriebskosten', money(up) + '/J.') + U.ikpi('growth', 'Überschuss', money(rev - up) + '/J.', rev - up < 0 ? 'neg' : 'pos') + U.ikpi('energy', 'Energieersparnis', Math.round(E.energySave(c) * 100) + ' %') + '</div>';
     h += U.gfx.cityView(c);
     h += '<div class="row" style="margin:12px 0"><label class="row"><input type="checkbox" data-chg="cityAuto"' + (c.cityAutoBuild ? ' checked' : '') + (U.can('business') ? '' : ' disabled') + '> Wirtschaftsbetriebe automatisch verwalten (KI baut rentable Betriebe selbstständig aus)</label>' +
       '<span class="muted small">Preisniveau:</span><div class="seg">' + ['Günstig', 'Normal', 'Gehoben'].map(function (l, i) { return '<button class="sm ' + ((c.cityPrice == null ? 1 : c.cityPrice) === i ? 'on' : '') + '" data-act="cityPrice" data-v="' + i + '"' + (U.can('business') ? '' : ' disabled') + '>' + l + '</button>'; }).join('') + '</div></div>';

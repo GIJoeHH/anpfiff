@@ -109,7 +109,7 @@
   // ---------- Managerkarriere ----------
   U.screens.karriere = function () {
     var st = U.st, mg = st.manager, c = U.club();
-    var h = '<h1>Managerkarriere</h1>';
+    var h = '<h1 class="row" style="gap:10px">' + (c ? U.crest(c, 34) : '') + 'Managerkarriere</h1>';
     if (mg.unemployed) {
       h += '<div class="panel" style="margin-bottom:14px;border-color:var(--amber)"><h2>Vereinslos</h2><p>Entlassungsgrund: <b>' + esc(mg.firedReason || '–') + '</b></p><p class="muted small">Die Spielwelt läuft weiter. Mit „WOCHE ABWARTEN“ kommen neue Angebote – oder bewerben Sie sich selbst.</p></div>';
       h += '<div class="panel" style="margin-bottom:14px"><h2>Stellenangebote (' + mg.offers.length + ')</h2>' + mg.offers.map(function (o, i) {
@@ -121,7 +121,7 @@
     h += '<div class="grid g2"><div class="panel"><h2>' + esc(mg.name) + '</h2><table class="t"><tr><td>Managerreputation</td><td class="num">' + mg.reputation + '/100 ' + U.bar(mg.reputation) + '</td></tr><tr><td>Aktuelle Rolle</td><td class="num">' + (c ? S.roleName(mg.role) + ' bei ' + esc(c.name) : 'vereinslos') + '</td></tr><tr><td>Saisons</td><td class="num">' + mg.seasonsPlayed + '</td></tr><tr><td>Entlassbar</td><td class="num">' + (mg.founder ? 'nein (Vereinsgründer)' : mg.canBeFired ? 'ja' : 'nein') + '</td></tr>' + (mg.lastRating ? '<tr><td>Letzte Bewertung</td><td class="num">' + esc(mg.lastRating.text) + ' (Platz ' + mg.lastRating.pos + ', ' + (mg.lastRating.delta >= 0 ? '+' : '') + mg.lastRating.delta + ')</td></tr>' : '') + '</table>' +
       (c && !mg.founder ? '<button class="danger sm" style="margin-top:10px" data-act="resign">Zurücktreten</button>' : '') +
       (c && mg.founder ? '<h3 style="margin-top:14px">Spielmodus wechseln</h3><p class="muted small">Als Präsident Ihres eigenen Vereins legen Sie fest, welche Aufgaben Sie selbst übernehmen.</p><div class="seg">' + [['manager', '👔 Manager'], ['trainer', '📋 Trainer'], ['gf', '💼 Geschäftsführer']].map(function (r) { return '<button class="' + (mg.role === r[0] ? 'on' : '') + '" data-act="setRole" data-v="' + r[0] + '">' + r[1] + '</button>'; }).join('') + '</div>' : '') + '</div>';
-    h += '<div class="panel"><h2>Stationen</h2><table class="t">' + mg.history.slice().reverse().map(function (x) { return '<tr><td>' + x.from + '–' + (x.to || 'heute') + '</td><td>' + esc(x.club) + '</td><td>' + S.roleName(x.role) + '</td><td class="small">' + (x.titles.length ? x.titles.map(esc).join(', ') : '') + (x.fired ? ' <span class="neg">entlassen</span>' : '') + '</td></tr>'; }).join('') + '</table></div></div>';
+    h += '<div class="panel"><h2>Stationen</h2><table class="t">' + mg.history.slice().reverse().map(function (x) { var hc = st.clubs[x.clubId]; return '<tr><td>' + x.from + '–' + (x.to || 'heute') + '</td><td>' + (hc ? U.crest(hc, 18) + ' ' : '') + esc(x.club) + '</td><td>' + S.roleName(x.role) + '</td><td class="small">' + (x.titles.length ? x.titles.map(esc).join(', ') : '') + (x.fired ? ' <span class="neg">entlassen</span>' : '') + '</td></tr>'; }).join('') + '</table></div></div>';
     // Achievements
     var ach = st.achievements;
     h += '<div class="panel" style="margin-top:14px"><h2>Achievements (' + Object.keys(ach).length + '/' + Object.keys(D.achievements).length + ')</h2><div class="grid g3">' + Object.keys(D.achievements).map(function (k) {
@@ -153,7 +153,7 @@
   // ---------- Editor ----------
   U.screens.editor = function () {
     var st = U.st, tab = U.p.tab || 'vereine';
-    var h = '<h1>Datenbankeditor</h1><div class="seg" style="margin-bottom:12px">' + [['vereine', 'Vereine'], ['spieler', 'Spieler'], ['sponsoren', 'Sponsoren'], ['ocr', 'Screenshot-Import (OCR)'], ['daten', 'Import / Export']].map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="tab" data-s="editor" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
+    var h = '<h1>Datenbankeditor</h1><div class="seg" style="margin-bottom:12px">' + [['vereine', 'Vereine'], ['spieler', 'Spieler'], ['sponsoren', 'Sponsoren'], ['wappen', 'Wappen'], ['ocr', 'Screenshot-Import (OCR)'], ['daten', 'Import / Export']].map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="tab" data-s="editor" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
     var clubOpts = function (sel, withNone) { return (withNone ? '<option value="">— vereinslos —</option>' : '') + Object.keys(st.clubs).map(function (k) { return st.clubs[k]; }).sort(function (a, b) { return a.league - b.league || a.name.localeCompare(b.name); }).map(function (c) { return '<option value="' + c.id + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(c.name) + ' (L' + c.league + ')</option>'; }).join(''); };
     if (tab === 'vereine') {
       var cid = U.p.cid || st.manager.clubId || 'c1', c = st.clubs[cid];
@@ -201,6 +201,7 @@
         }).join('') + '</table>' + (o.raw ? '<details style="margin-top:10px"><summary class="muted small">Erkannter Rohtext</summary><pre class="small" style="white-space:pre-wrap">' + esc(o.raw) + '</pre></details>' : '') + '</div>';
       }
     }
+    if (tab === 'wappen') h += U.crestPanel();
     if (tab === 'daten') {
       h += U.realDbPanel();
       h += '<div class="grid g2"><div class="panel"><h2>Spielerdatenbank</h2><p class="muted small">Datenbanken (Vereine &amp; Spieler) werden getrennt von Spielständen verwaltet. Importierte Daten werden vorher geprüft.</p><div class="grid"><button data-act="dbExport">Gesamtdatenbank als JSON exportieren</button><button data-act="dbImport">Datenbank (JSON) importieren</button><button data-act="csvExport">Alle Spieler als CSV exportieren</button><button data-act="csvImport">Spieler aus CSV importieren (in eigenen Verein)</button></div></div>' +
@@ -229,9 +230,9 @@
     var img = new Image(); img.onload = function () { var s = Math.min(1, max / Math.max(img.width, img.height)); var cv = document.createElement('canvas'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); cb(cv.toDataURL('image/png')); };
     img.onerror = function () { U.toast('Bild konnte nicht gelesen werden.'); }; img.src = dataUrl;
   };
-  U.acts.edCrestImg = function (d) { U.pickFile('image/*', function (url) { U.resizeImage(url, 160, function (small) { ED.updateClub(U.st, d.id, { crestImage: small }); U.render(); U.toast('Wappenbild übernommen.'); U.autosave && U.autosave(); }); }, true); };
+  U.acts.edCrestImg = function (d) { U.pickFile('image/*', function (url) { U.resizeImage(url, 160, function (small) { ED.updateClub(U.st, d.id, { crestImage: small }); var cc = U.st.clubs[d.id]; cc.crestManual = true; cc.crestSrc = null; if (R.crests) R.crests.libPut(cc); U.render(); U.toast('Wappenbild übernommen.'); U.autosave && U.autosave(); }); }, true); };
   U.acts.edCrestSet = function (d) { var f = { crestImage: null }; f[d.k] = +d.v; ED.updateClub(U.st, d.id, f); U.render(); U.autosave && U.autosave(); };
-  U.acts.edCrestDel = function (d) { ED.updateClub(U.st, d.id, { crestImage: null }); U.render(); };
+  U.acts.edCrestDel = function (d) { ED.updateClub(U.st, d.id, { crestImage: null }); var cc = U.st.clubs[d.id]; cc.crestManual = false; cc.crestSrc = null; if (R.crests) R.crests.libRemove(cc); U.render(); };
   U.acts.edClubExport = function (d) {
     var st = U.st, db = ED.exportDB(st);
     db.clubs = db.clubs.filter(function (c) { return c.id === d.id; }); db.players = db.players.filter(function (p) { return p.clubId === d.id; });
@@ -352,6 +353,95 @@
   U.acts.realDbLater = function () { U.realDbLater = true; U.render(); };
   U.acts.realDbReset = function () {
     U.confirm('Mitgelieferte Daten wiederherstellen', 'Die hochgeladenen Spielerdaten auf diesem Gerät verwerfen? Neue Karrieren starten dann wieder mit den mitgelieferten Daten. Laufende Karrieren bleiben unverändert.', function () { R.dbimport.clearOverride(); U.render(); U.toast('Mitgelieferte Daten werden wieder verwendet.'); });
+  };
+
+  // ---------- Original-Vereinswappen (OpenLigaDB) ----------
+  var CREST_STATUS = {
+    id: ['green', 'Team-ID'], exakt: ['green', 'exakt'], alias: ['green', 'Alias'], normalisiert: ['green', 'Name normalisiert'],
+    vorschlag: ['yellow', 'Vorschlag – bitte bestätigen'], mehrdeutig: ['yellow', 'mehrdeutig – bitte wählen'], liga: ['yellow', 'Liga weicht ab – bitte bestätigen'], fehlt: ['red', 'kein passender Verein']
+  };
+  function crestState(c) {
+    if (c.crestImage && c.crestSrc) return ['green', 'Original (' + esc(c.crestSrc.license || c.crestSrc.provider) + ')'];
+    if (c.crestImage) return ['yellow', 'eigenes Bild'];
+    if (c.oldbId) return ['', 'zugeordnet, neutrales Wappen'];
+    return ['', 'neutrales Wappen'];
+  }
+  U.crestPanel = function () {
+    var st = U.st, clubs = Object.keys(st.clubs).map(function (k) { return st.clubs[k]; }).sort(function (a, b) { return a.league - b.league || a.name.localeCompare(b.name, 'de'); });
+    var cnt = { 1: 0, 2: 0, 3: 0 }, withImg = 0, orig = 0, ids = 0;
+    clubs.forEach(function (c) { cnt[c.league]++; if (c.crestImage) withImg++; if (c.crestSrc) orig++; if (c.oldbId) ids++; });
+    var h = '<div class="panel" style="margin-bottom:14px"><h2>🛡️ Original-Vereinswappen</h2>' +
+      '<p class="small">Liest die Vereinslisten der 1. Bundesliga, 2. Bundesliga und 3. Liga aus der frei abrufbaren <b>OpenLigaDB</b> (Saison ' + st.season + '), ordnet sie Ihren Vereinen zu und lädt die Wappen. Vor dem Speichern sehen Sie eine Vorschau. Gespeicherte Wappen liegen im Spielstand und funktionieren danach auch offline.</p>' +
+      '<p class="muted small">Rechte: Vereinswappen sind Marken der Vereine. Frei lizenzierte Dateien (Wikimedia Commons) werden vorausgewählt; Wappen mit unklarer oder nicht freier Lizenz nur, wenn Sie bestätigen, dass Sie sie ausschließlich privat in Ihrem Spiel nutzen. Alle anderen behalten das neutrale, im Spiel erzeugte Wappen. Wappen werden nie in die veröffentlichte Web-App eingebaut.</p>' +
+      '<div class="row"><button class="primary" data-act="crestAuto">Original-Vereinswappen automatisch zuordnen</button><span class="muted small">' + clubs.length + ' Vereine (1. Liga ' + cnt[1] + ' · 2. Liga ' + cnt[2] + ' · 3. Liga ' + cnt[3] + ') · ' + orig + ' Originalwappen · ' + (withImg - orig) + ' eigene Bilder · ' + ids + ' mit OpenLigaDB-ID</span></div></div>';
+    h += '<div class="panel tight"><table class="t"><tr><th></th><th>Verein</th><th>Liga</th><th>OpenLigaDB</th><th>Wappen</th><th></th></tr>' + clubs.map(function (c) {
+      var s = crestState(c);
+      return '<tr><td>' + U.crest(c, 30) + '</td><td>' + esc(c.name) + '</td><td>' + c.league + '</td><td class="small">' + (c.oldbId ? 'ID ' + c.oldbId : '<span class="muted">–</span>') + '</td><td><span class="tag ' + s[0] + '">' + s[1] + '</span></td>' +
+        '<td style="white-space:nowrap"><button class="sm" data-act="edCrestImg" data-id="' + c.id + '" title="Eigenes Wappenbild hochladen">🖼️ Bild</button>' + (c.crestImage ? ' <button class="sm" data-act="edCrestDel" data-id="' + c.id + '" title="Neutrales Wappen verwenden">✕</button>' : '') + '</td></tr>';
+    }).join('') + '</table></div>';
+    return h;
+  };
+  function crestProgress(text) { var el = document.getElementById('crestProg'); if (el) el.textContent = text; }
+  U.acts.crestAuto = function () {
+    var st = U.st, CR = R.crests;
+    U.modal('Original-Vereinswappen', '<p id="crestProg">Lade Vereinslisten von OpenLigaDB …</p>', '<button data-act="closeModal">Abbrechen</button>');
+    CR.fetchTeams(st.season).then(function (res) {
+      var total = res.teams[1].length + res.teams[2].length + res.teams[3].length;
+      if (!total) { U.modal('Keine Verbindung', '<p>Die Vereinslisten konnten nicht geladen werden:</p><ul class="small">' + res.errors.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul><p class="small">Ihre Wappen bleiben unverändert. Sie können Wappen jederzeit einzeln über „🖼️ Bild“ importieren.</p>'); return; }
+      var m = CR.match(st, res.teams);
+      m.errors = res.errors; m.privateOk = false;
+      crestProgress('Lade und prüfe Wappen … 0/' + m.rows.filter(function (r) { return r.team; }).length);
+      CR.loadAll(m.rows, function (d, n) { crestProgress('Lade und prüfe Wappen … ' + d + '/' + n); }).then(function () {
+        m.rows.forEach(function (r) { r.sel = U.crestDefaultSel(r, false); });
+        U.crestPrev = m; U.showCrestPreview();
+      });
+    });
+  };
+  U.crestDefaultSel = function (r, privateOk) {
+    return !!(r.team && r.img && !r.needsConfirm && (r.license && r.license.free || privateOk) && !R.crests.hasManual(r.club));
+  };
+  U.showCrestPreview = function () {
+    var m = U.crestPrev, CR = R.crests, dup = CR.duplicates(m.rows.filter(function (r) { return r.sel; }));
+    var cnt = m.counts, ok = cnt[1] === 18 && cnt[2] === 18 && cnt[3] === 20;
+    var h = '<p class="small">OpenLigaDB: 1. Bundesliga <b>' + cnt[1] + '</b> · 2. Bundesliga <b>' + cnt[2] + '</b> · 3. Liga <b>' + cnt[3] + '</b> Vereine' + (ok ? ' ✔' : ' <span class="neg">(erwartet 18 / 18 / 20)</span>') + '</p>' +
+      (m.errors.length ? '<p class="small neg">Teilweise nicht geladen: ' + m.errors.map(esc).join(' · ') + '</p>' : '') +
+      (dup.length ? '<p class="small neg">Doppelt vergeben: ' + dup.map(esc).join(' · ') + '</p>' : '') +
+      '<label class="row small" style="gap:8px;margin:6px 0 10px"><input type="checkbox" data-chg="crestPrivate"' + (m.privateOk ? ' checked' : '') + '> Ich nutze die Wappen ausschließlich privat in meinem Spiel – auch Wappen mit unklarer oder nicht freier Lizenz übernehmen</label>' +
+      '<div class="scroll" style="max-height:52vh"><table class="t"><tr><th>✓</th><th>Neu</th><th>Bisher</th><th>Verein</th><th>L</th><th>OpenLigaDB</th><th>Zuordnung</th><th>Lizenz / Bild</th></tr>' + m.rows.map(function (r, i) {
+        var c = r.club, s = CREST_STATUS[r.status] || ['', r.status];
+        var cand = r.candidates && r.candidates.length && r.needsConfirm ? '<select class="sm" data-chg="crestCand" data-i="' + i + '"><option value="">– wählen –</option>' + r.candidates.map(function (t) { return '<option value="' + t.teamId + '"' + (r.team && r.team.teamId === t.teamId ? ' selected' : '') + '>' + esc(t.teamName) + '</option>'; }).join('') + '</select>' : '';
+        var img = r.img ? '<img src="' + r.img + '" style="width:30px;height:30px;object-fit:contain">' : '<span class="muted">–</span>';
+        var lic = r.team ? (r.imgError ? '<span class="neg">✘ ' + esc(r.imgError) + '</span>' : '<span class="' + (r.license.free ? 'pos' : 'warn') + '">' + esc(r.license.label) + '</span>') : '';
+        return '<tr><td><input type="checkbox" data-chg="crestSel" data-i="' + i + '"' + (r.sel ? ' checked' : '') + (r.team && r.img ? '' : ' disabled') + '></td><td>' + img + '</td><td>' + U.crest(c, 30) + (CR.hasManual(c) ? '<div class="small warn">eigenes</div>' : '') + '</td><td>' + esc(c.name) + '</td><td>' + c.league + '</td>' +
+          '<td class="small">' + (r.team ? esc(r.team.teamName) + ' <span class="muted">(' + r.team.teamId + (r.apiLeague && r.apiLeague !== c.league ? ', Liga ' + r.apiLeague : '') + ')</span>' : '') + cand + '</td><td><span class="tag ' + s[0] + '">' + s[1] + '</span></td><td class="small">' + lic + '</td></tr>';
+      }).join('') + '</table></div>' +
+      '<p class="muted small" style="margin-top:8px">Vorausgewählt sind sichere Zuordnungen mit gültigem Bild und freier Lizenz. Vorschläge und mehrdeutige Treffer übernehmen Sie, indem Sie den Verein wählen und das Häkchen setzen. Eigene Wappen werden nur ersetzt, wenn Sie sie ausdrücklich anhaken. Nicht übernommene Vereine behalten ihr bisheriges bzw. das neutrale Wappen.</p>';
+    var n = m.rows.filter(function (r) { return r.sel; }).length;
+    U.modal('Vorschau: Vereinswappen zuordnen', h, '<button data-act="closeModal">Abbrechen</button><button class="primary" data-act="crestApply"' + (dup.length ? ' disabled' : '') + '>' + n + ' Wappen übernehmen</button>', true);
+  };
+  U.acts.crestPrivate = function (d, el) { var m = U.crestPrev; m.privateOk = el.checked; m.rows.forEach(function (r) { r.sel = U.crestDefaultSel(r, m.privateOk); }); U.showCrestPreview(); };
+  U.acts.crestSel = function (d, el) { var r = U.crestPrev.rows[+d.i]; r.sel = el.checked; if (el.checked && r.needsConfirm) r.confirmed = true; U.showCrestPreview(); };
+  U.acts.crestCand = function (d, el) {
+    var r = U.crestPrev.rows[+d.i], t = r.candidates.filter(function (x) { return String(x.teamId) === el.value; })[0];
+    r.team = t || null; r.img = null; r.imgError = null; r.sel = false; r.license = t ? R.crests.license(t.teamIconUrl) : null;
+    if (!t) { U.showCrestPreview(); return; }
+    R.crests.loadImage(t.teamIconUrl).then(function (img) { r.img = img; }, function (e) { r.imgError = e.message; }).then(function () { U.showCrestPreview(); });
+  };
+  U.acts.crestApply = function () {
+    var st = U.st, m = U.crestPrev, CR = R.crests, applied = 0, idsOnly = 0, placeholder = 0, failed = [], open = [];
+    m.rows.forEach(function (r) {
+      if (r.sel && r.team && r.img) { CR.applyRow(st, r); applied++; return; }
+      // Sichere Zuordnung ohne Bildübernahme: Team-ID trotzdem dauerhaft speichern
+      if (r.team && !r.needsConfirm) { st.clubs[r.clubId].oldbId = r.team.teamId; CR.libPut(st.clubs[r.clubId]); idsOnly++; }
+      if (r.team && r.imgError) failed.push(r.club.short);
+      else if (r.needsConfirm && !r.sel) open.push(r.club.short);
+      else if (r.team && r.img && !r.sel && !CR.hasManual(r.club)) placeholder++;
+    });
+    U.crestPrev = null; if (U.autosave) U.autosave();
+    U.go('editor', { tab: 'wappen' });
+    U.modal('Wappen gespeichert', '<table class="t"><tr><td>Originalwappen übernommen</td><td class="num"><b>' + applied + '</b></td></tr><tr><td>Neutrales Wappen behalten (Lizenz nicht bestätigt oder abgewählt)</td><td class="num">' + placeholder + '</td></tr><tr><td>Bild fehlerhaft – bitte manuell importieren</td><td class="num">' + failed.length + '</td></tr><tr><td>Offen (Bestätigung fehlt)</td><td class="num">' + open.length + '</td></tr></table>' +
+      (failed.length ? '<p class="small">Fehlerhaft: ' + failed.map(esc).join(', ') + '</p>' : '') + (open.length ? '<p class="small">Offen: ' + open.map(esc).join(', ') + '</p>' : '') +
+      '<p class="muted small">Die OpenLigaDB-Team-IDs sind bei den Vereinen gespeichert. Die Wappen gelten auch für neue Karrieren auf diesem Gerät. Die Übersicht unten zeigt alle Vereine; einzelne Wappen können Sie mit „🖼️ Bild“ ersetzen oder mit „✕“ entfernen.</p>');
   };
 
   // OCR

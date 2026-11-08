@@ -113,7 +113,7 @@
       { k: 'age', l: 'Alter', num: true }, { k: 'ovr', l: 'Stärke', num: true, f: function (p) { return U.ovrBadge(p.ovr); } },
       { k: 'pot', l: 'Pot.', num: true, f: function (p) { return U.potText(p); } }
     ];
-    if (opts.club) cols.push({ k: 'club', l: 'Verein', v: function (p) { return p.clubId ? st.clubs[p.clubId].short : 'zzz'; }, f: function (p) { return p.clubId ? esc(st.clubs[p.clubId].short) + ' <span class="muted small">L' + st.clubs[p.clubId].league + '</span>' : '<span class="tag green">vereinslos</span>'; } });
+    if (opts.club) cols.push({ k: 'club', l: 'Verein', v: function (p) { return p.clubId ? st.clubs[p.clubId].short : 'zzz'; }, f: function (p) { return p.clubId ? U.crest(st.clubs[p.clubId], 16) + ' ' + esc(st.clubs[p.clubId].short) + ' <span class="muted small">L' + st.clubs[p.clubId].league + '</span>' : '<span class="tag green">vereinslos</span>'; } });
     if (!opts.market) cols.push({ k: 'form', l: 'Form', num: true, f: function (p) { return p.form.toFixed(1); } }, { k: 'fitness', l: 'Fitness', v: function (p) { return p.fitness; }, f: function (p) { return U.bar(p.fitness, 100, p.fitness < 70 ? '#f5b301' : null); } }, { k: 'morale', l: 'Moral', num: true, f: function (p) { return Math.round(p.morale); } });
     cols.push({ k: 'value', l: 'Marktwert', num: true, f: function (p) { return money(p.value); } }, { k: 'wage', l: 'Gehalt', num: true, f: function (p) { return money(p.wage); } }, { k: 'contract', l: 'Vertr.', num: true });
     if (!opts.market) cols.push({ k: 'goals', l: 'Tore', num: true, v: function (p) { return p.stats.goals; }, f: function (p) { return p.stats.goals; } }, { k: 'apps', l: 'Sp.', num: true, v: function (p) { return p.stats.apps; }, f: function (p) { return p.stats.apps; } });
