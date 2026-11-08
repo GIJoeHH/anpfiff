@@ -245,7 +245,7 @@
       '<div class="menu-btns">' + (U.st ? '<button class="primary" data-act="resume">▶ Weiterspielen</button>' : '') +
       '<button class="' + (U.st ? '' : 'primary') + '" data-act="newCareer">Neue Karriere</button><button data-act="loadScreen">Spielstand laden</button><button data-act="importSave">Spielstand importieren</button></div>' +
       '<p class="muted small" style="margin-top:26px" id="storeInfo">' + (R.save.isNative ? '💾 Spielstände werden im iCloud-Sync-Ordner gespeichert.' : '💾 Browser-Modus: Spielstände liegen in diesem Browser. Zum Abgleich mit Mac/iPad: Speichern → „In iCloud sichern“ bzw. „Spielstand importieren“.' + (R.save.lastSync() ? ' Zuletzt in iCloud gesichert: ' + new Date(R.save.lastSync()).toLocaleString('de-DE') + '.' : '')) + '</p>' +
-      '<p class="muted small">Version 1.0 · ' + R.save.platform() + '</p></div></div>';
+      '<p class="muted small">' + R.versionText(true) + '</p></div></div>';
   };
   U.acts.resume = function () { U.go('zentrale'); };
   U.acts.newCareer = function () { U.wiz = { step: 1, mode: null, world: W.hasRealWorld() ? 'real' : 'fiktiv', difficulty: 'normal', role: 'manager', canBeFired: true, name: 'Daniel', seed: Date.now() % 2147483647, nc: { name: 'FC Neustadt 2026', short: 'Neustadt', city: 'Neustadt', color1: '#16a34a', color2: '#ffffff', stadium: 'Sportpark am Bahndamm', capital: 1500000, crestShape: 0, crestSymbol: 1 } }; U.go('wizard'); };
