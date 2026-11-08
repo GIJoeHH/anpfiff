@@ -210,6 +210,7 @@
     h += U.bankHero(st, c);
     h += '<div class="seg" style="margin-bottom:12px">' + [['bank', 'Kredite & Tagesgeld'], ['aktien', 'Aktienmarkt'], ['krypto', 'Kryptowährungen'], ['bilanz', 'Finanzbericht']].map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="tab" data-s="bank" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
     if (tab === 'bank') {
+      h += U.forecastPanel(st, c, false);
       var rate = E.loanRate(st, c), lim = E.creditLimit(st, c);
       h += '<div class="grid g2"><div class="panel"><h2>Kredite</h2><table class="t"><tr><td>Zinskosten/Jahr</td><td class="num neg">' + money(R.sum(c.loans, function (l) { return l.amount * l.rate; })) + '</td></tr></table>' +
         (can ? '<div class="row" style="margin-top:10px"><input type="number" id="loanAmt" placeholder="Betrag in €" step="100000" style="width:150px"><button class="primary" data-act="loanTake">Kredit aufnehmen</button><button data-act="loanRepay">Tilgen</button><button data-act="loanRepayAll">Alles zurückzahlen</button></div>' : '') +
@@ -224,7 +225,7 @@
       h += '<div class="row" style="margin-bottom:12px;gap:10px"><div class="help" style="flex:1;margin:0">' + (tab === 'aktien' ? '📈 Fiktiver Aktienmarkt – Kurse ändern sich wöchentlich, 0,5 % Gebühr pro Kauf/Verkauf. Börsencrashs kommen in unregelmäßigen Abständen und drücken alle Kurse – danach erholen sie sich meist langsam.' : '🪙 Fiktive Kryptowährungen – extrem schwankend: Kurssprünge, Crashs und Spekulationsblasen jederzeit möglich. Kein Echtgeld.') + '</div>' +
         '<div class="seg">' + [[26, '6 Mon.'], [52, '1 Jahr'], [104, '2 Jahre']].map(function (x) { return '<button class="sm ' + (range === x[0] ? 'on' : '') + '" data-act="chartRange" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div><div class="grid g2">';
       defs.forEach(function (sd) {
-        var m = mk[sd.id], pf = c.portfolio[sd.id], hist = m.hist.slice(-range), first = hist[0], chg = (m.price / first - 1) * 100;
+        var m = mk[sd.id], pf = c.portfolio[sd.id], hist = m.hist.slice(-range - 1), first = hist[0], chg = (m.price / first - 1) * 100;
         var val = pf ? pf.qty * m.price : 0, buyIn = pf ? pf.cost / pf.qty : null;
         var bvb = sd.club ? E.bvbClub(st) : null, stake = sd.club ? E.bvbStake(st, c) : 0;
         if (sd.club && (!bvb || bvb.id === c.id)) return;
@@ -238,14 +239,43 @@
       });
       h += '</div>';
     }
-    if (tab === 'bilanz') h += U.financeReport(c);
+    if (tab === 'bilanz') h += U.forecastPanel(st, c, true) + U.financeReport(c);
     return h;
+  };
+  // Bilanzprognose bis Saisonende
+  U.forecastPanel = function (st, c, full) {
+    var f = E.forecast(st, c);
+    var past = (c.hist || []).filter(function (x) { return x.s === st.season && x.cash != null; }).map(function (x) { return x.cash; });
+    if (past.length && Math.abs(past[past.length - 1] - c.cash) > 1) past.push(c.cash); // Änderungen seit dem letzten Spieltag
+    var diff = f.endCash - c.cash;
+    var h = '<div class="panel forecast" style="margin-bottom:14px"><div class="panel-h"><h2>📊 Bilanzprognose bis Saisonende</h2><span class="muted small">' +
+      (f.weeksLeft ? 'noch ' + f.weeksLeft + ' Spielwochen · ' + f.homeGames + ' Heimspiele' : 'Saison beendet') + '</span></div>';
+    h += '<div class="grid g4" style="margin-bottom:10px">' +
+      U.ikpi('bank', 'Kontostand heute', money(c.cash), U.moneyCls(c.cash)) +
+      U.ikpi('growth', 'Erw. Einnahmen', '+' + money(f.income), 'pos') +
+      U.ikpi('debt', 'Erw. Ausgaben', money(f.expense), 'neg') +
+      U.ikpi(f.endCash < 0 ? 'debt' : 'piggy', 'Prognose Saisonende', money(f.endCash), f.endCash < 0 ? 'neg' : 'pos', '<div class="small ' + (diff < 0 ? 'neg' : 'pos') + '">' + (diff >= 0 ? '▲ +' : '▼ ') + money(diff) + '</div>') + '</div>';
+    h += U.forecastChart(past, f.path, { h: full ? 200 : 160 });
+    if (f.endCash < 0) h += '<div class="small neg" style="margin-top:6px">⚠ Ohne Gegenmaßnahmen rutscht das Konto bis Saisonende ins Minus – Dispozinsen (12 %) und am Saisonende Punktabzug drohen.</div>';
+    if (full) {
+      var keys = Object.keys(f.lines).filter(function (k) { return Math.round(f.lines[k]) !== 0; });
+      var inc = keys.filter(function (k) { return f.lines[k] > 0; }).sort(function (a, b) { return f.lines[b] - f.lines[a]; });
+      var exp = keys.filter(function (k) { return f.lines[k] < 0; }).sort(function (a, b) { return f.lines[a] - f.lines[b]; });
+      var mx = Math.max(f.income, -f.expense) || 1;
+      h += '<div class="grid g2" style="margin-top:12px"><div><h3 class="pos">Noch zu erwarten: Einnahmen <span class="mono">' + money(f.income) + '</span></h3>' + U.hbars(inc.map(function (k) { return { k: k, v: f.lines[k] }; }), mx, '#22c55e') + '</div>' +
+        '<div><h3 class="neg">Noch zu erwarten: Ausgaben <span class="mono">' + money(f.expense) + '</span></h3>' + U.hbars(exp.map(function (k) { return { k: k, v: f.lines[k] }; }), mx, '#ef4444') + '</div></div>';
+      h += '<p class="muted small" style="margin-top:8px">Hochrechnung mit den aktuellen Gehältern, Sponsoren, Eintrittspreisen und Gegnern; Liga-Prämie und Sponsorenboni nach aktuellem Tabellenplatz (' + f.pos + '.). Nicht enthalten: Pokalspiele, Transfers, neue Bauprojekte und Kursänderungen bei Aktien/Krypto.</p>';
+    } else h += '<div class="row between small" style="margin-top:6px"><span class="muted">Einnahmen, Ausgaben und Details im Finanzbericht</span><button class="sm" data-act="tab" data-s="bank" data-tab="bilanz">Details ›</button></div>';
+    return h + '</div>';
   };
   U.acts.chartRange = function (d) { U.p.range = +d.v; U.render(); };
   // Kursdiagramm: Fläche, Linie, Achsen, Einstiegslinie, Crash-/Übernahme-Markierungen
   U.priceChart = function (m, o) {
     o = o || {}; var W_ = 560, H = o.h || 170, L = 58, Rr = 10, T = 12, B = 22;
-    var all = m.hist, off = Math.max(0, all.length - (o.range || 52)), hist = all.slice(off);
+    // Tageskurse (5 je Spielwoche), falls vorhanden – sonst Wochenkurse
+    var TK = m.ticks && m.ticks.length === m.hist.length * E.TICKS ? E.TICKS : 1, all = TK > 1 ? m.ticks : m.hist;
+    var weeks = Math.min(o.range || 52, m.hist.length), off = Math.max(0, all.length - weeks * TK), hist = all.slice(off);
+    if (TK > 1 && Math.abs(hist[hist.length - 1] - m.price) > 1e-9) hist = hist.concat([m.price]); // Kursänderung durch eigene Käufe
     if (hist.length < 2) hist = [hist[0] || m.price, m.price];
     var vals = hist.concat(o.buyIn ? [o.buyIn] : []), mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
     if (mx - mn < mx * 0.02) { mx *= 1.01; mn *= 0.99; }
@@ -255,10 +285,10 @@
     var pts = hist.map(function (v, i) { return x(i).toFixed(1) + ',' + y(v).toFixed(1); }).join(' ');
     var svg = '<svg viewBox="0 0 ' + W_ + ' ' + H + '"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + col + '" stop-opacity=".35"/><stop offset="1" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>';
     for (var g = 0; g <= 3; g++) { var gv = mn + (mx - mn) * g / 3, gy = y(gv); svg += '<line x1="' + L + '" y1="' + gy.toFixed(1) + '" x2="' + (W_ - Rr) + '" y2="' + gy.toFixed(1) + '" stroke="#2a3b60" stroke-width="1"/><text x="' + (L - 6) + '" y="' + (gy + 4).toFixed(1) + '" font-size="13" fill="#9fb0d0" text-anchor="end">' + U.fmtPrice(gv).replace(' €', '') + '</text>'; }
-    var n = hist.length; [[0, 'vor ' + (n - 1) + ' Wo.'], [Math.floor((n - 1) / 2), ''], [n - 1, 'heute']].forEach(function (t) { if (t[1]) svg += '<text x="' + x(t[0]).toFixed(1) + '" y="' + (H - 5) + '" font-size="12" fill="#9fb0d0" text-anchor="' + (t[0] === 0 ? 'start' : 'end') + '">' + t[1] + '</text>'; });
-    svg += '<polygon points="' + x(0).toFixed(1) + ',' + (H - B) + ' ' + pts + ' ' + x(n - 1).toFixed(1) + ',' + (H - B) + '" fill="url(#' + id + ')"/><polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round"/>';
+    var n = hist.length; [[0, 'vor ' + weeks + ' Wo.'], [Math.floor((n - 1) / 2), ''], [n - 1, 'heute']].forEach(function (t) { if (t[1]) svg += '<text x="' + x(t[0]).toFixed(1) + '" y="' + (H - 5) + '" font-size="12" fill="#9fb0d0" text-anchor="' + (t[0] === 0 ? 'start' : 'end') + '">' + t[1] + '</text>'; });
+    svg += '<polygon points="' + x(0).toFixed(1) + ',' + (H - B) + ' ' + pts + ' ' + x(n - 1).toFixed(1) + ',' + (H - B) + '" fill="url(#' + id + ')"/><polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="' + (TK > 1 ? 1.6 : 2) + '" stroke-linejoin="round"/>';
     if (o.buyIn) { var by = y(o.buyIn); svg += '<line x1="' + L + '" y1="' + by.toFixed(1) + '" x2="' + (W_ - Rr) + '" y2="' + by.toFixed(1) + '" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5 4"/><text x="' + (L + 4) + '" y="' + (by - 4).toFixed(1) + '" font-size="12" fill="#fbbf24">Ihr Einstieg ' + U.fmtPrice(o.buyIn) + '</text>'; }
-    (m.marks || []).forEach(function (k) { var i = k.i - off; if (i < 0 || i >= n) return; var mx_ = x(i), my = y(hist[i]); svg += '<circle cx="' + mx_.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="4.5" fill="#ef4444" stroke="#fff" stroke-width="1.5"/><text x="' + mx_.toFixed(1) + '" y="' + Math.min(H - B - 4, my + 16).toFixed(1) + '" font-size="12" font-weight="700" fill="#fca5a5" text-anchor="middle">' + esc(k.t) + '</text>'; });
+    (m.marks || []).forEach(function (k) { var i = k.i * TK + TK - 1 - off; if (i < 0 || i >= n) return; var mx_ = x(i), my = y(hist[i]); svg += '<circle cx="' + mx_.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="4.5" fill="#ef4444" stroke="#fff" stroke-width="1.5"/><text x="' + mx_.toFixed(1) + '" y="' + Math.min(H - B - 4, my + 16).toFixed(1) + '" font-size="12" font-weight="700" fill="#fca5a5" text-anchor="middle">' + esc(k.t) + '</text>'; });
     svg += '<circle cx="' + x(n - 1).toFixed(1) + '" cy="' + y(hist[n - 1]).toFixed(1) + '" r="4" fill="' + col + '"/></svg>';
     return '<div class="chart-box">' + svg + '</div>';
   };

@@ -277,10 +277,41 @@
     for (var w = 0; w < 51; w++) { var g = (rnd() + rnd() + rnd() - 1.5) * 1.4; p = p / Math.exp(s.drift + s.vol * g); out.unshift(p); }
     return out;
   };
+  E.TICKS = 5; // Handelstage pro Spielwoche (für die Kurscharts)
+  // Kleiner eigener Zufallsgenerator (verändert den Spielzufall nicht)
+  function mrng(str) {
+    var x = 2166136261; for (var i = 0; i < str.length; i++) { x ^= str.charCodeAt(i); x = Math.imul(x, 16777619) >>> 0; } x = x || 1;
+    return function () { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+  }
+  function mgauss(rnd) { return (rnd() + rnd() + rnd() + rnd() - 2) * 1.732; }
+  // Tagesverlauf zwischen zwei Wochenkursen (Brownsche Brücke im Log-Raum, endet genau beim Wochenkurs)
+  E.dayTicks = function (a, b, vol, rnd) {
+    var n = E.TICKS, sd = vol * 0.8 / Math.sqrt(n), walk = [0], out = [];
+    for (var i = 1; i <= n; i++) walk.push(walk[i - 1] + sd * mgauss(rnd));
+    var la = Math.log(a), lb = Math.log(b);
+    for (var j = 1; j <= n; j++) { var t = j / n; out.push(+Math.exp(la + (lb - la) * t + walk[j] - t * walk[n]).toPrecision(6)); }
+    return out;
+  };
+  E.buildTicks = function (s, m, salt) {
+    var rnd = mrng(s.id + ':' + salt), t = [];
+    for (var i = 0; i < m.hist.length; i++) t = t.concat(E.dayTicks(i ? m.hist[i - 1] : m.hist[0] * Math.exp(s.vol * mgauss(rnd) * 0.5), m.hist[i], s.vol, rnd));
+    m.ticks = t;
+  };
   E.ensureMarkets = function (st) {
     st.market = st.market || { stocks: {}, crypto: {} };
-    D.stocks.forEach(function (s) { if (!st.market.stocks[s.id]) st.market.stocks[s.id] = { price: s.price, hist: E.seedHist(s, st.seed) }; });
-    D.cryptos.forEach(function (s) { if (!st.market.crypto[s.id]) st.market.crypto[s.id] = { price: s.price, hist: E.seedHist(s, st.seed) }; });
+    function fix(s, bucket) {
+      var m = bucket[s.id];
+      if (!m) m = bucket[s.id] = { price: s.price, hist: E.seedHist(s, st.seed) };
+      // Kurze Kurshistorie (ältere Spielstände): Vorgeschichte ergänzen, die beim ersten bekannten Kurs endet
+      if (m.hist.length < 52 && !m.backfilled) {
+        var pre = E.seedHist({ id: s.id, price: m.hist[0] || m.price, vol: s.vol, drift: s.drift }, st.seed).slice(0, 52 - m.hist.length);
+        m.hist = pre.concat(m.hist); if (m.marks) m.marks.forEach(function (k) { k.i += pre.length; });
+        m.backfilled = true; m.ticks = null;
+      }
+      if (!m.ticks || m.ticks.length !== m.hist.length * E.TICKS) E.buildTicks(s, m, st.seed);
+    }
+    D.stocks.forEach(function (s) { fix(s, st.market.stocks); });
+    D.cryptos.forEach(function (s) { fix(s, st.market.crypto); });
   };
   // Verein hinter der Vereinsaktie (echte Welt: Borussia Dortmund, fiktive Welt: Verein aus Dortmund)
   E.bvbClub = function (st) {
@@ -289,9 +320,11 @@
     return null;
   };
   // Neuen Kurs anhängen; marks = besondere Ereignisse (Crash, Übernahme) für die Chartanzeige
-  E.marketPush = function (m, mark) {
+  E.marketPush = function (m, mark, st, sym) {
+    var prev = m.hist[m.hist.length - 1] || m.price, def = sym && E.marketDef(sym);
     m.hist.push(m.price);
-    if (m.hist.length > E.HIST) { m.hist.shift(); if (m.marks) { m.marks.forEach(function (k) { k.i--; }); m.marks = m.marks.filter(function (k) { return k.i >= 0; }); } }
+    if (m.ticks) m.ticks = m.ticks.concat(E.dayTicks(prev, m.price, def ? def.vol : 0.05, mrng((sym || '') + ':' + (st ? st.seed + ':' + st.season + ':' + st.week + ':' + m.hist.length : m.hist.length))));
+    if (m.hist.length > E.HIST) { m.hist.shift(); if (m.ticks) m.ticks.splice(0, E.TICKS); if (m.marks) { m.marks.forEach(function (k) { k.i--; }); m.marks = m.marks.filter(function (k) { return k.i >= 0; }); } }
     if (mark) { m.marks = m.marks || []; m.marks.push({ i: m.hist.length - 1, t: mark }); }
   };
   E.updateMarkets = function (st) {
@@ -313,7 +346,7 @@
         if (bvb.form && bvb.form.length) r += bvb.form[bvb.form.length - 1] === 'S' ? 0.01 : bvb.form[bvb.form.length - 1] === 'N' ? -0.01 : 0;
       }
       m.price = Math.max(s.club ? 0.2 : 0.5, m.price * Math.exp(r));
-      E.marketPush(m, crash ? 'Crash' : null);
+      E.marketPush(m, crash ? 'Crash' : null, st, s.id);
     });
     D.cryptos.forEach(function (s) {
       var m = st.market.crypto[s.id];
@@ -324,7 +357,7 @@
       r -= 0.02 * Math.log(m.price / s.price);
       if (crash) r -= crash * R.randRange(1.2, 1.8);
       m.price = Math.max(0.0005, m.price * Math.exp(r));
-      E.marketPush(m, crash ? 'Crash' : null);
+      E.marketPush(m, crash ? 'Crash' : null, st, s.id);
     });
     st.savingsRate = R.clamp(st.savingsRate + R.gauss(0, 0.001), 0.005, 0.04);
   };
@@ -365,7 +398,7 @@
     var cash = Math.max(0, Math.round(bv.cash + bv.savings));
     club.cash += cash; E.book(club, 'Übernahme ' + bv.short, cash); bv.cash = 0; bv.savings = 0;
     // Aktien bleiben als Beteiligung bestehen, der Kurs bricht ein
-    var m = st.market.stocks.BVB; m.price *= 0.35; E.marketPush(m, 'Übernahme');
+    var m = st.market.stocks.BVB; m.price *= 0.35; E.marketPush(m, 'Übernahme', st, 'BVB');
     bv.takenOverBy = club.id; bv.forcedRelegation = true; bv.reputation = Math.max(10, bv.reputation - 25);
     bv.history.push({ season: st.season, type: 'abstieg', text: 'Übernahme durch ' + club.name + ' – Zwangsabstieg zum Saisonende' });
     // Damit der Spielbetrieb weiterläuft: Notkader aus Amateuren
@@ -417,6 +450,13 @@
 
   // Wöchentliche Finanzen (laufende Einnahmen/Ausgaben, ohne Spieltagseinnahmen)
   E.weeklyFinance = function (st, club) {
+    var r = E.weeklyLines(st, club), total = 0;
+    Object.keys(r).forEach(function (k) { total += r[k]; E.book(club, k, r[k]); });
+    club.cash += total;
+    return { lines: r, total: total };
+  };
+  // Laufende Wochenposten (ohne Buchung) – Grundlage für Buchung und Prognose
+  E.weeklyLines = function (st, club) {
     var n = E.WEEKS, diff = W.diffSettings[st.settings.difficulty];
     var costF = club.userControlled ? (0.9 + 0.1 * diff.econ) : 1;
     var lines = {};
@@ -438,10 +478,47 @@
     if (debt > 0) add('Kreditzinsen', -R.sum(club.loans, function (l) { return l.amount * l.rate; }) / n);
     if (club.cash < 0) add('Dispozinsen', club.cash * 0.12 / n);
     if (club.savings > 0) add('Zinserträge', club.savings * st.savingsRate / n);
-    var total = 0;
-    Object.keys(lines).forEach(function (k) { lines[k] = Math.round(lines[k]); total += lines[k]; E.book(club, k, lines[k]); });
-    club.cash += total;
-    return { lines: lines, total: total };
+    Object.keys(lines).forEach(function (k) { lines[k] = Math.round(lines[k]); });
+    return lines;
+  };
+
+  // Bilanzprognose bis Saisonende: laufende Posten × Restwochen, Heimspiel-Einnahmen der restlichen
+  // Ligaspiele (aktuelle Preise, Nachfrage und Gegner), Liga-Prämie und Sponsorenboni nach aktuellem Tabellenplatz.
+  // Nicht enthalten: Pokal, Transfers, neue Bauprojekte, Kursänderungen.
+  E.forecast = function (st, club) {
+    var S = R.season, total = S.SEASON_WEEKS;
+    var from = st.phase === 'preseason' ? 0 : st.phase === 'season' ? st.week : total;
+    var weekly = E.weeklyLines(st, club), wk = 0;
+    Object.keys(weekly).forEach(function (k) { wk += weekly[k]; });
+    var lines = {}, path = [club.cash], cash = club.cash, homeGames = 0;
+    function add(k, v) { lines[k] = (lines[k] || 0) + v; }
+    for (var w = from + 1; w <= total; w++) {
+      Object.keys(weekly).forEach(function (k) { add(k, weekly[k]); });
+      var wkCash = wk;
+      if (st.leagues[club.league]) S.roundsOf(st, club.league, w).forEach(function (r) {
+        (st.leagues[club.league].fixtures[r] || []).forEach(function (f) {
+          if (f.h !== club.id) return;
+          var a = E.attendance(st, club, st.clubs[f.a], 'league'), t = Math.round(a.ticket), g = Math.round(a.cater), pk = Math.round(a.parking);
+          add('Eintrittsgelder', t); add('Stadiongastronomie', g); add('Parkgebühren', pk);
+          wkCash += t + g + pk; homeGames++;
+        });
+      });
+      cash += wkCash; path.push(cash);
+    }
+    // Saisonende
+    var pos = E.leaguePos(st, club), lg = st.leagues[club.league], n = lg ? lg.clubIds.length : 18, end = 0;
+    var pr = S.LEAGUE_PRIZE[club.league];
+    if (pr && from < total + 1) {
+      var prize = Math.round(pr[0] - (pr[0] - pr[1]) * (pos - 1) / Math.max(1, n - 1)); add('Prämien', prize); end += prize;
+      club.sponsors.forEach(function (s) {
+        var b = 0; if (pos <= s.topN) b += s.bonusTop || 0; if (pos === 1 && club.league === 1) b += s.bonusTitle || 0; if (club.league > 1 && pos <= 2) b += s.bonusPromo || 0;
+        if (b) { add('Sponsorenboni', b); end += b; }
+      });
+    }
+    if (end) { cash += end; path.push(cash); }
+    var inc = 0, exp = 0;
+    Object.keys(lines).forEach(function (k) { if (lines[k] > 0) inc += lines[k]; else exp += lines[k]; });
+    return { weeksLeft: Math.max(0, total - from), from: from, homeGames: homeGames, lines: lines, income: inc, expense: exp, endCash: cash, path: path, pos: pos, seasonEnd: end };
   };
 
   E.matchdayIncome = function (st, club, att) {

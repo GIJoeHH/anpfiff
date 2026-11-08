@@ -79,6 +79,37 @@
     if (opts.fmt) s += '<div class="row between small muted" style="margin-top:2px"><span>' + (opts.leftLabel || '') + '</span><span>' + (opts.invert ? 'Bester: ' + opts.fmt(rmn) : 'Tief ' + opts.fmt(rmn) + ' · Hoch ' + opts.fmt(rmx) + ' · Jetzt ' + opts.fmt(vals[vals.length - 1])) + '</span></div>';
     return s;
   };
+  // ---------- Bilanzprognose: Kontostand bisher (durchgezogen) + Prognose bis Saisonende (gestrichelt) ----------
+  U.forecastChart = function (past, future, opts) {
+    opts = opts || {}; var w = 640, h = opts.h || 190, L = 84, Rr = 14, T = 14, B = 24;
+    past = past.filter(function (v) { return v != null && !isNaN(v); });
+    if (!past.length) past = [future[0]];
+    var all = past.concat(future.slice(1)), n = all.length, k = past.length - 1;
+    var mn = Math.min.apply(null, all), mx = Math.max.apply(null, all);
+    if (mn < 0 && mx > 0) { /* Nulllinie sichtbar */ } else if (mx - mn < Math.abs(mx) * 0.1) { var c0 = (mx + mn) / 2, r0 = Math.max(Math.abs(c0) * 0.06, 50000); mn = c0 - r0; mx = c0 + r0; }
+    var pd = (mx - mn) * 0.1; mx += pd; mn -= pd;
+    function X(i) { return L + (w - L - Rr) * i / Math.max(1, n - 1); }
+    function Y(v) { return T + (h - T - B) * (1 - (v - mn) / (mx - mn)); }
+    var end = all[n - 1], col = end < 0 ? '#ef4444' : end >= past[k] ? '#22c55e' : '#f5b301', id = 'fc' + (uid++);
+    var s = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;display:block"><defs><linearGradient id="' + id + '" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="' + col + '" stop-opacity=".28"/><stop offset="1" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>';
+    for (var g = 0; g <= 3; g++) { var gv = mn + (mx - mn) * g / 3; s += '<line x1="' + L + '" x2="' + (w - Rr) + '" y1="' + f1(Y(gv)) + '" y2="' + f1(Y(gv)) + '" stroke="#2a3b60"/><text x="' + (L - 6) + '" y="' + f1(Y(gv) + 4) + '" font-size="12" fill="#9fb0d0" text-anchor="end">' + esc(R.fmtMoney(gv)) + '</text>'; }
+    if (mn < 0 && mx > 0) s += '<line x1="' + L + '" x2="' + (w - Rr) + '" y1="' + f1(Y(0)) + '" y2="' + f1(Y(0)) + '" stroke="#ef4444" stroke-dasharray="4 3"/><text x="' + (w - Rr - 4) + '" y="' + f1(Y(0) - 4) + '" font-size="11" fill="#fca5a5" text-anchor="end">0 €</text>';
+    // Zukunftsbereich hinterlegen
+    s += '<rect x="' + f1(X(k)) + '" y="' + T + '" width="' + f1(X(n - 1) - X(k)) + '" height="' + (h - T - B) + '" fill="rgba(245,179,1,.05)"/>';
+    var pp = past.map(function (v, i) { return f1(X(i)) + ',' + f1(Y(v)); }).join(' ');
+    var fp = all.slice(k).map(function (v, i) { return f1(X(k + i)) + ',' + f1(Y(v)); }).join(' ');
+    var base = f1(Y(mn < 0 && mx > 0 ? 0 : mn));
+    s += '<polygon points="' + f1(X(k)) + ',' + base + ' ' + fp + ' ' + f1(X(n - 1)) + ',' + base + '" fill="url(#' + id + ')"/>';
+    if (past.length > 1) s += '<polyline points="' + pp + '" fill="none" stroke="#7dd3fc" stroke-width="2.2" stroke-linejoin="round"/>';
+    s += '<polyline points="' + fp + '" fill="none" stroke="' + col + '" stroke-width="2.4" stroke-dasharray="7 5" stroke-linejoin="round"/>';
+    s += '<line x1="' + f1(X(k)) + '" x2="' + f1(X(k)) + '" y1="' + T + '" y2="' + (h - B) + '" stroke="#e6ecf7" stroke-opacity=".35"/>';
+    s += '<circle cx="' + f1(X(k)) + '" cy="' + f1(Y(past[k])) + '" r="4.5" fill="#7dd3fc" stroke="#0b1220" stroke-width="1.5"/>';
+    s += '<circle cx="' + f1(X(n - 1)) + '" cy="' + f1(Y(end)) + '" r="5" fill="' + col + '" stroke="#0b1220" stroke-width="1.5"/>';
+    s += '<text x="' + f1(X(k)) + '" y="' + (h - 7) + '" font-size="12" fill="#e6ecf7" text-anchor="' + (k === 0 ? 'start' : 'middle') + '">heute</text>';
+    if (k > 0) s += '<text x="' + L + '" y="' + (h - 7) + '" font-size="12" fill="#9fb0d0">' + esc(opts.startLabel || 'Saisonstart') + '</text>';
+    s += '<text x="' + (w - Rr) + '" y="' + (h - 7) + '" font-size="12" fill="' + col + '" text-anchor="end" font-weight="700">Saisonende</text>';
+    return '<div class="chart-box">' + s + '</svg></div>';
+  };
   // ---------- Balken (horizontal, für Finanzbericht) ----------
   U.hbars = function (items, total, col) {
     return items.map(function (it) {
