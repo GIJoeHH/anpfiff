@@ -140,8 +140,23 @@
   };
   E.wageTotal = function (st, club) {
     var w = 0; for (var id in st.players) { var p = st.players[id]; if (p.clubId === club.id) w += p.wage; }
-    return w + (club.coach ? club.coach.wage : 0);
+    return w + (club.coach ? club.coach.wage : 0) + E.staffWages(club);
   };
+  // Trainerstab
+  E.staffLvl = function (club, k) { return club && club.staff && club.staff[k] ? club.staff[k].lvl : 0; };
+  E.staffWageFor = function (club, lvl) { return Math.round(D.staffWage.factor[lvl] * D.staffWage.base[club.league] / 1000) * 1000; };
+  E.staffWages = function (club) { var w = 0; if (club.staff) Object.keys(club.staff).forEach(function (k) { w += club.staff[k].wage || 0; }); return w; };
+  E.setStaff = function (st, club, k, lvl) {
+    if (!D.staff[k] || lvl < 0 || lvl > 3) return { ok: false };
+    club.staff = club.staff || {};
+    var cur = club.staff[k];
+    if (cur && cur.lvl > 0 && lvl !== cur.lvl) { var comp = Math.round(cur.wage * 0.25); club.cash -= comp; E.book(club, 'Abfindungen', -comp); }
+    if (!lvl) { delete club.staff[k]; return { ok: true }; }
+    club.staff[k] = { lvl: lvl, wage: E.staffWageFor(club, lvl), name: R.pick(D.firstNames) + ' ' + R.pick(D.lastNames) };
+    return { ok: true, s: club.staff[k] };
+  };
+  // Verletzungsrisiko-Faktor durch Fitnesstrainer und Ernährungsberater
+  E.injuryStaffF = function (club) { return 1 - E.staffLvl(club, 'fitness') * 0.05 - E.staffLvl(club, 'ernaehrung') * 0.03; };
   E.sponsorTotal = function (club) { return R.sum(club.sponsors, function (s) { return s.amount; }); };
 
   // Wirtschaftlichkeitsrechnung vor einem Ausbau
@@ -252,13 +267,53 @@
   // Märkte
   E.marketDef = function (sym) { return D.stocks.concat(D.cryptos).filter(function (s) { return s.id === sym; })[0]; };
   E.price = function (st, sym) { var m = st.market.stocks[sym] || st.market.crypto[sym]; return m ? m.price : 0; };
+  E.HIST = 104; // Kursverlauf: zwei Jahre (Wochenwerte)
+  // Fehlende Märkte ergänzen (ältere Spielstände, neue Werte wie die BVB-Aktie)
+  // Vorgeschichte eines Kurses (52 Wochen Zufallsweg, endet beim Startkurs) – eigener Zufall, die Spielwelt bleibt unberührt
+  E.seedHist = function (s, salt) {
+    var x = 0; for (var i = 0; i < s.id.length; i++) x = (x * 31 + s.id.charCodeAt(i)) >>> 0; x = (x + (salt || 0)) >>> 0 || 1;
+    var rnd = function () { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+    var out = [s.price], p = s.price;
+    for (var w = 0; w < 51; w++) { var g = (rnd() + rnd() + rnd() - 1.5) * 1.4; p = p / Math.exp(s.drift + s.vol * g); out.unshift(p); }
+    return out;
+  };
+  E.ensureMarkets = function (st) {
+    st.market = st.market || { stocks: {}, crypto: {} };
+    D.stocks.forEach(function (s) { if (!st.market.stocks[s.id]) st.market.stocks[s.id] = { price: s.price, hist: E.seedHist(s, st.seed) }; });
+    D.cryptos.forEach(function (s) { if (!st.market.crypto[s.id]) st.market.crypto[s.id] = { price: s.price, hist: E.seedHist(s, st.seed) }; });
+  };
+  // Verein hinter der Vereinsaktie (echte Welt: Borussia Dortmund, fiktive Welt: Verein aus Dortmund)
+  E.bvbClub = function (st) {
+    var ids = Object.keys(st.clubs);
+    for (var i = 0; i < ids.length; i++) { var c = st.clubs[ids[i]]; if (c.realName === 'Borussia Dortmund' || (!c.realName && c.city === 'Dortmund' && !c.founded)) return c; }
+    return null;
+  };
+  // Neuen Kurs anhängen; marks = besondere Ereignisse (Crash, Übernahme) für die Chartanzeige
+  E.marketPush = function (m, mark) {
+    m.hist.push(m.price);
+    if (m.hist.length > E.HIST) { m.hist.shift(); if (m.marks) { m.marks.forEach(function (k) { k.i--; }); m.marks = m.marks.filter(function (k) { return k.i >= 0; }); } }
+    if (mark) { m.marks = m.marks || []; m.marks.push({ i: m.hist.length - 1, t: mark }); }
+  };
   E.updateMarkets = function (st) {
+    E.ensureMarkets(st);
     var chaos = st.settings.difficulty === 'chaos' ? 1.5 : 1;
+    // Börsencrash in unregelmäßigen Abständen (ca. alle 1–2 Saisons), danach langsame Erholung
+    var crash = R.chance(0.022 * chaos) ? R.randRange(0.12, 0.32) : 0;
+    if (crash) st.news.unshift({ season: st.season, week: st.week, title: 'BÖRSENCRASH! Kurse brechen um bis zu ' + Math.round(crash * 100) + ' % ein', text: 'Panikverkäufe an allen Märkten. Mutige kaufen jetzt billig nach …', type: 'markt' });
+    st.market.recovery = crash ? crash * 0.5 : (st.market.recovery || 0) * 0.9;
+    var bvb = E.bvbClub(st);
     D.stocks.forEach(function (s) {
       var m = st.market.stocks[s.id];
       var shock = R.chance(0.01) ? R.randRange(-0.2, 0.15) : 0;
-      m.price = Math.max(0.5, m.price * Math.exp(s.drift + s.vol * chaos * R.gauss(0, 1) + shock));
-      m.hist.push(m.price); if (m.hist.length > 52) m.hist.shift();
+      var r = s.drift + s.vol * chaos * R.gauss(0, 1) + shock + (st.market.recovery || 0) * 0.08;
+      if (crash) r -= crash * R.randRange(0.7, 1.15);
+      if (s.club && bvb && st.week > 0) { // Vereinsaktie folgt dem sportlichen Erfolg
+        var pos = E.leaguePos(st, bvb), n = st.leagues[bvb.league].clubIds.length;
+        r += (0.5 - (pos - 1) / (n - 1)) * 0.012 - (bvb.league - 1) * 0.01;
+        if (bvb.form && bvb.form.length) r += bvb.form[bvb.form.length - 1] === 'S' ? 0.01 : bvb.form[bvb.form.length - 1] === 'N' ? -0.01 : 0;
+      }
+      m.price = Math.max(s.club ? 0.2 : 0.5, m.price * Math.exp(r));
+      E.marketPush(m, crash ? 'Crash' : null);
     });
     D.cryptos.forEach(function (s) {
       var m = st.market.crypto[s.id];
@@ -267,25 +322,65 @@
       else if (R.chance(0.03)) { r += R.randRange(0.3, 0.7); st.news.unshift({ season: st.season, week: st.week, title: s.name + ' explodiert!', text: 'Spekulationsblase oder Revolution?', type: 'markt' }); }
       // Mean-Reversion gegen Extremwerte
       r -= 0.02 * Math.log(m.price / s.price);
+      if (crash) r -= crash * R.randRange(1.2, 1.8);
       m.price = Math.max(0.0005, m.price * Math.exp(r));
-      m.hist.push(m.price); if (m.hist.length > 52) m.hist.shift();
+      E.marketPush(m, crash ? 'Crash' : null);
     });
     st.savingsRate = R.clamp(st.savingsRate + R.gauss(0, 0.001), 0.005, 0.04);
   };
   E.buyAsset = function (st, club, sym, qty) {
-    qty = Math.floor(qty); var price = E.price(st, sym);
+    E.ensureMarkets(st);
+    qty = Math.floor(qty); var price = E.price(st, sym), def = E.marketDef(sym);
     if (qty <= 0 || !price) return { ok: false, why: 'Ungültige Menge' };
-    var cost = qty * price * 1.005;
+    if (def && def.club) {
+      var bv = E.bvbClub(st); if (!bv) return { ok: false, why: 'Diese Aktie wird in dieser Spielwelt nicht gehandelt' };
+      if (bv.id === club.id) return { ok: false, why: 'Eigene Vereinsaktien können Sie nicht kaufen' };
+      var have = club.portfolio[sym] ? club.portfolio[sym].qty : 0;
+      qty = Math.min(qty, def.shares - have);
+      if (qty <= 0) return { ok: false, why: 'Alle Aktien gehören bereits Ihnen' };
+    }
+    // Große Käufe der Vereinsaktie treiben den Kurs; gehandelt wird zum Mittel aus altem und neuem Kurs
+    var impact = def && def.club ? Math.min(0.5, qty / def.shares * 0.9) : 0;
+    var cost = qty * price * (1 + impact / 2) * 1.005;
     if (cost > club.cash) return { ok: false, why: 'Nicht genug Geld' };
     var pf = club.portfolio[sym] || { qty: 0, cost: 0 };
     pf.qty += qty; pf.cost += cost; club.portfolio[sym] = pf; club.cash -= cost;
     E.book(club, 'Kapitalanlagen', -cost);
-    return { ok: true, cost: cost };
+    if (impact) st.market.stocks[sym].price *= 1 + impact;
+    return { ok: true, cost: cost, takeover: def && def.club ? E.bvbStake(st, club) > 0.5 : false };
+  };
+  E.bvbStake = function (st, club) { var d = E.marketDef('BVB'), pf = club.portfolio.BVB; return pf && d ? pf.qty / d.shares : 0; };
+  // Übernahme: alle Spieler, das Vermögen und die Vereinsanlagen-Werte gehen an den Käufer, der Verein steigt zwangsweise ab
+  E.takeoverBVB = function (st, club) {
+    var bv = E.bvbClub(st); if (!bv || bv.id === club.id || bv.takenOverBy) return { ok: false, why: 'Übernahme nicht möglich' };
+    if (E.bvbStake(st, club) <= 0.5) return { ok: false, why: 'Keine Mehrheit' };
+    var moved = 0;
+    Object.keys(st.players).forEach(function (id) {
+      var p = st.players[id]; if (p.clubId !== bv.id) return;
+      if (bv.lineup) bv.lineup = bv.lineup.map(function (x) { return x === p.id ? null : x; });
+      p.clubId = club.id; p.listed = false; p.joined = st.season; moved++;
+      st.transfers.unshift({ season: st.season, week: st.week, pid: p.id, name: W.playerName(p), from: bv.name, fromId: bv.id, to: club.name, toId: club.id, fee: 0, loan: false });
+    });
+    bv.lineup = []; bv.bench = []; bv.manualLineup = false;
+    var cash = Math.max(0, Math.round(bv.cash + bv.savings));
+    club.cash += cash; E.book(club, 'Übernahme ' + bv.short, cash); bv.cash = 0; bv.savings = 0;
+    // Aktien bleiben als Beteiligung bestehen, der Kurs bricht ein
+    var m = st.market.stocks.BVB; m.price *= 0.35; E.marketPush(m, 'Übernahme');
+    bv.takenOverBy = club.id; bv.forcedRelegation = true; bv.reputation = Math.max(10, bv.reputation - 25);
+    bv.history.push({ season: st.season, type: 'abstieg', text: 'Übernahme durch ' + club.name + ' – Zwangsabstieg zum Saisonende' });
+    // Damit der Spielbetrieb weiterläuft: Notkader aus Amateuren
+    var mean = R.season.leagueMean(st, Math.min(3, bv.league + 1)) - 10;
+    [['TW', 2], ['ABW', 6], ['MIT', 6], ['STU', 4]].forEach(function (pp) { for (var i = 0; i < pp[1]; i++) { var np = W.genPlayer(st, pp[0], R.clamp(R.gauss(mean, 3), 30, 80), R.randInt(19, 30), bv.id); np.contract = 1; } });
+    R.match.autoBest(st, bv);
+    R.season.news(st, 'SENSATION: ' + club.name + ' übernimmt ' + bv.name + '!', moved + ' Spieler und ' + R.fmtMoney(cash) + ' wechseln den Besitzer. ' + bv.short + ' muss zum Saisonende zwangsweise absteigen.', 'transfer');
+    return { ok: true, players: moved, cash: cash, club: bv };
   };
   E.sellAsset = function (st, club, sym, qty) {
     var pf = club.portfolio[sym]; qty = Math.floor(Math.min(qty, pf ? pf.qty : 0));
     if (qty <= 0) return { ok: false, why: 'Keine Anteile' };
-    var price = E.price(st, sym), revenue = qty * price * 0.995;
+    var sd = E.marketDef(sym), impact = sd && sd.club ? Math.min(0.5, qty / sd.shares * 0.9) : 0;
+    var price = E.price(st, sym), revenue = qty * price * (1 - impact / 2) * 0.995;
+    if (impact) st.market.stocks[sym].price *= 1 - impact;
     var costPart = pf.cost * qty / pf.qty;
     pf.qty -= qty; pf.cost -= costPart; club.cash += revenue;
     if (pf.qty <= 0) delete club.portfolio[sym];
@@ -335,7 +430,7 @@
     for (var id in st.players) { var p = st.players[id]; if (p.clubId === club.id) { if (p.youth) youthW += p.wage; else wages += p.wage; } }
     add('Spielergehälter', -wages / n);
     add('Nachwuchsgehälter', -youthW / n);
-    add('Trainer & Personal', -((club.coach ? club.coach.wage : 0) + { 1: 1500000, 2: 500000, 3: 150000 }[club.league]) / n);
+    add('Trainer & Personal', -((club.coach ? club.coach.wage : 0) + E.staffWages(club) + { 1: 1500000, 2: 500000, 3: 150000 }[club.league]) / n);
     add('Unterhalt Anlagen', -E.upkeepTotal(club) * costF / n);
     var budgets = 0; Object.keys(D.budgetAreas).forEach(function (a) { budgets += E.budgetCost(club, a); });
     add('Verwaltung & Budgets', -budgets * costF / n);

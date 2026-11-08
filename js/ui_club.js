@@ -3,46 +3,130 @@
   var D = R.data, W = R.world, E = R.econ, S = R.season, U = R.ui;
   var esc = R.esc, money = R.fmtMoney;
 
-  // ---------- Vereinsmanagement ----------
+  // ---------- Vereinsmanagement (Kacheln, Details in Fenstern) ----------
+  var SP_IC = { haupt: '🏆', trikot: '👕', aermel: '🎽', ausruester: '👟', namensrechte: '🏟️', bande: '📢' };
+  var BUD_IC = { admin: '🗄️', marketing: '📣', fans: '🤝', scouting: '🔭', trainorg: '📅' };
+  var BUD_FX = {
+    admin: ['Sponsorenkonditionen', 'Bessere Verträge mit Sponsoren (bis +6 %).'],
+    marketing: ['Fanwachstum & Sponsoren', 'Mehr neue Fans pro Saison und etwas höhere Sponsorenangebote.'],
+    fans: ['Zuschauer & Fanbindung', 'Mehr Zuschauer, stabileres Fanvertrauen.'],
+    scouting: ['Talente & Potenzial', 'Genauere Potenzialangaben; auf „Premium“ ein zusätzliches Talent je Jahrgang.'],
+    trainorg: ['Spielerentwicklung', 'Training wirkt bis zu 10 % besser bzw. schlechter.']
+  };
+  U.stars = function (n, max) { var s = ''; for (var i = 1; i <= max; i++) s += i <= n ? '★' : '<span class="off">★</span>'; return '<span class="stars">' + s + '</span>'; };
+  // Cheftrainer: Ist der Nutzer Manager oder Trainer, steht sein eigener Name an der Seitenlinie
+  U.coachName = function (c) {
+    var st = U.st;
+    if (c && c.userControlled && st && !st.manager.unemployed && (st.manager.role === 'manager' || st.manager.role === 'trainer')) return st.manager.name;
+    return c && c.coach ? c.coach.name : '–';
+  };
+  // Firmenlogo (selbst gezeichnet aus dem Namen – keine echten Marken)
+  var LOGO_IC = [[/versicher|optimus|insolvenz/i, '🛡️'], [/brauerei|bier|brauhaus/i, '🍺'], [/bäcker|backer/i, '🥨'], [/auto|kfz|turbo|rastst/i, '🚗'], [/energie|solar|strom|flutlicht|elektro/i, '⚡'], [/telekom/i, '📡'], [/software|pixel|tech/i, '💻'], [/logistik|spedition|versand/i, '🚚'], [/wasser|quell/i, '💧'], [/wurst|würst|kartoffel|pommes|nudel|feinkost/i, '🍽️'], [/kredit|sparkasse|bank/i, '💶'], [/möbel/i, '🛋️'], [/optik|brille/i, '👓'], [/reise/i, '✈️'], [/schuh/i, '👟'], [/friseur|haar/i, '✂️'], [/zahn/i, '🦷'], [/baumarkt|schraube/i, '🔨'], [/kohle|stahl/i, '⚙️'], [/getränk/i, '🥤']];
+  var LOGO_COL = [['#1d4ed8', '#60a5fa'], ['#b91c1c', '#f87171'], ['#047857', '#34d399'], ['#7c3aed', '#c4b5fd'], ['#c2410c', '#fdba74'], ['#0f766e', '#5eead4'], ['#a16207', '#fde047'], ['#be185d', '#f9a8d4'], ['#334155', '#cbd5e1']];
+  function hashStr(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  U.brandLogo = function (name, size, isKit) {
+    size = size || 64; name = String(name || '?');
+    var h = hashStr(name), col = LOGO_COL[h % LOGO_COL.length], shape = (h >> 4) % 3, ic = isKit ? '👕' : '';
+    if (!ic) for (var i = 0; i < LOGO_IC.length; i++) if (LOGO_IC[i][0].test(name)) { ic = LOGO_IC[i][1]; break; }
+    var words = name.replace(/[&.,]/g, ' ').split(/\s+/).filter(function (w) { return w && !/^(AG|GmbH|SE|und|&|Zum|Der|Die|Das|Holding)$/i.test(w); });
+    var ini = esc(((words[0] || '?').charAt(0) + (words[1] ? words[1].charAt(0) : '')).toUpperCase());
+    var id = 'lg' + h, bg = shape === 0 ? '<rect x="4" y="4" width="92" height="92" rx="22" fill="url(#' + id + ')"/>' : shape === 1 ? '<circle cx="50" cy="50" r="46" fill="url(#' + id + ')"/>' : '<path d="M50 4 L92 18 V52 Q92 82 50 96 Q8 82 8 52 V18 Z" fill="url(#' + id + ')"/>';
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 100 100" aria-label="' + esc(name) + '"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + col[1] + '"/><stop offset="1" stop-color="' + col[0] + '"/></linearGradient></defs>' + bg +
+      '<path d="M14 30 Q50 10 86 30" stroke="rgba(255,255,255,.35)" stroke-width="3" fill="none"/>' +
+      (ic ? '<text x="50" y="50" font-size="30" text-anchor="middle">' + ic + '</text><text x="50" y="84" font-size="15" font-weight="900" text-anchor="middle" fill="#fff" font-family="-apple-system,system-ui,sans-serif" letter-spacing="1">' + ini + '</text>' : '<text x="50" y="64" font-size="34" font-weight="900" text-anchor="middle" fill="#fff" font-family="Menlo,monospace">' + ini + '</text>') + '</svg>';
+  };
+
   U.screens.verein = function () {
-    var st = U.st, c = U.club(), can = U.can('business');
+    var st = U.st, c = U.club();
     var h = '<h1 class="row" style="gap:10px">' + U.crest(c, 34) + 'Vereinsmanagement</h1>' + U.roleNote('business');
-    // Sponsorenangebote
-    var offers = st.inbox.filter(function (o) { return o.type === 'sponsor'; });
-    if (offers.length) {
-      h += '<div class="panel" style="margin-bottom:14px"><h2>Offene Sponsorenangebote</h2>';
-      offers.forEach(function (o) {
-        h += '<h3 style="margin-top:10px">' + D.sponsorCategories[o.cat] + '</h3><table class="t">' + o.offers.map(function (s, i) {
-          return '<tr><td><b>' + esc(s.name) + '</b></td><td class="num">' + money(s.amount) + '/J.</td><td class="num">' + s.years + ' J.</td><td class="small muted">Top-' + s.topN + ': +' + money(s.bonusTop) + ' · Aufstieg: +' + money(s.bonusPromo) + ' · Meister: +' + money(s.bonusTitle) + '</td><td>' + (can ? '<button class="sm primary" data-act="sponsorPick" data-id="' + o.id + '" data-i="' + i + '">Unterschreiben</button>' : '') + '</td></tr>';
-        }).join('') + '</table>';
-      });
-      h += '</div>';
-    }
-    h += '<div class="grid g2"><div class="panel"><h2>Sponsorenverträge</h2><table class="t">' + Object.keys(D.sponsorCategories).map(function (cat) {
-      var s = c.sponsors.filter(function (x) { return x.cat === cat; })[0];
-      return '<tr><td class="muted small">' + D.sponsorCategories[cat] + '</td>' + (s ? '<td><b>' + esc(s.name) + '</b><div class="muted small">Top-' + s.topN + ' +' + money(s.bonusTop) + ' · Aufstieg +' + money(s.bonusPromo) + ' · Meister +' + money(s.bonusTitle) + '</div></td><td class="num">' + money(s.amount) + '</td><td class="num">' + s.years + ' J.</td>' : '<td colspan="3" class="muted">offen' + (can ? ' <button class="sm" data-act="sponsorSearch" data-k="' + cat + '">Angebote einholen</button>' : '') + '</td>') + '</tr>';
-    }).join('') + '<tr><td></td><td><b>Gesamt</b></td><td class="num"><b>' + money(E.sponsorTotal(c)) + '</b></td><td></td></tr></table><p class="muted small">Die Höhe der Angebote hängt von Liga, Ruf, Fanbasis und Erfolg ab. Verwaltung und Marketing auf „Premium“ verbessern die Konditionen.</p></div>';
-    h += '<div class="panel"><h2>Verwaltungsausgaben</h2><table class="t">' + Object.keys(D.budgetAreas).map(function (a) {
-      return '<tr><td>' + D.budgetAreas[a] + '</td><td><div class="seg">' + D.budgetLevels.map(function (l, i) { return '<button class="sm ' + (c.budgets[a] === i ? 'on' : '') + '" data-act="budget" data-k="' + a + '" data-v="' + i + '"' + (can ? '' : ' disabled') + '>' + l + '</button>'; }).join('') + '</div></td><td class="num">' + money(E.budgetCost(c, a)) + '/J.</td></tr>';
-    }).join('') + '</table><p class="muted small">Verwaltung: Sponsorenkonditionen · Marketing: Fanwachstum &amp; Sponsoren · Fanbetreuung: Zuschauer &amp; Fanbindung · Scouting: Genauigkeit der Potenzialangaben, mehr Talente · Trainingsorganisation: Spielerentwicklung.</p></div></div>';
-    h += '<div class="grid g2" style="margin-top:14px"><div class="panel"><h2>Trainer</h2><p><b>' + esc(c.coach.name) + '</b> – ' + esc(c.coach.profile) + ', Qualität ' + c.coach.quality + ', Gehalt ' + money(c.coach.wage) + '/J.</p>' + (st.manager.role === 'gf' ? '<button data-act="coachMarket">Trainer wechseln</button>' : '<p class="muted small">' + (st.manager.role === 'manager' ? 'Sie sind selbst Cheftrainer – der Co-Trainer beeinflusst die Spielerentwicklung.' : '') + '</p>') + '</div>';
-    h += '<div class="panel"><h2>Vereinsdaten</h2><table class="t small"><tr><td>Reputation</td><td class="num">' + Math.round(c.reputation) + '/100</td></tr><tr><td>Fanbasis</td><td class="num">' + R.fmtNum(c.fans) + '</td></tr><tr><td>Tradition</td><td class="num">' + c.tradition + '</td></tr><tr><td>Titel</td><td class="num">' + c.titles.league + ' Meister · ' + c.titles.cup + ' Pokal · ' + c.titles.promo + ' Aufstiege</td></tr><tr><td>Zuschauerrekord</td><td class="num">' + R.fmtNum(c.records.attendance) + '</td></tr></table></div></div>';
+    // Sponsoren
+    h += '<div class="sec-h">🤝 Sponsoren <span class="tv" style="margin-left:auto;color:var(--text)">' + money(E.sponsorTotal(c)) + '/J.</span></div><div class="tiles">' + Object.keys(D.sponsorCategories).map(function (cat) {
+      var s = c.sponsors.filter(function (x) { return x.cat === cat; })[0], off = st.inbox.filter(function (o) { return o.type === 'sponsor' && o.cat === cat; })[0];
+      return '<div class="tile' + (s ? '' : ' empty') + '" data-act="sponsorOpen" data-k="' + cat + '">' + (off ? '<span class="tb">' + off.offers.length + ' Angebote</span>' : '') +
+        '<div class="row-ic"><span class="ti">' + SP_IC[cat] + '</span><div><div class="tt">' + D.sponsorCategories[cat] + '</div><div class="ts">' + (s ? s.years + ' J. Laufzeit' : 'offen') + '</div></div></div>' +
+        (s ? '<div class="row-ic">' + U.brandLogo(s.name, 34, cat === 'ausruester') + '<span class="ts" style="color:var(--text)">' + esc(s.name) + '</span></div><div class="tv">' + money(s.amount) + '</div>' : '<div class="ts">Antippen: Angebote vergleichen</div>') + '</div>';
+    }).join('') + '</div>';
+    // Trainerteam
+    var lvlSum = 0; Object.keys(D.staff).forEach(function (k) { lvlSum += E.staffLvl(c, k); });
+    h += '<div class="sec-h">📋 Trainerteam <span class="ts" style="margin-left:auto">Personalkosten ' + money((c.coach ? c.coach.wage : 0) + E.staffWages(c)) + '/J.</span></div><div class="tiles">' +
+      '<div class="tile" data-act="coachOpen"><div class="row-ic"><span class="ti">🧑‍💼</span><div><div class="tt">Cheftrainer</div><div class="ts">' + esc(c.coach.profile) + '</div></div></div><div class="tt" style="font-size:15px">' + esc(U.coachName(c)) + '</div><div class="tv">' + U.stars(Math.round(c.coach.quality / 20), 5) + '</div></div>' +
+      Object.keys(D.staff).map(function (k) {
+        var s = c.staff && c.staff[k], l = s ? s.lvl : 0;
+        return '<div class="tile' + (l ? '' : ' empty') + '" data-act="staffOpen" data-k="' + k + '"><div class="row-ic"><span class="ti">' + D.staff[k].ic + '</span><div><div class="tt">' + D.staff[k].n + '</div><div class="ts">' + (s ? esc(s.name) : 'nicht besetzt') + '</div></div></div><div class="tv">' + U.stars(l, 3) + (s ? ' <span class="ts">' + money(s.wage) + '</span>' : '') + '</div></div>';
+      }).join('') + '</div>';
+    // Verwaltung
+    h += '<div class="sec-h">🏢 Verwaltung</div><div class="tiles">' + Object.keys(D.budgetAreas).map(function (a) {
+      return '<div class="tile" data-act="budgetOpen" data-k="' + a + '"><div class="row-ic"><span class="ti">' + BUD_IC[a] + '</span><div><div class="tt">' + D.budgetAreas[a] + '</div><div class="ts">' + BUD_FX[a][0] + '</div></div></div><div class="tv">' + D.budgetLevels[c.budgets[a]] + ' <span class="ts">' + money(E.budgetCost(c, a)) + '</span></div></div>';
+    }).join('') + '</div>';
+    // Vereinsdaten
+    h += '<div class="sec-h">📊 Verein</div><div class="grid g4">' + U.ikpi('star', 'Reputation', Math.round(c.reputation) + '/100', '', U.bar(c.reputation)) + U.ikpi('fans', 'Fanbasis', R.fmtNum(c.fans)) +
+      U.ikpi('trophy', 'Titel', c.titles.league + ' · ' + c.titles.cup + ' · ' + c.titles.promo, '', '<div class="ts muted small">Meister · Pokal · Aufstiege</div>') + U.ikpi('stadium', 'Zuschauerrekord', R.fmtNum(c.records.attendance)) + '</div>';
     h += U.dealPanel(c);
     return h;
   };
-  U.acts.sponsorPick = function (d) { S.acceptSponsor(U.st, d.id, +d.i); U.render(); U.toast('Vertrag unterschrieben!'); };
-  U.acts.sponsorSearch = function (d) {
+  // Sponsorenfenster: bestehender Vertrag bzw. drei Angebote nebeneinander
+  U.acts.sponsorOpen = function (d) {
+    var st = U.st, c = U.club(), cat = d.k, can = U.can('business');
+    var s = c.sponsors.filter(function (x) { return x.cat === cat; })[0], off = st.inbox.filter(function (o) { return o.type === 'sponsor' && o.cat === cat; })[0];
+    if (!s && !off && can) { U.acts.sponsorSearch({ k: cat }, true); off = st.inbox.filter(function (o) { return o.type === 'sponsor' && o.cat === cat; })[0]; }
+    var title = SP_IC[cat] + ' ' + D.sponsorCategories[cat], h = '';
+    function rows(x) { return [['Pro Jahr', x.amount], ['Laufzeit', x.years], ['Gesamtwert', x.amount * x.years], ['Bonus Top-' + x.topN, x.bonusTop], ['Bonus Aufstieg', x.bonusPromo], ['Bonus Meister', x.bonusTitle]]; }
+    if (s) {
+      h += '<div class="cmp"><div class="cmp-card best"><div class="logo">' + U.brandLogo(s.name, 84, cat === 'ausruester') + '</div><b>' + esc(s.name) + '</b><span class="tag green">Laufender Vertrag</span><table>' + rows(s).map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + (r[0] === 'Laufzeit' ? r[1] + ' J.' : money(r[1])) + '</td></tr>'; }).join('') + '</table></div></div><p class="muted small" style="margin-top:10px">Läuft der Vertrag aus, können Sie hier neue Angebote einholen.</p>';
+      U.modal(title, h, '<button class="primary" data-act="closeModal">Schließen</button>');
+      return;
+    }
+    if (!off) { U.modal(title, '<p class="muted">Keine Angebote.</p>'); return; }
+    var all = off.offers.map(rows), best = all[0].map(function (r, j) { return Math.max.apply(null, all.map(function (x) { return x[j][1]; })); });
+    var bestTotal = Math.max.apply(null, off.offers.map(function (x) { return x.amount * x.years; }));
+    h += '<div class="cmp">' + off.offers.map(function (x, i) {
+      return '<div class="cmp-card' + (x.amount * x.years === bestTotal ? ' best' : '') + '"><div class="logo">' + U.brandLogo(x.name, 84, cat === 'ausruester') + '</div><b>' + esc(x.name) + '</b><table>' + all[i].map(function (r, j) { return '<tr><td>' + r[0] + '</td><td class="' + (r[1] === best[j] && j !== 1 ? 'top' : '') + '">' + (j === 1 ? r[1] + ' J.' : money(r[1])) + '</td></tr>'; }).join('') + '</table>' +
+        (can ? '<button class="primary" data-act="sponsorPick" data-id="' + off.id + '" data-i="' + i + '">Unterschreiben</button>' : '') + '</div>';
+    }).join('') + '</div><p class="muted small" style="margin-top:10px">★ = bester Wert. Höhe der Angebote: Liga, Ruf, Fanbasis, Erfolg; Verwaltung und Marketing auf „Premium“ verbessern die Konditionen.</p>';
+    U.modal(title + ' – Angebote vergleichen', h, (can ? '<button data-act="sponsorRefresh" data-k="' + cat + '">Neue Angebote einholen</button>' : '') + '<button data-act="closeModal">Später</button>', true);
+  };
+  U.acts.sponsorPick = function (d) { S.acceptSponsor(U.st, d.id, +d.i); U.closeModal(); U.render(); U.toast('Vertrag unterschrieben!'); };
+  U.acts.sponsorSearch = function (d, silent) {
     var st = U.st, c = U.club();
     st.inbox = st.inbox.filter(function (o) { return !(o.type === 'sponsor' && o.cat === d.k); });
     st.inbox.push({ id: W.nextId(st, 'offer'), type: 'sponsor', cat: d.k, offers: E.sponsorOffers(st, c, d.k), season: st.season, week: st.week });
-    U.render();
+    if (!silent) U.render();
   };
-  U.acts.budget = function (d) { U.club().budgets[d.k] = +d.v; U.render(); };
+  U.acts.sponsorRefresh = function (d) { U.acts.sponsorSearch(d, true); U.acts.sponsorOpen(d); U.render(); };
+  // Verwaltungsbudget-Fenster
+  U.acts.budgetOpen = function (d) {
+    var c = U.club(), a = d.k, can = U.can('business');
+    var h = '<p class="small">' + BUD_FX[a][1] + '</p><div class="cmp">' + D.budgetLevels.map(function (l, i) {
+      var old = c.budgets[a]; c.budgets[a] = i; var cost = E.budgetCost(c, a); c.budgets[a] = old;
+      return '<div class="cmp-card' + (c.budgets[a] === i ? ' best' : '') + '"><div class="ti" style="font-size:34px">' + ['🪙', '💼', '💎'][i] + '</div><b>' + l + '</b><div class="tv mono">' + money(cost) + '/J.</div><div class="ts small muted">' + ['Spart Geld, leichte Nachteile', 'Ausgewogen', 'Teuer, spürbare Vorteile'][i] + '</div>' +
+        (c.budgets[a] === i ? '<span class="tag green">aktiv</span>' : can ? '<button class="primary sm" data-act="budgetSet" data-k="' + a + '" data-v="' + i + '">Wählen</button>' : '') + '</div>';
+    }).join('') + '</div>';
+    U.modal(BUD_IC[a] + ' ' + D.budgetAreas[a], h, '<button data-act="closeModal">Schließen</button>', true);
+  };
+  U.acts.budgetSet = function (d) { U.club().budgets[d.k] = +d.v; U.acts.budgetOpen(d); U.render(); };
+  U.acts.budget = U.acts.budgetSet;
+  // Trainerstab-Fenster
+  U.acts.staffOpen = function (d) {
+    var st = U.st, c = U.club(), k = d.k, def = D.staff[k], cur = E.staffLvl(c, k), can = U.can('business') || U.can('sport');
+    var h = '<p class="small">' + def.d + ' <b>Wirkung:</b> ' + def.eff + '.</p><div class="cmp">' + D.staffLevels.map(function (l, i) {
+      return '<div class="cmp-card' + (cur === i ? ' best' : '') + '"><div>' + U.stars(i, 3) + '</div><b>' + l + '</b><div class="tv mono">' + (i ? money(E.staffWageFor(c, i)) + '/J.' : '–') + '</div>' +
+        (cur === i ? '<span class="tag green">' + (i ? esc(c.staff[k].name) : 'aktuell') + '</span>' : can ? '<button class="' + (i ? 'primary' : '') + ' sm" data-act="staffSet" data-k="' + k + '" data-v="' + i + '">' + (i ? (cur ? 'Wechseln' : 'Einstellen') : 'Entlassen') + '</button>' : '') + '</div>';
+    }).join('') + '</div><p class="muted small" style="margin-top:10px">Bei einem Wechsel oder einer Entlassung fällt eine Abfindung von einem Vierteljahresgehalt an.</p>';
+    U.modal(def.ic + ' ' + def.n, h, '<button data-act="closeModal">Schließen</button>', true);
+  };
+  U.acts.staffSet = function (d) { var r = E.setStaff(U.st, U.club(), d.k, +d.v); if (r.ok) U.toast(+d.v ? D.staff[d.k].n + ' ' + r.s.name + ' eingestellt.' : D.staff[d.k].n + ' entlassen.'); U.acts.staffOpen(d); U.render(); };
+  U.acts.coachOpen = function () {
+    var st = U.st, c = U.club(), own = U.coachName(c) !== c.coach.name;
+    var h = '<div class="row" style="gap:16px;flex-wrap:nowrap"><div class="ti" style="font-size:56px">🧑‍💼</div><div><h3 style="margin:0">' + esc(U.coachName(c)) + '</h3><div class="muted small">' + (own ? 'Sie stehen selbst an der Seitenlinie.' : 'Cheftrainer') + '</div>' +
+      '<table class="t small" style="margin-top:8px"><tr><td>Spielphilosophie</td><td>' + esc(c.coach.profile) + '</td></tr><tr><td>Trainerqualität</td><td>' + U.stars(Math.round(c.coach.quality / 20), 5) + ' (' + c.coach.quality + ')</td></tr><tr><td>Gehalt</td><td>' + money(c.coach.wage) + '/J.</td></tr></table></div></div>' +
+      (own ? '<p class="muted small" style="margin-top:10px">Philosophie und Qualität beschreiben das sportliche Know-how Ihres Teams. Mit Co-, Reha- und Fitnesstrainern verbessern Sie es weiter.</p>' : '');
+    U.modal('Cheftrainer', h, (st.manager.role === 'gf' ? '<button data-act="coachMarket">Trainer wechseln</button>' : '') + '<button class="primary" data-act="closeModal">Schließen</button>');
+  };
   U.acts.coachMarket = function () {
     var st = U.st, c = U.club();
     U.coachOffers = U.coachOffers || [0, 1, 2, 3].map(function () { return W.genCoach(R.clamp(30 + c.tier * 60 + R.randInt(-15, 20), 20, 95), c.league); });
     var comp = Math.round(c.coach.wage * 0.5);
-    U.modal('Trainermarkt', '<p>Abfindung für den aktuellen Trainer: ' + money(comp) + '</p><table class="t">' + U.coachOffers.map(function (k, i) { return '<tr><td><b>' + esc(k.name) + '</b> (' + k.age + ')</td><td>' + esc(k.profile) + '</td><td class="num">Qualität ' + k.quality + '</td><td class="num">' + money(k.wage) + '/J.</td><td><button class="sm primary" data-act="hireCoach" data-i="' + i + '">Einstellen</button></td></tr>'; }).join('') + '</table>');
+    U.modal('Trainermarkt', '<p class="small">Abfindung für den aktuellen Trainer: ' + money(comp) + '</p><div class="cmp">' + U.coachOffers.map(function (k, i) { return '<div class="cmp-card"><div class="ti" style="font-size:40px">🧑‍💼</div><b>' + esc(k.name) + '</b><div class="small muted">' + k.age + ' Jahre · ' + esc(k.profile) + '</div><div>' + U.stars(Math.round(k.quality / 20), 5) + '</div><div class="tv mono">' + money(k.wage) + '/J.</div><button class="sm primary" data-act="hireCoach" data-i="' + i + '">Einstellen</button></div>'; }).join('') + '</div>', '<button data-act="closeModal">Abbrechen</button>', true);
   };
   U.acts.hireCoach = function (d) {
     var st = U.st, c = U.club(), k = U.coachOffers[+d.i], comp = Math.round(c.coach.wage * 0.5);
@@ -135,19 +219,48 @@
         '<div class="panel"><h2>Diese Saison</h2><div class="grid">' + U.ikpi('growth', 'Einnahmen', money(inc), 'pos') + U.ikpi('debt', 'Ausgaben', money(exp), 'neg') + U.ikpi('coins', 'Ø pro Woche', money((inc + exp) / weeks), U.moneyCls(inc + exp)) + '</div></div></div>';
     }
     if (tab === 'aktien' || tab === 'krypto') {
-      var defs = tab === 'aktien' ? D.stocks : D.cryptos, mk = tab === 'aktien' ? st.market.stocks : st.market.crypto;
-      h += '<div class="help" style="margin-bottom:12px">' + (tab === 'aktien' ? 'Fiktiver Aktienmarkt – Kurse ändern sich wöchentlich. 0,5 % Gebühr pro Kauf/Verkauf.' : 'Fiktive Kryptowährungen – extrem schwankend: Kurssprünge, Crashs und Spekulationsblasen sind jederzeit möglich. Kein Echtgeld.') + '</div><div class="grid g3">';
-      defs.forEach(function (s) {
-        var m = mk[s.id], pf = c.portfolio[s.id], first = m.hist[0], chg = (m.price / first - 1) * 100;
-        var val = pf ? pf.qty * m.price : 0;
-        h += '<div class="panel"><div class="panel-h"><h3>' + esc(s.name) + ' <span class="muted small">' + s.id + '</span></h3><b class="mono">' + U.fmtPrice(m.price) + '</b></div>' + U.sparkline(m.hist, 300, 80) + '<div class="row between small"><span class="muted">12 Monate</span><span class="' + (chg >= 0 ? 'pos' : 'neg') + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(1) + ' %</span></div>' +
-          (pf ? '<div class="small" style="margin-top:6px">Bestand: <b>' + R.fmtNum(pf.qty) + '</b> · Wert ' + money(val) + ' · <span class="' + (val - pf.cost >= 0 ? 'pos' : 'neg') + '">' + (val - pf.cost >= 0 ? '+' : '') + money(val - pf.cost) + '</span></div>' : '') +
-          (can ? '<div class="row" style="margin-top:8px"><input type="number" id="q_' + s.id + '" placeholder="Stück" style="width:90px" min="1"><button class="sm primary" data-act="assetBuy" data-k="' + s.id + '">Kaufen</button><button class="sm" data-act="assetSell" data-k="' + s.id + '">Verkaufen</button></div>' : '') + '</div>';
+      E.ensureMarkets(st);
+      var defs = tab === 'aktien' ? D.stocks : D.cryptos, mk = tab === 'aktien' ? st.market.stocks : st.market.crypto, range = U.p.range || 52;
+      h += '<div class="row" style="margin-bottom:12px;gap:10px"><div class="help" style="flex:1;margin:0">' + (tab === 'aktien' ? '📈 Fiktiver Aktienmarkt – Kurse ändern sich wöchentlich, 0,5 % Gebühr pro Kauf/Verkauf. Börsencrashs kommen in unregelmäßigen Abständen und drücken alle Kurse – danach erholen sie sich meist langsam.' : '🪙 Fiktive Kryptowährungen – extrem schwankend: Kurssprünge, Crashs und Spekulationsblasen jederzeit möglich. Kein Echtgeld.') + '</div>' +
+        '<div class="seg">' + [[26, '6 Mon.'], [52, '1 Jahr'], [104, '2 Jahre']].map(function (x) { return '<button class="sm ' + (range === x[0] ? 'on' : '') + '" data-act="chartRange" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div><div class="grid g2">';
+      defs.forEach(function (sd) {
+        var m = mk[sd.id], pf = c.portfolio[sd.id], hist = m.hist.slice(-range), first = hist[0], chg = (m.price / first - 1) * 100;
+        var val = pf ? pf.qty * m.price : 0, buyIn = pf ? pf.cost / pf.qty : null;
+        var bvb = sd.club ? E.bvbClub(st) : null, stake = sd.club ? E.bvbStake(st, c) : 0;
+        if (sd.club && (!bvb || bvb.id === c.id)) return;
+        h += '<div class="panel"' + (sd.club ? ' style="border-color:#c9a400"' : '') + '><div class="panel-h"><h3 class="row" style="gap:8px">' + (sd.club && bvb ? U.crest(bvb, 24) : '') + esc(sd.club && bvb ? bvb.name + ' (Aktie)' : sd.name) + ' <span class="muted small">' + sd.id + '</span></h3><b class="mono" style="font-size:18px">' + U.fmtPrice(m.price) + '</b></div>' +
+          U.priceChart(m, { range: range, buyIn: buyIn, h: 170 }) +
+          '<div class="chart-meta"><span>' + ({ 26: '6 Monate', 52: '12 Monate', 104: '24 Monate' }[range]) + ': <b class="' + (chg >= 0 ? 'pos' : 'neg') + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(1) + ' %</b></span><span>Tief ' + U.fmtPrice(Math.min.apply(null, hist)) + ' · Hoch ' + U.fmtPrice(Math.max.apply(null, hist)) + '</span></div>' +
+          (sd.club && bvb ? '<div style="margin-top:8px"><div class="row between small"><span>Ihr Anteil: <b>' + (stake * 100).toFixed(2).replace('.', ',') + ' %</b></span><span class="muted">Mehrheit ab 50 % · ' + R.fmtNum(sd.shares) + ' Aktien</span></div><div class="stake"><i style="width:' + Math.min(100, stake * 100) + '%"></i></div>' +
+            (bvb.takenOverBy === c.id ? '<div class="small pos" style="margin-top:4px">✔ Übernommen – der Verein steigt zum Saisonende ab.</div>' : '<div class="small muted" style="margin-top:4px">Mit der Aktienmehrheit übernehmen Sie alle Spieler und das Vermögen von ' + esc(bvb.short) + ' – der Verein muss zwangsweise absteigen. Große Käufe treiben den Kurs. Mehrheit bei aktuellem Kurs: ca. ' + money(Math.max(0, sd.shares * 0.5001 - (pf ? pf.qty : 0)) * m.price) + '.</div>') + '</div>' : '') +
+          (pf ? '<div class="small" style="margin-top:6px">Bestand: <b>' + R.fmtNum(pf.qty) + '</b> · Einstieg Ø ' + U.fmtPrice(buyIn) + ' · Wert ' + money(val) + ' · <span class="' + (val - pf.cost >= 0 ? 'pos' : 'neg') + '">' + (val - pf.cost >= 0 ? '+' : '') + money(val - pf.cost) + '</span></div>' : '') +
+          (can ? '<div class="row" style="margin-top:8px"><input type="number" id="q_' + sd.id + '" placeholder="Stück" style="width:120px" min="1"><button class="sm primary" data-act="assetBuy" data-k="' + sd.id + '">Kaufen</button><button class="sm" data-act="assetSell" data-k="' + sd.id + '">Verkaufen</button><span class="muted small">max. ' + R.fmtNum(Math.floor(c.cash / (m.price * 1.005))) + ' Stück</span></div>' : '') + '</div>';
       });
       h += '</div>';
     }
     if (tab === 'bilanz') h += U.financeReport(c);
     return h;
+  };
+  U.acts.chartRange = function (d) { U.p.range = +d.v; U.render(); };
+  // Kursdiagramm: Fläche, Linie, Achsen, Einstiegslinie, Crash-/Übernahme-Markierungen
+  U.priceChart = function (m, o) {
+    o = o || {}; var W_ = 560, H = o.h || 170, L = 58, Rr = 10, T = 12, B = 22;
+    var all = m.hist, off = Math.max(0, all.length - (o.range || 52)), hist = all.slice(off);
+    if (hist.length < 2) hist = [hist[0] || m.price, m.price];
+    var vals = hist.concat(o.buyIn ? [o.buyIn] : []), mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+    if (mx - mn < mx * 0.02) { mx *= 1.01; mn *= 0.99; }
+    var pad = (mx - mn) * 0.08; mn -= pad; mx += pad;
+    var x = function (i) { return L + (W_ - L - Rr) * i / Math.max(1, hist.length - 1); }, y = function (v) { return T + (H - T - B) * (1 - (v - mn) / (mx - mn)); };
+    var up = hist[hist.length - 1] >= hist[0], col = up ? '#22c55e' : '#ef4444', id = 'pc' + Math.floor(Math.random() * 1e9);
+    var pts = hist.map(function (v, i) { return x(i).toFixed(1) + ',' + y(v).toFixed(1); }).join(' ');
+    var svg = '<svg viewBox="0 0 ' + W_ + ' ' + H + '"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + col + '" stop-opacity=".35"/><stop offset="1" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>';
+    for (var g = 0; g <= 3; g++) { var gv = mn + (mx - mn) * g / 3, gy = y(gv); svg += '<line x1="' + L + '" y1="' + gy.toFixed(1) + '" x2="' + (W_ - Rr) + '" y2="' + gy.toFixed(1) + '" stroke="#2a3b60" stroke-width="1"/><text x="' + (L - 6) + '" y="' + (gy + 4).toFixed(1) + '" font-size="13" fill="#9fb0d0" text-anchor="end">' + U.fmtPrice(gv).replace(' €', '') + '</text>'; }
+    var n = hist.length; [[0, 'vor ' + (n - 1) + ' Wo.'], [Math.floor((n - 1) / 2), ''], [n - 1, 'heute']].forEach(function (t) { if (t[1]) svg += '<text x="' + x(t[0]).toFixed(1) + '" y="' + (H - 5) + '" font-size="12" fill="#9fb0d0" text-anchor="' + (t[0] === 0 ? 'start' : 'end') + '">' + t[1] + '</text>'; });
+    svg += '<polygon points="' + x(0).toFixed(1) + ',' + (H - B) + ' ' + pts + ' ' + x(n - 1).toFixed(1) + ',' + (H - B) + '" fill="url(#' + id + ')"/><polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round"/>';
+    if (o.buyIn) { var by = y(o.buyIn); svg += '<line x1="' + L + '" y1="' + by.toFixed(1) + '" x2="' + (W_ - Rr) + '" y2="' + by.toFixed(1) + '" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5 4"/><text x="' + (L + 4) + '" y="' + (by - 4).toFixed(1) + '" font-size="12" fill="#fbbf24">Ihr Einstieg ' + U.fmtPrice(o.buyIn) + '</text>'; }
+    (m.marks || []).forEach(function (k) { var i = k.i - off; if (i < 0 || i >= n) return; var mx_ = x(i), my = y(hist[i]); svg += '<circle cx="' + mx_.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="4.5" fill="#ef4444" stroke="#fff" stroke-width="1.5"/><text x="' + mx_.toFixed(1) + '" y="' + Math.min(H - B - 4, my + 16).toFixed(1) + '" font-size="12" font-weight="700" fill="#fca5a5" text-anchor="middle">' + esc(k.t) + '</text>'; });
+    svg += '<circle cx="' + x(n - 1).toFixed(1) + '" cy="' + y(hist[n - 1]).toFixed(1) + '" r="4" fill="' + col + '"/></svg>';
+    return '<div class="chart-box">' + svg + '</div>';
   };
   U.fmtPrice = function (p) { return p >= 100 ? p.toFixed(0) + ' €' : p >= 1 ? p.toFixed(2).replace('.', ',') + ' €' : p.toFixed(4).replace('.', ',') + ' €'; };
   U.financeReport = function (c) {
@@ -186,6 +299,20 @@
   U.acts.loanRepayAll = function () { var r = E.repayLoan(U.st, U.club(), 1e15); U.toast(r.ok ? 'Getilgt: ' + money(r.amount) : r.why); U.render(); };
   U.acts.savIn = function () { U.toast(E.deposit(U.club(), amt('savAmt')) ? 'Eingezahlt.' : 'Nicht möglich.'); U.render(); };
   U.acts.savOut = function () { U.toast(E.withdraw(U.club(), amt('savAmt')) ? 'Ausgezahlt.' : 'Nicht möglich.'); U.render(); };
-  U.acts.assetBuy = function (d) { var r = E.buyAsset(U.st, U.club(), d.k, amt('q_' + d.k)); U.toast(r.ok ? 'Gekauft für ' + money(r.cost) : r.why); U.render(); };
+  U.acts.assetBuy = function (d) {
+    var st = U.st, c = U.club(), r = E.buyAsset(st, c, d.k, amt('q_' + d.k)); U.toast(r.ok ? 'Gekauft für ' + money(r.cost) : r.why); U.render();
+    var bv = d.k === 'BVB' ? E.bvbClub(st) : null;
+    if (r.ok && r.takeover && bv && !bv.takenOverBy) {
+      var n = W.squad(st, bv.id).length + W.youthOf(st, bv.id).length;
+      U.modal('🟡 Aktienmehrheit erreicht!', '<div class="row" style="gap:16px;flex-wrap:nowrap">' + U.crest(bv, 80) + '<div><p>Sie besitzen jetzt <b>' + (E.bvbStake(st, c) * 100).toFixed(1).replace('.', ',') + ' %</b> der Aktien von <b>' + esc(bv.name) + '</b>.</p><p>Bei einer Übernahme wechseln alle <b>' + n + ' Spieler</b> und das Vereinsvermögen (<b>' + money(Math.max(0, bv.cash + bv.savings)) + '</b>) zu ' + esc(c.name) + '. ' + esc(bv.short) + ' muss zum Saisonende zwangsweise absteigen.</p></div></div>',
+        '<button data-act="closeModal">Noch nicht</button><button class="primary" data-act="bvbTakeover">Übernahme durchführen</button>');
+    }
+  };
+  U.acts.bvbTakeover = function () {
+    var r = E.takeoverBVB(U.st, U.club()); U.closeModal();
+    if (!r.ok) { U.toast(r.why); return; }
+    if (U.autosave) U.autosave(); U.render();
+    U.modal('Übernahme abgeschlossen', '<p>' + r.players + ' Spieler und ' + money(r.cash) + ' gehören jetzt Ihrem Verein. ' + esc(r.club.short) + ' steigt zum Saisonende zwangsweise ab.</p><p class="muted small">Tipp: Ihr Kader ist jetzt riesig – unter „Mannschaft“ und auf dem Transfermarkt können Sie Spieler verkaufen.</p>', '<button class="primary" data-act="closeModal">Weiter</button>');
+  };
   U.acts.assetSell = function (d) { var r = E.sellAsset(U.st, U.club(), d.k, amt('q_' + d.k) || 1e12); U.toast(r.ok ? 'Verkauft: ' + money(r.revenue) + ' (' + (r.profit >= 0 ? '+' : '') + money(r.profit) + ')' : r.why); U.render(); };
 })(RFM);

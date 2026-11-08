@@ -331,13 +331,15 @@
   // Training: Fitness, Entwicklung, Verletzungsheilung
   S.trainingWeek = function (st, club) {
     var focus = club.training || 'technik';
-    var trainQ = 0.8 + E.level(club, 'training').q * 0.08 + [-0.1, 0, 0.1][club.budgets.trainorg] + ((club.coach ? club.coach.quality : 50) - 50) * 0.003;
+    var trainQ = 0.8 + E.level(club, 'training').q * 0.08 + [-0.1, 0, 0.1][club.budgets.trainorg] + ((club.coach ? club.coach.quality : 50) - 50) * 0.003 + E.staffLvl(club, 'co') * 0.03;
     var youthQ = 0.75 + E.level(club, 'jugend').q * 0.12 + (club.coach && club.coach.profile === 'Jugendförderung' ? 0.15 : 0);
     var med = E.level(club, 'medizin').q;
     var weekNo = Math.max(1, st.week);
     var focusAttr = { fitness: ['sta', 'spd'], taktik: ['pas', 'def'], angriff: ['sho', 'tec'], defensive: ['def', 'sta'], technik: ['tec', 'pas'], regeneration: [] }[focus];
     var growthF = focus === 'regeneration' ? 0.4 : 1;
-    var recover = 14 + (focus === 'regeneration' ? 9 : 0) - (focus === 'fitness' ? 4 : 0) + med * 1.5;
+    var recover = 14 + (focus === 'regeneration' ? 9 : 0) - (focus === 'fitness' ? 4 : 0) + med * 1.5 + E.staffLvl(club, 'fitness') * 1.5 + E.staffLvl(club, 'ernaehrung');
+    var moraleTarget = 65 + ((D.training[focus] && D.training[focus].mor) || 0) + E.staffLvl(club, 'assistent') * 2, injF = E.injuryStaffF(club);
+    if (E.staffLvl(club, 'assistent')) club.chemistry = Math.min(100, club.chemistry + E.staffLvl(club, 'assistent') * 0.15);
     if (focus === 'taktik') club.trainingBonus = 0.02;
     if (focus === 'angriff' || focus === 'defensive') club.trainingBonus = 0.008;
     for (var id in st.players) {
@@ -345,15 +347,15 @@
       if (p.clubId !== club.id) continue;
       // Heilung
       if (p.inj) {
-        var heal = 1 + (R.chance(med * 0.07) && p.inj.total < 12 ? 1 : 0);
+        var heal = 1 + (R.chance(med * 0.07 + E.staffLvl(club, 'reha') * 0.07) && p.inj.total < 12 ? 1 : 0);
         p.inj.weeks -= heal;
         if (p.inj.weeks <= 0) { p.inj = null; p.fitness = Math.min(p.fitness, 70); }
         continue;
       }
       p.fitness = R.clamp(p.fitness + recover, 0, 100);
-      p.morale += (65 - p.morale) * 0.08;
+      p.morale += (moraleTarget - p.morale) * 0.08;
       // Trainingsverletzung (selten; Prävention durch Medizin)
-      if (focus !== 'regeneration' && R.chance(0.0025 * (focus === 'fitness' ? 1.6 : 1) * (1 - med * 0.08) * (0.6 + p.risk))) {
+      if (focus !== 'regeneration' && R.chance(0.0025 * (focus === 'fitness' ? 1.6 : 1) * (1 - med * 0.08) * injF * (0.6 + p.risk))) {
         p.inj = M.rollInjury(st, p, med); p.inj.weeks = Math.min(p.inj.weeks, 4); p.inj.total = p.inj.weeks; p.inj.type += ' (Training)';
         if (club.userControlled) S.news(st, 'Trainingsunfall: ' + W.playerName(p), p.inj.type + ', ' + p.inj.weeks + ' Wochen Pause.', 'medizin');
       }
@@ -737,11 +739,24 @@
       if (to < from) { c.titles.promo++; c.history.push({ season: st.season, type: 'aufstieg', text: 'Aufstieg in die ' + D.leagueNames[to] + (why ? ' (' + why + ')' : '') }); c.fans = Math.round(c.fans * 1.08); }
       else c.history.push({ season: st.season, type: 'abstieg', text: 'Abstieg in die ' + D.leagueNames[to] + (why ? ' (' + why + ')' : '') });
     }
-    var n1 = ft[1].length, n2 = ft[2].length;
+    var n1 = ft[1].length, n2 = ft[2].length, leagueBefore = {};
+    Object.keys(st.clubs).forEach(function (k) { leagueBefore[k] = st.clubs[k].league; });
     move(ft[2][0], 1); move(ft[2][1], 1); move(ft[1][n1 - 2], 2); move(ft[1][n1 - 1], 2);
     move(ft[3][0], 2); move(ft[3][1], 2); move(ft[2][n2 - 2], 3); move(ft[2][n2 - 1], 3);
     st.releg.forEach(function (rg) {
       if (rg.winner === rg.lower) { move(rg.lower, rg.levels[0], 'Relegation'); move(rg.upper, rg.levels[1], 'Relegation'); }
+    });
+    // Zwangsabstieg (z. B. nach Übernahme per Aktienmehrheit): eine Liga tiefer, der beste nicht aufgestiegene
+    // Verein der unteren Liga rückt nach – so bleiben die Ligagrößen erhalten
+    Object.keys(st.clubs).forEach(function (k) {
+      var fc = st.clubs[k]; if (!fc.forcedRelegation) return;
+      fc.forcedRelegation = false;
+      if (fc.league >= 3 || fc.league > leagueBefore[fc.id]) return; // bereits sportlich abgestiegen
+      var from = fc.league, lower = from + 1;
+      var up = ft[lower].filter(function (id) { return st.clubs[id].league === lower; })[0];
+      move(fc.id, lower, 'Zwangsabstieg');
+      if (up) move(up, from, 'Nachrücker');
+      S.news(st, 'Zwangsabstieg: ' + fc.short + ' muss in die ' + D.leagueNames[lower], up ? st.clubs[up].short + ' rückt nach.' : '', 'liga');
     });
 
     // Lizenz: hohe Überschuldung → Punktabzug

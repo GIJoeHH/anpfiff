@@ -6,7 +6,7 @@
   U.acts.clubInfo = function (d) {
     var st = U.st, c = st.clubs[d.id]; if (!c) return;
     var sq = W.squad(st, c.id).sort(function (a, b) { return b.ovr - a.ovr; });
-    U.modal(esc(c.name), '<div class="row" style="gap:16px;flex-wrap:nowrap">' + U.crest(c, 90) + '<table class="t small"><tr><td>Liga</td><td>' + D.leagueNames[c.league] + (st.week ? ' · ' + E.leaguePos(st, c) + '. Platz' : '') + '</td></tr><tr><td>Stadt / Stadion</td><td>' + esc(c.city) + ' · ' + esc(c.stadiumName) + ' (' + R.fmtNum(E.capacity(c)) + ')</td></tr><tr><td>Fans / Ruf</td><td>' + R.fmtNum(c.fans) + ' / ' + c.reputation + '</td></tr><tr><td>Trainer</td><td>' + esc(c.coach.name) + ' (' + esc(c.coach.profile) + ')</td></tr><tr><td>Titel</td><td>' + c.titles.league + '× Meister, ' + c.titles.cup + '× Pokal</td></tr><tr><td>Kaderstärke</td><td>' + U.ovrBadge(M.squadStrength(st, c)) + '</td></tr>' + (c.rivals.length ? '<tr><td>Rivalen</td><td>' + c.rivals.map(function (r) { return esc(st.clubs[r].short); }).join(', ') + '</td></tr>' : '') + '</table></div><h3 style="margin-top:12px">Kader</h3><div class="scroll" style="max-height:300px">' + U.squadTable(sq, 'ci' + c.id, { market: true }) + '</div>', '<button data-act="closeModal">Schließen</button>', true);
+    U.modal(esc(c.name), '<div class="row" style="gap:16px;flex-wrap:nowrap">' + U.crest(c, 90) + '<table class="t small"><tr><td>Liga</td><td>' + D.leagueNames[c.league] + (st.week ? ' · ' + E.leaguePos(st, c) + '. Platz' : '') + '</td></tr><tr><td>Stadt / Stadion</td><td>' + esc(c.city) + ' · ' + esc(c.stadiumName) + ' (' + R.fmtNum(E.capacity(c)) + ')</td></tr><tr><td>Fans / Ruf</td><td>' + R.fmtNum(c.fans) + ' / ' + c.reputation + '</td></tr><tr><td>Trainer</td><td>' + esc(U.coachName(c)) + ' (' + esc(c.coach.profile) + ')</td></tr><tr><td>Titel</td><td>' + c.titles.league + '× Meister, ' + c.titles.cup + '× Pokal</td></tr><tr><td>Kaderstärke</td><td>' + U.ovrBadge(M.squadStrength(st, c)) + '</td></tr>' + (c.rivals.length ? '<tr><td>Rivalen</td><td>' + c.rivals.map(function (r) { return esc(st.clubs[r].short); }).join(', ') + '</td></tr>' : '') + '</table></div><h3 style="margin-top:12px">Kader</h3><div class="scroll" style="max-height:300px">' + U.squadTable(sq, 'ci' + c.id, { market: true }) + '</div>', '<button data-act="closeModal">Schließen</button>', true);
   };
 
   // ---------- Liga & Statistiken ----------
@@ -107,6 +107,8 @@
   U.acts.ligaOwn = function () { U.go('liga', Object.assign({}, U.p, { own: !U.p.own })); };
 
   // ---------- Managerkarriere ----------
+  // Bankdirektor-Cheat entdeckt? (erst dann erscheinen Hinweise darauf)
+  U.cheatDiscovered = function (st) { return !!(st && (st.cheatUsed || st.cheatClicks > 0 || (st.achievements && st.achievements.bankdirector))); };
   U.screens.karriere = function () {
     var st = U.st, mg = st.manager, c = U.club();
     var h = '<h1 class="row" style="gap:10px">' + (c ? U.crest(c, 34) : '') + 'Managerkarriere</h1>';
@@ -123,11 +125,13 @@
       (c && mg.founder ? '<h3 style="margin-top:14px">Spielmodus wechseln</h3><p class="muted small">Als Präsident Ihres eigenen Vereins legen Sie fest, welche Aufgaben Sie selbst übernehmen.</p><div class="seg">' + [['manager', '👔 Manager'], ['trainer', '📋 Trainer'], ['gf', '💼 Geschäftsführer']].map(function (r) { return '<button class="' + (mg.role === r[0] ? 'on' : '') + '" data-act="setRole" data-v="' + r[0] + '">' + r[1] + '</button>'; }).join('') + '</div>' : '') + '</div>';
     h += '<div class="panel"><h2>Stationen</h2><table class="t">' + mg.history.slice().reverse().map(function (x) { var hc = st.clubs[x.clubId]; return '<tr><td>' + x.from + '–' + (x.to || 'heute') + '</td><td>' + (hc ? U.crest(hc, 18) + ' ' : '') + esc(x.club) + '</td><td>' + S.roleName(x.role) + '</td><td class="small">' + (x.titles.length ? x.titles.map(esc).join(', ') : '') + (x.fired ? ' <span class="neg">entlassen</span>' : '') + '</td></tr>'; }).join('') + '</table></div></div>';
     // Achievements
-    var ach = st.achievements;
-    h += '<div class="panel" style="margin-top:14px"><h2>Achievements (' + Object.keys(ach).length + '/' + Object.keys(D.achievements).length + ')</h2><div class="grid g3">' + Object.keys(D.achievements).map(function (k) {
+    var ach = st.achievements, cheatKnown = U.cheatDiscovered(st);
+    // Das Cheat-Achievement bleibt verborgen, bis der Bankdirektor entdeckt wurde
+    var achKeys = Object.keys(D.achievements).filter(function (k) { return k !== 'bankdirector' || cheatKnown; });
+    h += '<div class="panel" style="margin-top:14px"><h2>Achievements (' + achKeys.filter(function (k) { return ach[k]; }).length + '/' + achKeys.length + ')</h2><div class="grid g3">' + achKeys.map(function (k) {
       var a = ach[k];
       return '<div class="kpi" style="opacity:' + (a ? 1 : 0.45) + '"><div class="l">' + (a ? '🏆' : '🔒') + ' ' + esc(D.achievements[k][0]) + (a && a.cheat ? ' <span class="cheat-tag">Cheat</span>' : '') + '</div><div class="small muted" style="margin-top:4px">' + esc(D.achievements[k][1]) + (a ? ' · ' + a.season : '') + '</div></div>';
-    }).join('') + '</div><p class="muted small">Achievements, die in einem Spielstand mit genutztem Cheat erreicht wurden, werden separat gekennzeichnet.</p></div>';
+    }).join('') + '</div>' + (cheatKnown ? '<p class="muted small">Achievements, die in einem Spielstand mit genutztem Cheat erreicht wurden, werden separat gekennzeichnet.</p>' : '') + '</div>';
     // Saisonarchiv
     if (st.history.length) h += '<div class="panel" style="margin-top:14px"><h2>Saisonarchiv</h2><table class="t">' + st.history.slice().reverse().map(function (x) { return '<tr><td>' + x.season + '</td><td>Meister: <b>' + esc(st.clubs[x.champions[1]].name) + '</b></td><td>Pokal: ' + esc(st.clubs[x.cup].name) + '</td><td>' + (x.userClub ? esc(st.clubs[x.userClub].short) + ': ' + x.userPos + '. in L' + x.userLeague : '') + '</td></tr>'; }).join('') + '</table></div>';
     return h;
@@ -475,8 +479,8 @@
     R.save.storageInfo().then(function (i) { var el = document.getElementById('storeInfo2'); if (el) el.textContent = i.path || ''; });
     return '<h1>Einstellungen</h1><div class="grid g2"><div class="panel"><h2>Spiel</h2><table class="t"><tr><td>Standard-Spielgeschwindigkeit</td><td><div class="seg">' + [['normal', 'Normal'], ['schnell', 'Schnell'], ['sofort', 'Sofort']].map(function (x) { return '<button class="sm ' + (s.matchSpeed === x[0] ? 'on' : '') + '" data-act="setSpeed2" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></td></tr>' +
       '<tr><td>Retro-Soundeffekte</td><td><input type="checkbox" data-chg="setOpt" data-k="sound"' + (s.sound ? ' checked' : '') + '></td></tr>' +
-      '<tr><td>Bankdirektor-Cheat aktiv</td><td><input type="checkbox" data-chg="setOpt" data-k="cheatEnabled"' + (s.cheatEnabled ? ' checked' : '') + '></td></tr>' +
-      '<tr><td>Schwierigkeitsgrad</td><td>' + W.diffSettings[s.difficulty].name + '</td></tr><tr><td>Spielstand mit Cheat</td><td>' + (st.cheatUsed ? '<span class="cheat-tag">JA</span> (' + money(st.cheatTotal || 0) + ')' : 'nein') + '</td></tr></table></div>' +
+      (U.cheatDiscovered(st) ? '<tr><td>Bankdirektor-Cheat aktiv</td><td><input type="checkbox" data-chg="setOpt" data-k="cheatEnabled"' + (s.cheatEnabled ? ' checked' : '') + '></td></tr>' : '') +
+      '<tr><td>Schwierigkeitsgrad</td><td>' + W.diffSettings[s.difficulty].name + '</td></tr>' + (U.cheatDiscovered(st) ? '<tr><td>Spielstand mit Cheat</td><td>' + (st.cheatUsed ? '<span class="cheat-tag">JA</span> (' + money(st.cheatTotal || 0) + ')' : 'nein') + '</td></tr>' : '') + '</table></div>' +
       '<div class="panel"><h2>Speichern & Synchronisieren</h2><p class="small" id="storeInfo2"></p><div class="grid"><button data-act="saveQuick">Manuell speichern …</button><button data-act="exportSave">Spielstand exportieren</button><button data-act="importSave">Spielstand importieren</button></div><p class="muted small">Tipp: In der Mac-App liegen alle Spielstände im iCloud-Ordner „Spielstände“ – so können Sie abwechselnd auf MacBook und iMac spielen. Bitte das Spiel nicht gleichzeitig auf beiden Geräten geöffnet haben.</p></div></div>' +
       '<div class="panel" style="margin-top:14px"><h2>Kurzanleitung</h2><p class="small">1. <b>NÄCHSTER SPIELTAG</b> spielt die nächste Runde. 2. <b>Mannschaft</b>: Aufstellung per Klick oder Ziehen. 3. <b>Transfermarkt</b>: Filtern, Spieler anklicken, Angebot abgeben. 4. <b>Stadion / Vereinsstadt</b>: Ausbauen mit Wirtschaftlichkeitsrechnung. 5. <b>Bank</b>: Kredite, Tagesgeld, Aktien &amp; Krypto. ⏩ <b>Auto</b> spielt mehrere Spieltage am Stück. Leertaste pausiert das Live-Spiel.</p></div>';
   };

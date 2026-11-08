@@ -93,7 +93,7 @@
     var numF = Math.pow(n / 11, 0.7);
     var styleA = [0.86, 1, 1.09, 1.18][t.style], styleD = [1.12, 1, 0.93, 0.84][t.style];
     var pressM = [0.96, 1, 1.05][t.pressing];
-    var coachF = 0.96 + (club.coach ? club.coach.quality : 50) / 100 * 0.08;
+    var coachF = 0.96 + (club.coach ? club.coach.quality : 50) / 100 * 0.08 + R.econ.staffLvl(club, 'co') * 0.004;
     var home = (side === 0 && !m.neutral) ? 1.045 : 1;
     var mot = 1 + (m.mot[side] || 0) + (club.trainingBonus || 0) + (club.chemistry - 50) / 2500;
     var f = numF * coachF * home * mot * (m.dayForm ? m.dayForm[side] : 1);
@@ -245,7 +245,7 @@
       // Verletzungen
       var med = D.facilities.medizin.levels[st.clubs[m.clubs[s]].fac.medizin || 1].q;
       var diffInj = R.world.diffSettings[st.settings.difficulty].injury;
-      if (R.rand() < 0.0021 * [0.9, 1, 1.25][t[s].pressing] * (1 - med * 0.06) * diffInj) {
+      if (R.rand() < 0.0021 * [0.9, 1, 1.25][t[s].pressing] * (1 - med * 0.06) * diffInj * R.econ.injuryStaffF(st.clubs[m.clubs[s]])) {
         var ip = pickPlayer(m, s, function (p) { return 0.5 + p.risk + (100 - m.fit[p.id]) / 50 + (p.age > 30 ? 0.3 : 0); });
         if (ip) {
           m.injured[ip.id] = M.rollInjury(st, ip, med);
@@ -357,7 +357,8 @@
     var diff = R.world.diffSettings[st.settings.difficulty].injury;
     var inj = R.weighted(D.injuries, function (x) { return x.w * (x.min >= 6 ? diff : 1); });
     var weeks = R.randInt(inj.min, inj.max);
-    weeks = Math.max(inj.min > 10 ? Math.ceil(inj.min * 0.8) : 1, Math.round(weeks * (1 - medQ * 0.06)));
+    var reha = p && p.clubId && st.clubs[p.clubId] ? R.econ.staffLvl(st.clubs[p.clubId], 'reha') : 0;
+    weeks = Math.max(inj.min > 10 ? Math.ceil(inj.min * 0.8) : 1, Math.round(weeks * (1 - medQ * 0.06) * (1 - reha * 0.07)));
     return { type: inj.n, weeks: weeks, total: weeks };
   };
 

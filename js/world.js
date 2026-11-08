@@ -363,8 +363,7 @@
     [1, 2, 3].forEach(function (l) { st.leagues[l] = { level: l, name: D.leagueNames[l], clubIds: W.clubsInLeague(st, l).map(function (c) { return c.id; }), fixtures: [] }; });
 
     // Märkte
-    D.stocks.forEach(function (s) { st.market.stocks[s.id] = { price: s.price, hist: [s.price] }; });
-    D.cryptos.forEach(function (s) { st.market.crypto[s.id] = { price: s.price, hist: [s.price] }; });
+    R.econ.ensureMarkets(st); // inkl. 52 Wochen Kursverlauf
 
     var role = opts.role || 'manager';
     st.manager = {

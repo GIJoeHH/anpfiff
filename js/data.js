@@ -215,14 +215,28 @@
     { id: 'dubai', name: 'Dubai', cost: 900000, fit: 4, mor: 9, chem: 4, pr: 6, desc: 'Sehr teuer, hoher Komfort, Motivation und Öffentlichkeitswirkung.' }
   ];
 
+  // fx: Wirkung pro Woche (−2 … +2) auf Moral, Fitness (langfristig), Frische (kurzfristig), Verletzungsgefahr, Entwicklung
+  // mor: Moral-Zielwert-Verschiebung, die das Training tatsächlich bewirkt (season.js)
   D.training = {
-    fitness: { n: 'Fitness', d: 'Steigert Kondition und Tempo langfristig, kostet kurzfristig Frische.' },
-    taktik: { n: 'Taktik', d: 'Bessere Abstimmung: kleiner Bonus im nächsten Spiel.' },
-    angriff: { n: 'Angriff', d: 'Abschluss und Technik werden verbessert.' },
-    defensive: { n: 'Defensive', d: 'Zweikampf und Stellungsspiel werden verbessert.' },
-    technik: { n: 'Technik', d: 'Technik und Passspiel werden verbessert.' },
-    regeneration: { n: 'Regeneration', d: 'Schnelle Erholung, weniger Verletzungen, kaum Entwicklung.' }
+    fitness: { n: 'Fitness', ic: '🏃', d: 'Kondition und Tempo steigen langfristig – kostet kurzfristig Frische.', fx: { mor: -1, fit: 2, fresh: -2, inj: 1, dev: 1 }, attrs: 'Kondition, Tempo', mor: -2 },
+    taktik: { n: 'Taktik', ic: '🧠', d: 'Bessere Abstimmung: +2 % Bonus im nächsten Spiel.', fx: { mor: 0, fit: 0, fresh: 0, inj: 0, dev: 1 }, attrs: 'Passspiel, Defensive', mor: 0 },
+    angriff: { n: 'Angriff', ic: '⚽', d: 'Abschluss und Technik werden verbessert. Macht Spaß.', fx: { mor: 1, fit: 0, fresh: 0, inj: 0, dev: 2 }, attrs: 'Abschluss, Technik', mor: 2 },
+    defensive: { n: 'Defensive', ic: '🛡️', d: 'Zweikampf und Stellungsspiel werden verbessert.', fx: { mor: 0, fit: 1, fresh: 0, inj: 0, dev: 2 }, attrs: 'Defensive, Kondition', mor: 0 },
+    technik: { n: 'Technik', ic: '🎯', d: 'Ballbehandlung und Passspiel werden verbessert.', fx: { mor: 1, fit: 0, fresh: 0, inj: 0, dev: 2 }, attrs: 'Technik, Passspiel', mor: 1 },
+    regeneration: { n: 'Regeneration', ic: '🧘', d: 'Schnelle Erholung, keine Trainingsverletzungen, kaum Entwicklung.', fx: { mor: 2, fit: -1, fresh: 2, inj: -2, dev: -2 }, attrs: '–', mor: 3 }
   };
+  D.trainingFx = { mor: ['😊', 'Moral'], fit: ['💪', 'Fitness'], fresh: ['⚡', 'Frische'], inj: ['🩹', 'Verletzungsgefahr'], dev: ['📈', 'Entwicklung'] };
+
+  // Trainerstab (zusätzlich zum Cheftrainer); Gehalt je Stufe = Faktor × Ligabasis
+  D.staff = {
+    co: { n: 'Co-Trainer', ic: '📋', d: 'Bessere Trainingsarbeit und Spielvorbereitung.', eff: '+3 % Trainingswirkung und etwas bessere Spielleistung je Stufe' },
+    reha: { n: 'Reha-Trainer', ic: '🩹', d: 'Verletzte Spieler kehren schneller zurück.', eff: '−7 % Ausfallzeit je Stufe' },
+    fitness: { n: 'Fitnesstrainer', ic: '💪', d: 'Mehr Frische, weniger Muskelverletzungen.', eff: '+1,5 Erholung pro Woche, −5 % Verletzungsrisiko je Stufe' },
+    ernaehrung: { n: 'Ernährungsberater', ic: '🥗', d: 'Bessere Regeneration durch richtige Ernährung.', eff: '+1 Erholung pro Woche, −3 % Verletzungsrisiko je Stufe' },
+    assistent: { n: 'Teamassistent', ic: '🗂️', d: 'Reibungslose Abläufe, gute Stimmung im Team.', eff: '+2 Moral-Zielwert und Teamchemie je Stufe' }
+  };
+  D.staffLevels = ['Nicht besetzt', 'Einsteiger', 'Erfahren', 'Spitzenkraft'];
+  D.staffWage = { factor: [0, 1, 2.6, 6], base: { 1: 140000, 2: 55000, 3: 22000 } };
 
   D.stocks = [
     { id: 'STB', name: 'Stadionbau AG', price: 42, vol: 0.05, drift: 0.002 },
@@ -230,7 +244,9 @@
     { id: 'TFS', name: 'TechFuture SE', price: 76, vol: 0.08, drift: 0.003 },
     { id: 'NSE', name: 'Nordstern Energie', price: 31, vol: 0.035, drift: 0.001 },
     { id: 'WWH', name: 'Würstchen-Walter Holding', price: 12, vol: 0.06, drift: 0.0008 },
-    { id: 'RSL', name: 'Rheinstahl Logistik', price: 55, vol: 0.045, drift: 0.0012 }
+    { id: 'RSL', name: 'Rheinstahl Logistik', price: 55, vol: 0.045, drift: 0.0012 },
+    // Gimmick: börsennotierter Fußballverein. Mehrheit (über 50 % der Aktien) = Übernahme des Vereins
+    { id: 'BVB', name: 'Borussia Dortmund KGaA', price: 4.2, vol: 0.045, drift: 0.0005, club: true, shares: 110000000 }
   ];
   D.cryptos = [
     { id: 'FOOT', name: 'FootCoin', price: 2.5, vol: 0.18, drift: 0.004 },

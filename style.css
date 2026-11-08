@@ -223,3 +223,50 @@ html.native-ipad #app { height: 100dvh; }
 .rw-t .neg { color: #b91c1c; }
 .rw-t tr.rw-sum td { border-top: 2px solid #0b2a7a; font-weight: 800; }
 @media (max-width: 900px) { .rw-grid, .rw-lower { grid-template-columns: 1fr; } }
+
+/* ---------- Kacheln, Vergleichsfenster, Charts (Vereinsmanagement, Training, Bank) ---------- */
+.sec-h { display: flex; align-items: center; gap: 8px; margin: 18px 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); font-weight: 800; }
+.sec-h:first-of-type { margin-top: 6px; }
+.tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.tiles.big { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.tile { position: relative; background: linear-gradient(160deg, var(--panel2), var(--panel)); border: 1px solid var(--line); border-radius: 12px; padding: 14px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: transform .12s, border-color .12s, box-shadow .12s; min-height: 118px; }
+.tile:hover { border-color: #4a6aa8; transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.28); }
+.tile.on { border-color: var(--green); box-shadow: 0 0 0 1px var(--green) inset; background: linear-gradient(160deg, #18402e, #142a22); }
+.tile.empty { border-style: dashed; opacity: .9; }
+.tile.ro { cursor: default; }
+.tile .ti { font-size: 30px; line-height: 1; }
+.tile .tt { font-weight: 800; font-size: 14px; }
+.tile .ts { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.tile .tv { font-family: var(--mono); font-weight: 800; font-size: 16px; margin-top: auto; }
+.tile .tb { position: absolute; bottom: 10px; right: 10px; background: var(--amber); color: #111; border-radius: 10px; font-size: 11px; font-weight: 800; padding: 1px 7px; }
+.tile .row-ic { display: flex; align-items: center; gap: 10px; }
+.stars { color: #fbbf24; letter-spacing: 1px; font-size: 13px; }
+.stars .off { color: #3a4a6d; }
+.fx-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }
+.fx { background: rgba(0,0,0,.18); border-radius: 8px; padding: 6px 2px; text-align: center; font-size: 10.5px; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fx b { display: block; font-size: 18px; margin-bottom: 2px; }
+.fx .arr { display: block; font-weight: 900; font-size: 13px; letter-spacing: -1px; }
+.fx .up { color: var(--green); } .fx .dn { color: var(--red); } .fx .nu { color: #5b6b8f; }
+.fx.inv .up { color: var(--red); } .fx.inv .dn { color: var(--green); }
+.cmp { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.cmp-card { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; text-align: center; }
+.cmp-card.best { border-color: var(--green); }
+.cmp-card .logo { display: flex; justify-content: center; }
+.cmp-card table { width: 100%; font-size: 12.5px; border-collapse: collapse; text-align: left; }
+.cmp-card td { padding: 4px 2px; border-top: 1px solid var(--line); }
+.cmp-card td:last-child { text-align: right; font-family: var(--mono); font-weight: 700; }
+.cmp-card td.top { color: var(--green); }
+.cmp-card td.top::after { content: ' ★'; color: #fbbf24; }
+.cmp-card button { margin-top: auto; }
+.chart-box { position: relative; }
+.chart-box svg { display: block; width: 100%; height: auto; }
+.chart-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-top: 4px; flex-wrap: wrap; gap: 6px; }
+.stake { height: 10px; border-radius: 6px; background: #22304f; overflow: hidden; position: relative; }
+.stake > i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #f5d000, #f59e0b); }
+.stake::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: #fff; opacity: .7; }
+.art { width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #0d1527; }
+.art svg { display: block; width: 100%; height: auto; }
+.iso-wrap.art { background: none; padding: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+.iso-wrap.art svg { display: block; width: 100%; height: auto; }
+.iso-wrap.art .iso-click { cursor: pointer; }
+.iso-wrap.art .iso-click:hover { filter: brightness(1.12) drop-shadow(0 0 4px rgba(255,255,255,.6)); }
