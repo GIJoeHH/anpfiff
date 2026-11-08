@@ -21,7 +21,40 @@
   };
   S.userClub = function (st) { return st.manager.unemployed ? null : st.clubs[st.manager.clubId]; };
 
-  // Doppelrunde (Kreismethode), 17 Heim- und 17 Auswärtsspiele je Team
+  // Spielwochen je Saison. Ligen mit mehr Spieltagen (3. Liga mit 20 Vereinen = 38 Spieltage) spielen in
+  // einigen Wochen doppelt („englische Woche“), Ligen mit weniger Spieltagen haben spielfreie Wochen.
+  S.SEASON_WEEKS = 34;
+  S.weekPlan = function (nRounds) {
+    var W_ = S.SEASON_WEEKS, diff = nRounds - W_, special = {};
+    if (diff !== 0) {
+      // Sonderwochen gleichmäßig verteilen, möglichst nicht in Pokalwochen und nicht in der Winterpause (16–18)
+      var cand = [];
+      for (var w = 3; w <= W_ - 1; w++) if (S.CUP_WEEKS.indexOf(w) < 0 && (w < 16 || w > 18)) cand.push(w);
+      var k = Math.min(Math.abs(diff), cand.length);
+      for (var i = 0; i < k; i++) special[cand[Math.floor((i + 0.5) * cand.length / k)]] = true;
+    }
+    var plan = [], r = 0;
+    for (var wk = 1; wk <= W_; wk++) {
+      var n = special[wk] ? (diff > 0 ? 2 : 0) : 1, md = [];
+      for (var j = 0; j < n && r < nRounds; j++) md.push(r++);
+      plan.push(md);
+    }
+    while (r < nRounds) plan[W_ - 1].push(r++); // Sicherheitsnetz
+    return plan;
+  };
+  // Spieltage (Indizes in lg.fixtures), die in Spielwoche „week“ (1-basiert) stattfinden
+  S.roundsOf = function (st, l, week) {
+    var lg = st.leagues[l];
+    if (!lg.weeks) return week >= 1 && week <= lg.fixtures.length ? [week - 1] : [];
+    return lg.weeks[week - 1] || [];
+  };
+  // Anzahl der Spieltage bis einschließlich Spielwoche „week“
+  S.roundsUpTo = function (st, l, week) {
+    var n = 0; for (var w = 1; w <= week; w++) n += S.roundsOf(st, l, w).length; return n;
+  };
+  S.leagueSize = function (st, l) { return st.leagues[l] ? st.leagues[l].clubIds.length : 18; };
+
+  // Doppelrunde (Kreismethode): jede Mannschaft hat gleich viele Heim- und Auswärtsspiele
   S.makeSchedule = function (ids) {
     var teams = R.shuffle(ids.slice()), n = teams.length, rounds = [];
     var fixed = teams[0], rot = teams.slice(1);
@@ -66,13 +99,14 @@
     [1, 2, 3].forEach(function (l) {
       st.leagues[l].clubIds = W.clubsInLeague(st, l).map(function (c) { return c.id; });
       st.leagues[l].fixtures = S.makeSchedule(st.leagues[l].clubIds);
+      st.leagues[l].weeks = S.weekPlan(st.leagues[l].fixtures.length);
     });
     S.drawCup(st, 0);
     st.releg = null; st.week = 0; st.phase = 'preseason'; st.campDone = false;
     // Saisonziele / Vorstandserwartung
     [1, 2, 3].forEach(function (l) {
       var cl = W.clubsInLeague(st, l).map(function (c) { M.autoBest(st, c); return { c: c, s: M.squadStrength(st, c) }; }).sort(function (a, b) { return b.s - a.s; });
-      cl.forEach(function (x, i) { x.c.expectedPos = i + 1; });
+      cl.forEach(function (x, i) { x.c.expectedPos = i + 1; x.c.leagueSize = cl.length; });
     });
     var uc = S.userClub(st);
     if (uc) {
@@ -84,11 +118,11 @@
   };
 
   S.targetFor = function (club) {
-    var e = club.expectedPos || 9;
+    var e = club.expectedPos || 9, n = club.leagueSize || 18;
     if (e <= 2) return { pos: club.league === 1 ? 2 : 2, text: club.league === 1 ? 'Meisterschaft' : 'Aufstieg' };
     if (e <= 6) return { pos: 6, text: club.league === 1 ? 'Oberes Tabellendrittel' : 'Aufstiegskampf' };
     if (e <= 12) return { pos: 12, text: 'Gesichertes Mittelfeld' };
-    return { pos: club.league === 3 ? 18 : 15, text: club.league === 3 ? 'Ruhige Saison' : 'Klassenerhalt' };
+    return { pos: club.league === 3 ? n : n - 3, text: club.league === 3 ? 'Ruhige Saison' : 'Klassenerhalt' };
   };
 
   // ---------- Pokal ----------
@@ -96,7 +130,7 @@
     if (round === 0) {
       var all = Object.keys(st.clubs);
       var l1 = R.shuffle(all.filter(function (id) { return st.clubs[id].league === 1; }));
-      var byes = l1.slice(0, 10);
+      var byes = l1.slice(0, R.clamp(64 - all.length, 0, l1.length)); // Freilose, damit Runde 2 genau 32 Teams hat (54 Teams → 10, 56 → 8)
       var rest = R.shuffle(all.filter(function (id) { return byes.indexOf(id) < 0; }));
       st.cup = { rounds: [], byes: byes, winner: null, alive: all.slice() };
       st.cup.rounds.push({ name: S.CUP_NAMES[0], week: S.CUP_WEEKS[0], ties: S.pairCup(st, rest) });
@@ -123,13 +157,15 @@
     var list = [], uc = st.manager.unemployed ? null : st.manager.clubId;
     if (st.phase === 'preseason' || st.phase === 'season') {
       var week = st.phase === 'preseason' ? 1 : st.week + 1;
-      if (week > 34) return { list: [], week: week };
+      if (week > S.SEASON_WEEKS) return { list: [], week: week };
       var ci = S.CUP_WEEKS.indexOf(week);
       if (ci >= 0 && st.cup.rounds[ci]) st.cup.rounds[ci].ties.forEach(function (t, i) {
         list.push({ key: 'C-' + ci + '-' + i, comp: ci === 5 ? 'final' : 'cup', h: t.h, a: t.a, neutral: t.neutral, extraTime: true });
       });
       [1, 2, 3].forEach(function (l) {
-        st.leagues[l].fixtures[week - 1].forEach(function (f, i) { list.push({ key: 'L-' + l + '-' + (week - 1) + '-' + i, comp: 'league', h: f.h, a: f.a }); });
+        S.roundsOf(st, l, week).forEach(function (r) {
+          st.leagues[l].fixtures[r].forEach(function (f, i) { list.push({ key: 'L-' + l + '-' + r + '-' + i, comp: 'league', h: f.h, a: f.a }); });
+        });
       });
     } else if (st.phase === 'releg') {
       st.releg.forEach(function (rg, i) {
@@ -197,7 +233,7 @@
       var ci = S.CUP_WEEKS.indexOf(st.week);
       if (ci >= 0 && ci < 5 && st.cup.rounds[ci]) S.drawCup(st, ci + 1);
       if (ci === 5) S.cupFinished(st);
-      if (st.week >= 34) S.toRelegation(st);
+      if (st.week >= S.SEASON_WEEKS) S.toRelegation(st);
     } else if (st.phase === 'releg') {
       st.relegLeg++;
       Object.keys(st.clubs).forEach(function (k) { S.trainingWeek(st, st.clubs[k]); });
@@ -621,14 +657,15 @@
 
   S.toRelegation = function (st) {
     var t1 = S.table(st, 1), t2 = S.table(st, 2), t3 = S.table(st, 3);
+    var r1 = t1.length - 3, r2 = t2.length - 3; // Relegationsplatz (16. von 18)
     st.finalTables = { 1: t1.map(function (r) { return r.id; }), 2: t2.map(function (r) { return r.id; }), 3: t3.map(function (r) { return r.id; }) };
     st.finalRows = { 1: t1, 2: t2, 3: t3 };
     st.releg = [
-      { upper: t1[15].id, lower: t2[2].id, legs: [{ h: t2[2].id, a: t1[15].id, r: null }, { h: t1[15].id, a: t2[2].id, r: null }], winner: null, levels: [1, 2] },
-      { upper: t2[15].id, lower: t3[2].id, legs: [{ h: t3[2].id, a: t2[15].id, r: null }, { h: t2[15].id, a: t3[2].id, r: null }], winner: null, levels: [2, 3] }
+      { upper: t1[r1].id, lower: t2[2].id, legs: [{ h: t2[2].id, a: t1[r1].id, r: null }, { h: t1[r1].id, a: t2[2].id, r: null }], winner: null, levels: [1, 2] },
+      { upper: t2[r2].id, lower: t3[2].id, legs: [{ h: t3[2].id, a: t2[r2].id, r: null }, { h: t2[r2].id, a: t3[2].id, r: null }], winner: null, levels: [2, 3] }
     ];
     st.phase = 'releg'; st.relegLeg = 0;
-    S.news(st, 'Die Saison ist beendet – jetzt kommt die Relegation!', st.clubs[t1[15].id].short + ' gegen ' + st.clubs[t2[2].id].short + ' und ' + st.clubs[t2[15].id].short + ' gegen ' + st.clubs[t3[2].id].short + '.', 'liga');
+    S.news(st, 'Die Saison ist beendet – jetzt kommt die Relegation!', st.clubs[t1[r1].id].short + ' gegen ' + st.clubs[t2[2].id].short + ' und ' + st.clubs[t2[r2].id].short + ' gegen ' + st.clubs[t3[2].id].short + '.', 'liga');
   };
 
   S.finishRelegation = function (st) {
@@ -646,7 +683,8 @@
       sum.players[l] = best ? { id: best.id, name: W.playerName(best), club: st.clubs[best.clubId].short, avg: (best.stats.rsum / best.stats.apps).toFixed(2) } : null;
     });
     sum.promoted = [ft[2][0], ft[2][1], ft[3][0], ft[3][1]];
-    sum.relegated = [ft[1][16], ft[1][17], ft[2][16], ft[2][17]];
+    var n1 = ft[1].length, n2 = ft[2].length;
+    sum.relegated = [ft[1][n1 - 2], ft[1][n1 - 1], ft[2][n2 - 2], ft[2][n2 - 1]];
     st.releg.forEach(function (rg) { sum.releg.push({ upper: rg.upper, lower: rg.lower, winner: rg.winner }); });
     return sum;
   };
@@ -661,7 +699,7 @@
     [1, 2, 3].forEach(function (l) {
       ft[l].forEach(function (id, i) {
         var c = st.clubs[id], pr = S.LEAGUE_PRIZE[l];
-        var prize = Math.round(pr[0] - (pr[0] - pr[1]) * i / 17);
+        var prize = Math.round(pr[0] - (pr[0] - pr[1]) * i / Math.max(1, ft[l].length - 1));
         c.cash += prize; E.book(c, 'Prämien', prize);
         var row = st.finalRows[l][i];
         c.history.push({ season: st.season, type: 'saison', league: l, pos: i + 1, pts: row.pts, gf: row.gf, ga: row.ga });
@@ -699,8 +737,9 @@
       if (to < from) { c.titles.promo++; c.history.push({ season: st.season, type: 'aufstieg', text: 'Aufstieg in die ' + D.leagueNames[to] + (why ? ' (' + why + ')' : '') }); c.fans = Math.round(c.fans * 1.08); }
       else c.history.push({ season: st.season, type: 'abstieg', text: 'Abstieg in die ' + D.leagueNames[to] + (why ? ' (' + why + ')' : '') });
     }
-    move(ft[2][0], 1); move(ft[2][1], 1); move(ft[1][16], 2); move(ft[1][17], 2);
-    move(ft[3][0], 2); move(ft[3][1], 2); move(ft[2][16], 3); move(ft[2][17], 3);
+    var n1 = ft[1].length, n2 = ft[2].length;
+    move(ft[2][0], 1); move(ft[2][1], 1); move(ft[1][n1 - 2], 2); move(ft[1][n1 - 1], 2);
+    move(ft[3][0], 2); move(ft[3][1], 2); move(ft[2][n2 - 2], 3); move(ft[2][n2 - 1], 3);
     st.releg.forEach(function (rg) {
       if (rg.winner === rg.lower) { move(rg.lower, rg.levels[0], 'Relegation'); move(rg.upper, rg.levels[1], 'Relegation'); }
     });
@@ -790,7 +829,7 @@
       var squad = W.squad(st, c.id);
       var avg = squad.length ? R.avg(squad.slice().sort(function (a, b) { return b.ovr - a.ovr; }).slice(0, 14), function (p) { return p.ovr; }) : 50;
       var target = 40 + c.tier * 38;
-      var leagueMean = { 1: 70, 2: 60, 3: 52 }[c.league];
+      var leagueMean = S.leagueMean(st, c.league);
       var genMean = (avg * 0.5 + leagueMean * 0.5);
       if (avg < target - 6) genMean += 2;
       var need = { TW: 3, ABW: 7, MIT: 7, STU: 4 };
@@ -817,11 +856,15 @@
     st.rngState = R.rng.state;
   };
 
+  // Durchschnittliche Stammspielerstärke je Liga (wird beim Start der Karriere festgehalten, damit
+  // nachrückende Spieler zum Niveau der Spielwelt passen – fiktive Welt: 70/60/52)
+  S.leagueMean = function (st, l) { return (st.leagueMean && st.leagueMean[l]) || { 1: 70, 2: 60, 3: 52 }[l]; };
+
   // Notverpflichtungen, falls der Kader des Nutzers zu klein wird (keine Sackgasse)
   S.emergencySignings = function (st, club) {
     var squad = W.squad(st, club.id), signed = [];
     var need = { TW: 2, ABW: 5, MIT: 5, STU: 3 };
-    var mean = squad.length ? R.avg(squad, function (p) { return p.ovr; }) - 3 : { 1: 66, 2: 57, 3: 49 }[club.league];
+    var mean = squad.length ? R.avg(squad, function (p) { return p.ovr; }) - 3 : S.leagueMean(st, club.league) - 4;
     function add(pos) {
       var fa = T.freeAgents(st).filter(function (p) { return p.pos === pos && p.age <= 32; }).sort(function (a, b) { return Math.abs(a.ovr - mean) - Math.abs(b.ovr - mean); })[0];
       var p = fa && Math.abs(fa.ovr - mean) < 10 ? fa : null;

@@ -39,10 +39,11 @@
   // Sportliche Nachfrage 0.5..1.6
   E.sportFactor = function (st, club) {
     var pos = st.week >= 3 ? E.leaguePos(st, club) : (club.lastPos || 9);
-    var f = 0.78 + 0.45 * (1 - (pos - 1) / 17);
+    var n = (st.leagues[club.league] && st.leagues[club.league].clubIds.length) || 18;
+    var f = 0.78 + 0.45 * (1 - (pos - 1) / (n - 1));
     var form = club.form || [];
     f += R.sum(form.slice(-5), function (r) { return r === 'S' ? 0.025 : r === 'N' ? -0.02 : 0; });
-    if (st.week > 22 && (pos <= 3 || pos >= 16)) f += 0.08; // Aufstiegs-/Abstiegskampf
+    if (st.week > 22 && (pos <= 3 || pos >= n - 2)) f += 0.08; // Aufstiegs-/Abstiegskampf
     f += Math.min(0.15, (club.titles.league * 0.03 + club.titles.cup * 0.01));
     return R.clamp(f, 0.5, 1.6);
   };

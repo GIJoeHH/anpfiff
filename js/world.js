@@ -20,8 +20,14 @@
     if (p.pot < p.ovr) p.pot = p.ovr;
     p.value = W.marketValue(p);
   };
+  // Echte Spielwelt: Die Stärkewerte liegen enger beieinander und höher als in der fiktiven Welt
+  // (Ligaschnitt 76/69/64 statt 73/63/57). Für Geldbeträge (Gehalt, Marktwert) wird die Stärke deshalb
+  // auf die Skala der Wirtschaftssimulation umgerechnet; die angezeigte Stärke bleibt unverändert.
+  W.REAL_SCALE = [1.333, -29.3];
+  W.moneyOvr = function (p) { return p.rs ? W.REAL_SCALE[0] * p.ovr + W.REAL_SCALE[1] : p.ovr; };
+  W.fromMoneyScale = function (st, x) { return st && st.world === 'real' ? (x - W.REAL_SCALE[1]) / W.REAL_SCALE[0] : x; };
   W.marketValue = function (p) {
-    var v = 200000 * Math.exp((p.ovr - 50) / 6.2);
+    var v = 200000 * Math.exp((W.moneyOvr(p) - 50) / 6.2);
     var ageF = p.age <= 21 ? 1 + (p.pot - p.ovr) / 30 : p.age <= 27 ? 1 + Math.max(0, p.pot - p.ovr) / 50 : p.age <= 30 ? 0.85 : p.age <= 32 ? 0.55 : 0.3;
     v *= ageF;
     if (p.contract <= 1) v *= 0.75;
@@ -29,7 +35,7 @@
     return Math.max(10000, R.round(v, v > 1e6 ? 50000 : 5000));
   };
   W.fairWage = function (p) {
-    var w = 60000 * Math.exp((p.ovr - 50) / 6.5);
+    var w = 60000 * Math.exp((W.moneyOvr(p) - 50) / 6.5);
     if (p.age >= 31) w *= 0.9;
     return Math.max(15000, R.round(w, 1000));
   };
@@ -37,7 +43,7 @@
   var nextId = function (st, kind) { st.nextIds[kind] = (st.nextIds[kind] || 0) + 1; return kind.charAt(0) + st.nextIds[kind]; };
   W.nextId = nextId;
 
-  W.genPlayer = function (st, pos, target, age, clubId) {
+  W.blankPlayer = function (st, pos, age, clubId) {
     var p = {
       id: nextId(st, 'player'), first: R.pick(D.firstNames), last: R.pick(D.lastNames), age: age, pos: pos, alt: [],
       attr: {}, ovr: 0, pot: 0, form: 6, fitness: R.randInt(88, 100), morale: R.randInt(60, 80),
@@ -46,6 +52,11 @@
       stats: { apps: 0, goals: 0, assists: 0, yc: 0, rc: 0, rsum: 0 }, career: { apps: 0, goals: 0, assists: 0 },
       boughtFor: 0, risk: R.rand() < 0.15 ? R.randRange(0.4, 1) : R.randRange(0, 0.3), joined: st.season
     };
+    if (st.world === 'real') p.rs = 1;
+    return p;
+  };
+  W.genPlayer = function (st, pos, target, age, clubId) {
+    var p = W.blankPlayer(st, pos, age, clubId);
     var w = D.posWeights[pos];
     D.attrKeys.forEach(function (k, i) {
       var bias = w[i] >= 0.2 ? 6 : (w[i] === 0 ? (k === 'gk' ? -35 : -14) : 0);
@@ -74,7 +85,7 @@
   W.genYouth = function (st, club, quality) {
     // quality 0..4 (Stufe Nachwuchszentrum)
     var pos = R.weighted(['TW', 'ABW', 'MIT', 'STU'], function (x) { return { TW: 1, ABW: 3, MIT: 3, STU: 2 }[x]; });
-    var base = 34 + quality * 4 + (club.league === 1 ? 4 : club.league === 2 ? 2 : 0);
+    var base = W.fromMoneyScale(st, 34 + quality * 4 + (club.league === 1 ? 4 : club.league === 2 ? 2 : 0));
     var p = W.genPlayer(st, pos, R.clamp(R.gauss(base, 5), 25, 70), R.randInt(16, 18), club.id);
     p.pot = R.clamp(Math.round(p.ovr + R.randInt(10, 22) + quality * R.randInt(2, 5) + (R.chance(0.04 + quality * 0.02) ? R.randInt(5, 12) : 0)), p.ovr, 96);
     p.youth = true; p.homegrown = true; p.contract = 3;
@@ -180,8 +191,96 @@
   W.clubsInLeague = function (st, lvl) {
     return Object.keys(st.clubs).map(function (k) { return st.clubs[k]; }).filter(function (c) { return c.league === lvl; });
   };
-  W.playerName = function (p) { return p ? p.first + ' ' + p.last : '—'; };
-  W.shortName = function (p) { return p ? p.first.charAt(0) + '. ' + p.last : '—'; };
+  W.playerName = function (p) { return p ? (p.first ? p.first + ' ' + p.last : p.last) : '—'; };
+  W.shortName = function (p) { return p ? (p.first ? p.first.charAt(0) + '. ' + p.last : p.last) : '—'; };
+
+  // ---------- Echte Spielwelt 2026/27 (Daten aus game/js/data_real.js, erzeugt von tools/import_real_db.py) ----------
+  W.hasRealWorld = function () { return !!(D.real && D.real.clubs && D.real.clubs.length); };
+  // Feste Pseudozufallszahl 0..1 je Spieler, damit Potenzial & Co. in jeder Karriere gleich sind
+  function h01(id, salt) { var x = Math.sin(id * 12.9898 + salt * 78.233) * 43758.5453; return x - Math.floor(x); }
+  var ROLE = { TW: 'TW', IV: 'ABW', AV: 'ABW', DM: 'MIT', ZM: 'MIT', OM: 'MIT', ST: 'STU' };
+  W.realRole = function (posA, posEA) { return posA === 'FL' ? (posEA === 'LW' || posEA === 'RW' ? 'STU' : 'MIT') : (ROLE[posA] || 'MIT'); };
+  W.realTier = function (avgOvr) { return R.clamp(0.25 + (avgOvr - 58) / 22 * 0.75, 0.2, 1); };
+  // Attribute so anpassen, dass die Gesamtstärke (gerundet) exakt dem Zielwert entspricht.
+  // Die Korrektur verteilt sich nach Positionsgewichten (kleinstmögliche Änderung der Einzelwerte).
+  W.fitOverall = function (p, target) {
+    var w = D.posWeights[p.pos], keys = D.attrKeys, sw2 = R.sum(w, function (x) { return x * x; });
+    for (var it = 0; it < 8; it++) {
+      var d = target - W.overallFor(p, p.pos); if (Math.abs(d) < 0.05) break;
+      keys.forEach(function (k, i) { p.attr[k] = R.clamp(p.attr[k] + d * w[i] / sw2, 1, 99); });
+    }
+    keys.forEach(function (k) { p.attr[k] = Math.round(p.attr[k]); });
+    var order = keys.map(function (k, i) { return i; }).sort(function (a, b) { return w[b] - w[a]; });
+    for (var g = 0; g < 40; g++) {
+      var cur = Math.round(W.overallFor(p, p.pos)); if (cur === target) break;
+      var dir = cur < target ? 1 : -1;
+      for (var j = 0; j < order.length; j++) { var k = keys[order[j]]; if (w[order[j]] > 0 && p.attr[k] + dir >= 1 && p.attr[k] + dir <= 99) { p.attr[k] += dir; break; } }
+    }
+  };
+  W.importPlayer = function (st, row, cols, clubId) {
+    var c = {}; cols.forEach(function (k, i) { c[k] = row[i]; });
+    var pos = W.realRole(c.posA, c.posEA), ovr = c.ovr, age = c.age, id = c.extId;
+    var p = W.blankPlayer(st, pos, age, clubId);
+    p.first = c.first; p.last = c.last; p.extId = id; p.nat = c.nat; p.dob = c.dob; p.posDetail = c.posA;
+    p.foot = c.foot === 'L' ? 'L' : 'R'; p.skills = c.skills; p.weakFoot = c.weakFoot;
+    var alt = [];
+    String(c.altA || '').split(/\s+/).forEach(function (a) {
+      if (!a) return;
+      var r = a === 'FL' ? (pos === 'MIT' ? 'STU' : 'MIT') : ROLE[a];
+      if (r && r !== pos && alt.indexOf(r) < 0) alt.push(r);
+    });
+    p.alt = alt;
+    var gk = Math.round((c.keeper_hechten + c.keeper_fangen + c.keeper_abstoss + c.keeper_stellungsspiel + c.keeper_reflexe) / 5);
+    if (pos === 'TW') {
+      // Bei Torhütern stehen in den Feldspieler-Spalten die Torwartwerte; echte Werte: Ballkontrolle, Kurzpass, Abschluss, Defensivbewusstsein, Ausdauer, Tempo (Spalte Verteidigung)
+      var floor = ovr - 14;
+      p.attr = { tec: Math.max(c.ballkontrolle, floor), pas: Math.max(c.kurzpass, floor), sho: Math.max(c.abschluss, floor - 10), def: Math.max(c.defensivbewusstsein, floor), spd: Math.max(c.verteidigung, floor), sta: Math.max(c.ausdauer, floor), gk: gk };
+    } else {
+      p.attr = { tec: (c.dribbling + c.ballkontrolle) / 2, pas: c.passspiel * 0.6 + c.kurzpass * 0.4, sho: (c.schuss + c.abschluss) / 2, def: c.verteidigung * 0.6 + c.defensivbewusstsein * 0.4, spd: c.schnelligkeit, sta: c.ausdauer * 0.6 + c.physis * 0.4, gk: gk };
+    }
+    W.fitOverall(p, ovr);
+    p.ovr = ovr;
+    // Fehlende Werte berechnen: Potenzial, Vertragslaufzeit, Gehalt, Marktwert
+    var r1 = h01(id, 1), r2 = h01(id, 2), r3 = h01(id, 3);
+    var potAdd = age <= 18 ? 8 + r1 * 14 : age <= 20 ? 5 + r1 * 11 : age <= 22 ? 3 + r1 * 8 : age <= 24 ? 1 + r1 * 5 : age <= 26 ? r1 * 3 : 0;
+    potAdd *= R.clamp((95 - ovr) / 25, 0.3, 1);
+    p.pot = R.clamp(Math.round(ovr + potAdd), ovr, Math.max(ovr, 95));
+    p.contract = age <= 22 ? 2 + Math.floor(r2 * 4) : age <= 29 ? 1 + Math.floor(r2 * 4) : age <= 32 ? 1 + Math.floor(r2 * 2) : 1;
+    p.wage = Math.max(15000, Math.round(W.fairWage(p) * (0.85 + r3 * 0.3) / 1000) * 1000);
+    p.value = W.marketValue(p);
+    st.players[p.id] = p;
+    return p;
+  };
+  // Echte Vereine anlegen (Ersatz für D.clubs) und Kader importieren
+  W.buildRealWorld = function (st) {
+    var RD = D.real, cc = {}; RD.clubCols.forEach(function (k, i) { cc[k] = i; });
+    var clubs = RD.clubs.map(function (r, i) {
+      var row = [r[cc.name], r[cc.short], r[cc.city], r[cc.color1], r[cc.color2], r[cc.league], W.realTier(r[cc.avgOvr]), r[cc.fans]];
+      var club = W.makeClub(st, row, i);
+      club.real = true;
+      return club;
+    });
+    var byShort = {}; clubs.forEach(function (c) { byShort[c.short] = c; });
+    (RD.derbies || []).forEach(function (d) { var a = byShort[d[0]], b = byShort[d[1]]; if (a && b && a.rivals.indexOf(b.id) < 0) { a.rivals.push(b.id); b.rivals.push(a.id); } });
+    return clubs;
+  };
+  W.importRealPlayers = function (st) {
+    var RD = D.real, ci = RD.playerCols.indexOf('club'), seen = {}, dup = 0;
+    RD.players.forEach(function (row) {
+      var ext = row[0];
+      if (seen[ext]) { dup++; return; } // doppelte Einträge werden ignoriert
+      seen[ext] = true;
+      var club = st.clubs['c' + (row[ci] + 1)];
+      W.importPlayer(st, row, RD.playerCols, club.id);
+    });
+    // Durchschnittliche Stammspielerstärke je Liga festhalten (für nachrückende/neu erzeugte Spieler)
+    st.leagueMean = {};
+    [1, 2, 3].forEach(function (l) {
+      var cl = W.clubsInLeague(st, l);
+      st.leagueMean[l] = Math.round(R.avg(cl, function (c) { return R.avg(W.squad(st, c.id).sort(function (a, b) { return b.ovr - a.ovr; }).slice(0, 14), function (p) { return p.ovr; }); }));
+    });
+    st.realWorld = { source: RD.source, season: RD.season, players: Object.keys(st.players).length, duplicatesSkipped: dup };
+  };
 
   W.diffSettings = {
     einsteiger: { name: 'Einsteiger', cash: 1.6, nego: 0.85, injury: 0.7, econ: 0.8, ai: -2, events: 1 },
@@ -202,10 +301,15 @@
       transfers: [], allTime: {}, pendingEvent: null, deal: null, dealsScheduled: [], dealLog: [], lastResults: null, seasonLog: []
     };
     var diff = W.diffSettings[st.settings.difficulty];
-    D.clubs.forEach(function (row, i) { W.makeClub(st, row, i); });
-    // Rivalitäten
-    var byShort = {}; Object.keys(st.clubs).forEach(function (k) { byShort[st.clubs[k].short] = st.clubs[k]; });
-    D.derbies.forEach(function (d) { var a = byShort[d[0]], b = byShort[d[1]]; if (a && b) { a.rivals.push(b.id); b.rivals.push(a.id); } });
+    var real = opts.world ? opts.world === 'real' && W.hasRealWorld() : W.hasRealWorld();
+    st.world = real ? 'real' : 'fiktiv';
+    if (real) W.buildRealWorld(st);
+    else {
+      D.clubs.forEach(function (row, i) { W.makeClub(st, row, i); });
+      // Rivalitäten
+      var byShort = {}; Object.keys(st.clubs).forEach(function (k) { byShort[st.clubs[k].short] = st.clubs[k]; });
+      D.derbies.forEach(function (d) { var a = byShort[d[0]], b = byShort[d[1]]; if (a && b) { a.rivals.push(b.id); b.rivals.push(a.id); } });
+    }
 
     // Eigener Verein gründen
     var userClub = null;
@@ -230,12 +334,19 @@
       userClub = st.clubs[opts.clubId] || st.clubs.c37;
     }
 
-    // Kader erzeugen
+    // Kader erzeugen (echte Welt: importierte Spieler; ein neu gegründeter Verein bekommt einen erzeugten Kader)
+    if (real) {
+      W.importRealPlayers(st);
+      if (opts.mode === 'found') {
+        // Der Kader des ersetzten Vereins wird vertragslos (Transfermarkt), damit keine Spieler verloren gehen
+        Object.keys(st.players).forEach(function (id) { var p = st.players[id]; if (p.clubId === userClub.id) { p.clubId = null; p.freeSince = st.season; } });
+      }
+    }
     Object.keys(st.clubs).forEach(function (k) {
       var c = st.clubs[k];
       var mean = 40 + c.tier * 38 + (c === userClub ? 0 : diff.ai);
-      if (c.founded) mean = 47;
-      W.genSquad(st, c, mean);
+      if (c.founded) mean = real ? st.leagueMean[3] - 9 : 47;
+      if (!real || c.founded) W.genSquad(st, c, mean);
       ['haupt', 'trikot', 'aermel', 'ausruester', 'bande'].forEach(function (cat) { var s = W.genSponsor(st, c, cat); if (c.founded && cat !== 'haupt' && cat !== 'bande') return; c.sponsors.push(s); });
     });
     userClub.cash = Math.round(userClub.cash * (opts.mode === 'found' ? 1 : diff.cash));

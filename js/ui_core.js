@@ -248,7 +248,7 @@
       '<p class="muted small">Version 1.0 · ' + R.save.platform() + '</p></div></div>';
   };
   U.acts.resume = function () { U.go('zentrale'); };
-  U.acts.newCareer = function () { U.wiz = { step: 1, mode: null, difficulty: 'normal', role: 'manager', canBeFired: true, name: 'Daniel', seed: Date.now() % 2147483647, nc: { name: 'FC Neustadt 2026', short: 'Neustadt', city: 'Neustadt', color1: '#16a34a', color2: '#ffffff', stadium: 'Sportpark am Bahndamm', capital: 1500000, crestShape: 0, crestSymbol: 1 } }; U.go('wizard'); };
+  U.acts.newCareer = function () { U.wiz = { step: 1, mode: null, world: W.hasRealWorld() ? 'real' : 'fiktiv', difficulty: 'normal', role: 'manager', canBeFired: true, name: 'Daniel', seed: Date.now() % 2147483647, nc: { name: 'FC Neustadt 2026', short: 'Neustadt', city: 'Neustadt', color1: '#16a34a', color2: '#ffffff', stadium: 'Sportpark am Bahndamm', capital: 1500000, crestShape: 0, crestSymbol: 1 } }; U.go('wizard'); };
   U.acts.loadScreen = function () { U.go('load'); };
 
   U.screens.load = function () {
@@ -299,7 +299,7 @@
 
   // ---------- Karriere-Assistent ----------
   U.wizPreview = function () {
-    if (!U.wiz.preview) U.wiz.preview = W.newGame({ seed: U.wiz.seed, difficulty: U.wiz.difficulty, clubId: 'c1' });
+    if (!U.wiz.preview) U.wiz.preview = W.newGame({ seed: U.wiz.seed, difficulty: U.wiz.difficulty, clubId: 'c1', world: U.wiz.world });
     return U.wiz.preview;
   };
   U.clubFacts = function (st, c) {
@@ -324,11 +324,14 @@
         U.choice('mode', 'existing', w.mode, '🏟️ Verein übernehmen', 'Übernehmen Sie einen beliebigen Verein aus allen drei Ligen.') +
         U.choice('mode', 'found', w.mode, '🛠️ Eigenen Verein gründen', 'Präsident + Geschäftsführer + Trainer in einer Person. Start in der 3. Liga, unkündbar.') +
         U.choice('mode', 'project', w.mode, '🚀 Vom Drittligisten zum Spitzenclub', 'Schnellstart mit einem schwachen Drittligisten als Aufbauprojekt.') + '</div>';
+      if (W.hasRealWorld()) h += '<div class="panel" style="margin-top:14px"><h2>Spielwelt</h2><div class="grid g2">' +
+        U.choice('world', 'real', w.world, '🇩🇪 Echte Vereine 2026/27', '56 Vereine (18/18/20) mit ' + R.fmtNum(D.real.players.length) + ' echten Spielern. Daten: ' + esc(D.real.source) + '.') +
+        U.choice('world', 'fiktiv', w.world, '🎲 Fiktive Vereine', '54 erfundene Vereine (18/18/18) mit zufällig erzeugten Spielern.') + '</div></div>';
       h += '<div class="row" style="margin-top:18px"><button data-act="toStart">← Zurück</button><div class="tb-spacer"></div><button class="primary" data-act="wizNext"' + (w.mode ? '' : ' disabled') + '>Weiter →</button></div>';
     } else if (w.step === 2) {
       var st = U.wizPreview();
       if (w.mode === 'found') {
-        h += '<div class="panel"><h2>Welcher Drittligist wird ersetzt?</h2><p class="muted small">Ihr neuer Verein übernimmt den Platz in der 3. Liga, damit die Liga weiterhin 18 Mannschaften hat.</p><select data-chg="wizReplace">' + W.clubsInLeague(st, 3).map(function (c) { return '<option value="' + c.id + '"' + (w.replace === c.id ? ' selected' : '') + '>' + esc(c.name) + ' (' + esc(c.city) + ')</option>'; }).join('') + '</select></div>';
+        h += '<div class="panel"><h2>Welcher Drittligist wird ersetzt?</h2><p class="muted small">Ihr neuer Verein übernimmt den Platz in der 3. Liga, damit die Liga weiterhin ' + W.clubsInLeague(st, 3).length + ' Mannschaften hat.' + (st.world === 'real' ? ' Die Spieler des ersetzten Vereins werden vertragslos und stehen auf dem Transfermarkt.' : '') + '</p><select data-chg="wizReplace">' + W.clubsInLeague(st, 3).map(function (c) { return '<option value="' + c.id + '"' + (w.replace === c.id ? ' selected' : '') + '>' + esc(c.name) + ' (' + esc(c.city) + ')</option>'; }).join('') + '</select></div>';
         if (!w.replace) w.replace = W.clubsInLeague(st, 3)[0].id;
       } else {
         var lv = w.mode === 'project' ? [3] : [1, 2, 3];
@@ -381,7 +384,7 @@
   };
   U.choice = function (key, val, cur, title, text) { return '<div class="choice ' + (cur === val ? 'on' : '') + '" data-act="wizSet" data-k="' + key + '" data-v="' + val + '"><h3>' + title + '</h3><div class="muted small">' + text + '</div></div>'; };
   U.field = function (label, inner) { return '<div class="f"><span>' + label + '</span>' + inner + '</div>'; };
-  U.acts.wizSet = function (d) { U.wiz[d.k] = d.v; if (d.k === 'mode') U.wiz.clubId = null; if (d.k === 'difficulty') U.wiz.preview = null; U.render(); };
+  U.acts.wizSet = function (d) { U.wiz[d.k] = d.v; if (d.k === 'mode') U.wiz.clubId = null; if (d.k === 'difficulty' || d.k === 'world') { U.wiz.preview = null; U.wiz.clubId = null; U.wiz.replace = null; } U.render(); };
   U.acts.wizNext = function () { U.wiz.step++; U.render(); };
   U.acts.wizBack = function () { U.wiz.step--; U.render(); };
   U.acts.wizPickClub = function (d) { U.wiz.clubId = d.id; U.render(); };
@@ -398,7 +401,7 @@
     var w = U.wiz;
     var main = document.getElementById('main'); main.innerHTML = '<div class="title-screen"><div class="logo" style="font-size:24px">Die Spielwelt wird erschaffen …</div></div>';
     setTimeout(function () {
-      var opts = { seed: w.seed, difficulty: w.difficulty, managerName: w.name || 'Manager', role: w.role, canBeFired: w.canBeFired };
+      var opts = { seed: w.seed, world: w.world, difficulty: w.difficulty, managerName: w.name || 'Manager', role: w.role, canBeFired: w.canBeFired };
       if (w.mode === 'found') { opts.mode = 'found'; opts.replaceClubId = w.replace; opts.newClub = w.nc; }
       else { opts.mode = 'existing'; opts.clubId = w.clubId; }
       U.st = W.newGame(opts);

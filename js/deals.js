@@ -161,9 +161,9 @@
     from = from || st.week + 2;
     if (!days) return { week: st.week + 1, mode: 'none' };
     var block = null;
-    for (var w = from; w <= Math.min(33, from + 5); w++) {
-      var md = st.leagues[c.league].fixtures[w - 1]; if (!md) break;
-      var home = md.some(function (f) { return f.h === c.id; });
+    for (var w = from; w <= Math.min(R.season.SEASON_WEEKS - 1, from + 5); w++) {
+      var rounds = R.season.roundsOf(st, c.league, w);
+      var home = rounds.some(function (r) { return st.leagues[c.league].fixtures[r].some(function (f) { return f.h === c.id; }); });
       var cupIdx = R.season.CUP_WEEKS.indexOf(w), cupHome = false;
       if (cupIdx >= 0 && st.cup.rounds[cupIdx]) cupHome = st.cup.rounds[cupIdx].ties.some(function (t) { return t.h === c.id; });
       if (!home && !cupHome) return { week: w, mode: 'away' };
