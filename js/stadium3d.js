@@ -485,7 +485,7 @@
         B.box('f_office', x - 28, z + 46, 54, 16, 0, 11, 0, { topKey: 'roofTop' });
         B.box('glassWarm', x - 28, z + 37.6, 22, 1.4, 0, 4, 0, {});
         B.box('band', x - 28, z + 46, 54.4, 16.4, 10.4, 0.6, 0, { top: false });
-        sign(B, 'sgNLZ2', 'NLZ', m.colors[0], '#ffffff', x - 46, z + 37.8, 6.2, 8, 3.2, 0);
+        sign(B, 'sgNLZ2', 'NLZ', m.colors[0], '#ffffff', x - 46, z + 37.8, 6.2, 8, 3.2, 180);
         B.box('f_hotel', x + 40, z + 46, 28, 14, 0, l >= 5 ? 24 : 14, 0, { topKey: 'roofTop', tw: 24, th: 20.4 });
       }
       if (l >= 5) {
@@ -514,7 +514,7 @@
       if (l >= 5) { B.box('f_clinic', x + 26, z + 4, 18, 28, 0, 12, 0, { topKey: 'roofTop', tw: 24, th: 20 }); B.box('lawn', x, z, main[0] * 0.8, main[1] * 0.7, main[2], 0.4, 0, {}); }
       if (l === 6) { B.box('f_clinic', x - 26, z + 4, 18, 28, 0, 10, 0, { topKey: 'roofTop', tw: 24, th: 20 }); B.quad('heli', [x - 8, main[2] + 0.1, z - 8], [x + 8, main[2] + 0.1, z - 8], [x + 8, main[2] + 0.1, z + 8], [x - 8, main[2] + 0.1, z + 8]); I.cars.push({ x: x + 16, z: fz - 8, a: 0, c: '#f8fafc', l: 1.25 }); }
       cross(x + main[0] / 2 - 3, fz - 0.05, main[2] - 0.6, l >= 4 ? 3.2 : 2.2);
-      sign(B, 'sgMED' + l, ['', '', 'VEREINSARZT', 'PHYSIOTHERAPIE', 'MEDIZINZENTRUM', 'SPORTMEDIZIN', 'PRIVATKLINIK'][l], '#ffffff', '#b91c1c', x - (l >= 4 ? 4 : 2), fz - 0.1, main[2] - (l >= 4 ? 2.8 : 2), Math.min(20, main[0] * 0.55), l >= 4 ? 2 : 1.4, 0);
+      sign(B, 'sgMED' + l, ['', '', 'VEREINSARZT', 'PHYSIOTHERAPIE', 'MEDIZINZENTRUM', 'SPORTMEDIZIN', 'PRIVATKLINIK'][l], '#ffffff', '#b91c1c', x - (l >= 4 ? 4 : 2), fz - 0.1, main[2] - (l >= 4 ? 2.8 : 2), Math.min(20, main[0] * 0.55), l >= 4 ? 2 : 1.4, 180); // Front zeigt nach Norden (Richtung Stadion): Schrift von dort lesbar, nicht gespiegelt
       for (var t2 = 0; t2 < 5; t2++) treeAt(I, r, x - 30 + t2 * 15, z + main[1] / 2 + 8, 0.8);
       return main[2] + (l === 6 ? 2 : 1);
     },
@@ -577,7 +577,7 @@
       var dome = new T.Mesh(new T.SphereGeometry(1, 40, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.roof); dome.scale.set(s[0] / 2 + 1, s[2] * 0.45, s[1] / 2 + 1); dome.position.set(x, s[2], z); dome.castShadow = hq(); group_(dome);
       var band = new T.Mesh(new T.CylinderGeometry(1, 1, 1.4, 40, 1, true), l >= 2 ? M.band : M.glassWarm); band.scale.set(s[0] / 2 + 0.3, 1, s[1] / 2 + 0.3); band.position.set(x, s[2] * 0.62, z); group_(band);
       var foyer = new T.Mesh(new T.CylinderGeometry(1, 1, 5, 40, 1, true, -0.6, 1.2), M.glassWarm); foyer.scale.set(s[0] / 2 + 3, 1, s[1] / 2 + 3); foyer.position.set(x, 2.5, z); group_(foyer);
-      sign(B, 'sgEH', 'EVENTHALLE', '#0b1424', '#ffffff', x, z - s[1] / 2 - 1.5, s[2] * 0.75, 22, 2.6, 0);
+      sign(B, 'sgEH', 'EVENTHALLE', '#0b1424', '#ffffff', x, z - s[1] / 2 - 1.5, s[2] * 0.75, 22, 2.6, 180);
       return s[2] * 1.45;
     },
     erlebnis: function (B, b, I, r, M, m) {

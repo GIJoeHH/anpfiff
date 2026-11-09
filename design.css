@@ -286,7 +286,7 @@ table.t tr.sel td:first-child { box-shadow: inset 3px 0 var(--act); }
 #modal.drawer .dlg-f { position: sticky; bottom: 0; background: var(--card); justify-content: flex-start; }
 @keyframes drawerIn { from { transform: translateX(30px); opacity: .3; } to { transform: none; opacity: 1; } }
 .pp-head { display: flex; gap: var(--s4); align-items: center; }
-.pp-head img, .pp-ph { width: 84px; height: 84px; border-radius: 14px; object-fit: cover; background: var(--card2); display: flex; align-items: center; justify-content: center; color: var(--dim); flex: none; }
+.pp-head > img, .pp-ph { width: 84px; height: 84px; border-radius: 14px; object-fit: cover; background: var(--card2); display: flex; align-items: center; justify-content: center; color: var(--dim); flex: none; }
 .pp-name { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
 .pp-sub { color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
 .pp-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: var(--s4); }
