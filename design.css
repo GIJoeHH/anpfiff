@@ -468,3 +468,38 @@ table.t tr.sel td:first-child { box-shadow: inset 3px 0 var(--act); }
 .bank-logo i { font-style: normal; font-size: 7px; letter-spacing: .6px; color: #9fb0d0; margin-top: 1px; }
 .s3d-lbl.bank-sign.flash { animation: signFlash .45s ease-out; }
 @keyframes signFlash { 0% { box-shadow: 0 0 0 0 rgba(241,215,140,.9); } 100% { box-shadow: 0 0 0 10px rgba(241,215,140,0); } }
+
+/* =====================  Spieltag (Vorschau-Dashboard)  ===================== */
+.md-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) minmax(250px, .62fr); gap: var(--s4); align-items: stretch; }
+@media (max-width: 1280px) { .md-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .md-right { grid-column: 1 / -1; } }
+@media (max-width: 900px) { .md-grid { grid-template-columns: 1fr; } }
+.md-tabs { margin-bottom: var(--s3); }
+.md-pitch { aspect-ratio: 68 / 62; cursor: pointer; }
+.token.mini { width: 84px; } .token.mini .dot { width: 32px; height: 32px; font-size: 12.5px; } .token.mini .nm { font-size: 10.5px; padding: 1px 5px; }
+.md-form { display: flex; align-items: flex-end; gap: 10px; margin-top: var(--s3); flex-wrap: wrap; }
+.md-form .f { flex: 1; min-width: 150px; } .md-form select { width: 100%; }
+.md-form .primary { margin-left: auto; }
+.md-title { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; color: #7fbaf0; margin-bottom: var(--s3); display: flex; gap: 8px; align-items: center; }
+.md-vs { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; background: var(--card2); border: 1px solid var(--line2); border-radius: var(--r); padding: var(--s3); margin-bottom: var(--s3); text-align: center; }
+.md-vs > div { display: flex; flex-direction: column; align-items: center; gap: 6px; } .md-vs b { font-size: 14.5px; } .md-vs > span { font-size: 22px; color: var(--muted); }
+.md-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-bottom: var(--s3); }
+.md-chips > div { display: flex; gap: 8px; align-items: center; background: var(--card2); border: 1px solid var(--line2); border-radius: var(--r); padding: 8px 10px; }
+.md-chips .lc { color: #7fbaf0; flex: none; } .md-chips b { display: block; font-size: 12.5px; } .md-chips small { color: var(--muted); font-size: 11px; }
+table.md-cmp { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.md-cmp th { font-size: 12.5px; font-weight: 650; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+table.md-cmp td { padding: 7px 6px; border-bottom: 1px solid #1E3050; text-align: center; color: var(--muted); }
+table.md-cmp td.l, table.md-cmp th.l { text-align: left; color: var(--text); font-weight: 650; } table.md-cmp td.r, table.md-cmp th.r { text-align: right; color: var(--text); font-weight: 650; }
+table.md-cmp td.pos { color: var(--ok); } table.md-cmp td.neg { color: var(--bad); }
+.form-let { display: inline-flex; gap: 5px; font-weight: 800; letter-spacing: .02em; }
+.form-let .S { color: var(--ok); } .form-let .U { color: var(--warn); } .form-let .N { color: var(--bad); }
+.md-res { padding: 5px 0; border-bottom: 1px solid #1E3050; }
+.md-right { display: flex; flex-direction: column; }
+.md-right h2 { color: var(--ok); }
+.md-notes { display: grid; gap: 12px; }
+.md-note { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.4; }
+.md-note .ic-tile { width: 30px; height: 30px; border-radius: 8px; }
+.md-start { margin-top: auto; padding-top: var(--s4); display: grid; gap: 10px; }
+.md-start .seg { justify-self: stretch; display: flex; } .md-start .seg button { flex: 1; }
+.md-go { width: 100%; padding: 14px; font-size: 17px; font-weight: 750; border-radius: 12px; box-shadow: 0 8px 22px rgba(24,185,121,.3); }
+/* Kopfzeile bleibt auf dem iPad quer einzeilig: weniger wichtige Chips (Stärke/Moral, Gegner) ausblenden */
+@media (max-width: 1280px) { #topbar { flex-wrap: nowrap; } .tb-chip.opt ~ .tb-chip.opt { display: none; } }
