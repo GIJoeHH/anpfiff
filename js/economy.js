@@ -205,13 +205,17 @@
   // Öffentliche Zuschüsse hängen von der öffentlichen Wahrnehmung ab
   E.subRate = function (club, lvl) { if (!lvl || !lvl.sub) return 0; return Math.min(0.5, lvl.sub * (0.8 + (club.publicImage != null ? club.publicImage : 50) / 250)); };
   // Gleichzeitige Bauvorhaben (Ausbaustufen + Tribünenprojekte im Stadionplan)
+  // Begrenzung nur im Stadion (Ausstattung, Verkehr, Tribünen im Stadionplan): max. 10 gleichzeitig.
+  // Vereinsstadt und Abteilungen (Medizin, Jugend, Training) sind unbegrenzt.
   E.MAX_BUILDS = 10;
-  E.buildCount = function (club) { return club.construction.length + (club.stadium && club.stadium.jobs ? club.stadium.jobs.length : 0); };
+  E.STADIUM_GROUPS = ['stadion', 'infra'];
+  E.isStadiumKey = function (key) { return E.STADIUM_GROUPS.indexOf(D.facilities[key].group) >= 0; };
+  E.buildCount = function (club) { return club.construction.filter(function (c) { return E.isStadiumKey(c.key); }).length + (club.stadium && club.stadium.jobs ? club.stadium.jobs.length : 0); };
   E.canBuild = function (st, club, key) {
     var f = D.facilities[key], cur = club.fac[key] != null ? club.fac[key] : (f.min || 0);
     if (!f.levels[cur + 1]) return { ok: false, why: 'Höchste Stufe erreicht' };
     if (club.construction.some(function (c) { return c.key === key; })) return { ok: false, why: 'Wird bereits ausgebaut' };
-    if (E.buildCount(club) >= E.MAX_BUILDS) return { ok: false, why: 'Maximal ' + E.MAX_BUILDS + ' Bauvorhaben gleichzeitig' };
+    if (E.isStadiumKey(key) && E.buildCount(club) >= E.MAX_BUILDS) return { ok: false, why: 'Maximal ' + E.MAX_BUILDS + ' Bauvorhaben im Stadion gleichzeitig' };
     var cost = f.levels[cur + 1].cost * (1 - E.subRate(club, f.levels[cur + 1]));
     if (club.cash < cost) return { ok: false, why: 'Nicht genug Geld (' + R.fmtMoney(cost) + ')' };
     return { ok: true, cost: cost };
@@ -519,9 +523,24 @@
   // Wöchentliche Finanzen (laufende Einnahmen/Ausgaben, ohne Spieltagseinnahmen)
   E.weeklyFinance = function (st, club) {
     var r = E.weeklyLines(st, club), total = 0;
+    // Tagesgeldzinsen laufen wöchentlich auf und werden monatlich (alle 4 Spielwochen) dem Girokonto gutgeschrieben
+    var zins = r['Zinserträge'] || 0; delete r['Zinserträge'];
     Object.keys(r).forEach(function (k) { total += r[k]; E.book(club, k, r[k]); });
     club.cash += total;
-    return { lines: r, total: total };
+    club.interestAccrued = (club.interestAccrued || 0) + zins;
+    var paid = E.interestPayday(st) ? E.payInterest(st, club) : 0;
+    if (zins) r['Zinserträge'] = zins;
+    return { lines: r, total: total + paid, interestPaid: paid };
+  };
+  E.INTEREST_MONTH = 4; // Spielwochen je Zinsmonat
+  E.interestPayday = function (st) { return st.phase === 'season' && (st.week % E.INTEREST_MONTH === 0 || st.week >= R.season.SEASON_WEEKS); };
+  E.nextInterestWeek = function (st) { var w = st.phase === 'season' ? st.week : 0, n = (Math.floor(w / E.INTEREST_MONTH) + 1) * E.INTEREST_MONTH; return Math.min(n, R.season.SEASON_WEEKS); };
+  E.payInterest = function (st, club) {
+    var amt = Math.round(club.interestAccrued || 0); club.interestAccrued = 0;
+    if (!amt) return 0;
+    club.cash += amt; E.book(club, 'Zinserträge', amt);
+    club.interestLog = (club.interestLog || []).concat([{ s: st.season, w: st.week, a: amt }]).slice(-12);
+    return amt;
   };
   // Laufende Wochenposten (ohne Buchung) – Grundlage für Buchung und Prognose
   E.weeklyLines = function (st, club) {
@@ -560,6 +579,8 @@
     Object.keys(weekly).forEach(function (k) { wk += weekly[k]; });
     var lines = {}, path = [club.cash], cash = club.cash, homeGames = 0;
     function add(k, v) { lines[k] = (lines[k] || 0) + v; }
+    var acc = Math.round(club.interestAccrued || 0); // bereits aufgelaufene, noch nicht gutgeschriebene Zinsen
+    if (acc && from < total) { add('Zinserträge', acc); cash += acc; }
     for (var w = from + 1; w <= total; w++) {
       Object.keys(weekly).forEach(function (k) { add(k, weekly[k]); });
       var wkCash = wk;

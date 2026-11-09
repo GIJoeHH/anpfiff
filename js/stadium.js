@@ -132,7 +132,7 @@
   SP.start = function (st, club, id, idx) {
     var opt = SP.options(st, club, id)[idx];
     if (!opt) return { ok: false, why: 'Maßnahme nicht möglich' };
-    if (E.buildCount(club) >= E.MAX_BUILDS) return { ok: false, why: 'Maximal ' + E.MAX_BUILDS + ' Bauvorhaben gleichzeitig' };
+    if (E.buildCount(club) >= E.MAX_BUILDS) return { ok: false, why: 'Maximal ' + E.MAX_BUILDS + ' Bauvorhaben im Stadion gleichzeitig' };
     if (club.cash < opt.cost) return { ok: false, why: 'Nicht genug Geld (' + R.fmtMoney(opt.cost) + ')' };
     club.cash -= opt.cost; if (opt.cost) E.book(club, 'Bauprojekte', -opt.cost);
     club.stadium.jobs.push({ sec: id, tier: opt.tier, action: opt.action, type: opt.type, weeks: opt.weeks, total: opt.weeks, cost: opt.cost, n: opt.n });

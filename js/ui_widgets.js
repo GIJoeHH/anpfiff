@@ -152,7 +152,7 @@
       row('Girokonto', money(c.cash), c.cash < 0 ? 'neg' : '') + row('Tagesgeld', money(c.savings)) + row('Aktien / Krypto', money(stocksV + cryptoV)) + row('Kredite', debt ? '−' + money(debt) : money(0), debt ? 'neg' : '') +
       '<tr class="rw-sum"><td>Gesamtvermögen</td><td class="num ' + (total < 0 ? 'neg' : '') + '">' + money(total) + '</td></tr></table></div></div>' +
       '<div class="rw-grid rw-lower"><div><div class="rw-h">KREDIT</div><table class="rw-t">' + row('Aufgenommen', money(debt)) + row('Kreditrahmen frei', money(lim)) + row('Zinssatz', (rate * 100).toFixed(1).replace('.', ',') + ' %') + '</table></div>' +
-      '<div><div class="rw-h">TAGESGELD</div><table class="rw-t">' + row('Zinssatz', (st.savingsRate * 100).toFixed(2).replace('.', ',') + ' %') + row('Guthaben', money(c.savings)) + row('Zinsen/Jahr', money(c.savings * st.savingsRate)) + '</table></div></div>' +
+      '<div><div class="rw-h">TAGESGELD</div><table class="rw-t">' + row('Zinssatz', (st.savingsRate * 100).toFixed(2).replace('.', ',') + ' %') + row('Guthaben', money(c.savings)) + row('Zinsen/Monat', money(c.savings * st.savingsRate * E.INTEREST_MONTH / E.WEEKS)) + row('Aufgelaufen', money(c.interestAccrued || 0)) + '</table></div></div>' +
       '</div></div></div>';
     return h;
   };
