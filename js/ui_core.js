@@ -284,8 +284,20 @@
     });
   };
   U.pickFile = function (accept, cb, asDataUrl) {
-    var inp = document.createElement('input'); inp.type = 'file'; inp.accept = accept;
-    inp.onchange = function () { var f = inp.files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () { cb(rd.result, f); }; if (asDataUrl) rd.readAsDataURL(f); else rd.readAsText(f); };
+    // iPad/Safari: Das Feld muss im Dokument hängen, sonst wird es während der Dateiauswahl verworfen
+    // und „change“ kommt nie an. JSON-Filter weglassen: iOS graut .json-Dateien aus „Dateien“ sonst teils aus.
+    var old = document.getElementById('rfmFilePick'); if (old) old.remove();
+    var inp = document.createElement('input'); inp.type = 'file'; inp.id = 'rfmFilePick';
+    if (!/json/.test(accept)) inp.accept = accept;
+    inp.style.cssText = 'position:fixed;left:-1000px;top:0;width:1px;height:1px;opacity:0';
+    document.body.appendChild(inp);
+    inp.onchange = function () {
+      var f = inp.files && inp.files[0]; if (!f) { inp.remove(); return; }
+      var rd = new FileReader();
+      rd.onload = function () { inp.remove(); cb(rd.result, f); };
+      rd.onerror = function () { inp.remove(); U.modal('Datei konnte nicht gelesen werden', '<p>' + esc(f.name) + '</p><p class="muted">Liegt die Datei in iCloud, erst in „Dateien“ einmal antippen, damit sie heruntergeladen wird.</p>'); };
+      if (asDataUrl) rd.readAsDataURL(f); else rd.readAsText(f);
+    };
     inp.click();
   };
   U.showSaveDialog = function () {
