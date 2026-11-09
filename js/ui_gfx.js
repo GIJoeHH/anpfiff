@@ -304,6 +304,22 @@
     if (steh >= 4) { sides.E = dims(steh - 2); sides.E.kind = 'steh'; sides.E.roof = dach >= 3; }
     else if (sitz >= 5) { sides.E = dims(sitz - 3); sides.E.kind = 'sitz'; sides.E.roof = dach >= 3; }
     if (sitz >= 3) { sides.S = dims(sitz - 1); sides.S.kind = 'sitz'; sides.S.roof = dach >= 2; }
+    // Stadionplan (Sektoren/Ränge): Tribünenhöhe je Seite aus den Rängen, Art aus dem vorherrschenden Platztyp
+    var corners = null, SPm = R.stadium;
+    if (SPm && SPm.has(club)) {
+      sides = {}; corners = {};
+      var roofSide = { N: dach >= 1, S: dach >= 2, W: dach >= 2, E: dach >= 3 };
+      ['N', 'S', 'W', 'E'].forEach(function (sd) {
+        var pr = SPm.sideProfile(club, sd); if (pr.depth <= 0) return;
+        var Lv = Math.max(1, Math.min(7, Math.round(pr.depth * 2.2)));
+        var kind = pr.type === 'steh' ? (pr.depth < 0.5 ? 'huegel' : pr.depth < 0.9 ? 'wall' : 'steh') : 'sitz';
+        sides[sd] = dims(Lv); sides[sd].kind = kind; sides[sd].roof = roofSide[sd] && pr.depth >= 0.6;
+      });
+      if (!sides.N) { sides.N = dims(1); sides.N.kind = 'holz'; sides.N.roof = false; }
+      ['NW', 'NE', 'SW', 'SE'].forEach(function (id) { corners[id] = club.stadium.sectors[id].tiers.length > 0; });
+      var lg = SPm.sideProfile(club, 'N').loge + SPm.sideProfile(club, 'S').loge;
+      vip = lg <= 0 ? 0 : Math.max(1, Math.min(5, Math.round(lg * 1.6)));
+    }
     var dN = sides.N.D, dW = sides.W ? sides.W.D : 0, dE = sides.E ? sides.E.D : 0, dS = sides.S ? sides.S.D : 0;
     var bb = [X - g - dW - 1.5 * k, Y - g - dN - 1.5 * k, X + PL + g + dE + 1.5 * k, Y + PW + g + dS + 1.5 * k];
     if (opts.register !== false) sc.bbox = bb;
@@ -412,14 +428,15 @@
       }
     }
     function corner(x, y, w, d, h, depth) { sc.box(x, y, 0, w, d, h, concrete, { depth: depth, top: crowdPattern(sc, shade(seatCol, 0.8), c1, c2, 0.8), shadow: false }); }
-    if (sitz >= 4 && sides.W) corner(X - g - dW, Y - g - dN, dW, dN, Math.min(sides.N.H, sides.W.H), BACK - 10);
+    function cOn(id, a, b) { return corners ? corners[id] && sides[a] && sides[b] : sitz >= 4 && sides[a] && sides[b]; }
+    if (cOn('NW', 'N', 'W')) corner(X - g - dW, Y - g - dN, dW, dN, Math.min(sides.N.H, sides.W.H), BACK - 10);
     backStand('N', sides.N, BACK);
-    if (sitz >= 4 && sides.E) corner(X + PL + g, Y - g - dN, dE, dN, Math.min(sides.N.H, sides.E.H), BACK + 40);
+    if (cOn('NE', 'N', 'E')) corner(X + PL + g, Y - g - dN, dE, dN, Math.min(sides.N.H, sides.E.H), BACK + 40);
     if (sides.W) backStand('W', sides.W, BACK + 20);
-    if (sitz >= 4 && sides.W && sides.S) corner(X - g - dW, Y + PW + g, dW, dS, Math.min(sides.W.H, sides.S.H), BACK + 60);
+    if (cOn('SW', 'W', 'S')) corner(X - g - dW, Y + PW + g, dW, dS, Math.min(sides.W.H, sides.S.H), BACK + 60);
     if (sides.E) frontStand('E', sides.E, FRONT);
     if (sides.S) frontStand('S', sides.S, FRONT + 20);
-    if (sitz >= 4 && sides.E && sides.S) corner(X + PL + g, Y + PW + g, dE, dS, Math.min(sides.E.H, sides.S.H), FRONT + 40);
+    if (cOn('SE', 'E', 'S')) corner(X + PL + g, Y + PW + g, dE, dS, Math.min(sides.E.H, sides.S.H), FRONT + 40);
     // VIP-Logen als Glasband in der Haupttribüne
     if (vip > 0) {
       var N = sides.N, vw = PL * (0.25 + vip * 0.1), vt = 0.55, vz = 0.45 * k + (N.H - 0.45 * k) * vt;
@@ -469,6 +486,7 @@
     people(sc, bb[0] + 1, bb[3] - 1.2 * k, bb[2] - bb[0] - 2, 1, 24, [c1, c2, '#334155', '#e11d48', '#f5f5f5'], FRONT + 200);
     // Baustellen
     ['steh', 'sitz', 'dach', 'vip', 'licht', 'video', 'rasen', 'sanitaer', 'hosp', 'technik'].forEach(function (key, i) { var b = building(club, key); if (b) crane(sc, i % 2 ? bb[2] - 1 : bb[0] + 1, bb[1] + (bb[3] - bb[1]) * (0.2 + 0.15 * (i % 4)), opts.labels ? 'Bau: ' + D.facilities[key].name : '', k * 0.9); });
+    if (R.stadium && R.stadium.has(club)) club.stadium.jobs.slice(0, 3).forEach(function (j, i) { var sd = R.stadium.sec(j.sec).side, cx = sd === 'W' ? bb[0] + 1 : sd === 'E' ? bb[2] - 1 : X + PL * (0.25 + 0.25 * i), cy = sd === 'N' ? bb[1] + 1 : sd === 'S' ? bb[3] - 1 : Y + PW / 2; crane(sc, cx, cy, opts.labels ? 'Bau: ' + R.stadium.sec(j.sec).n : '', k * 0.9); });
     if (opts.labels) sc.label(X + PL / 2, Y - g - dN, sides.N.H + (sides.N.roof ? 3 : 1.5) * k, club.stadiumName.toUpperCase(), 'Kapazität ' + R.fmtNum(R.econ.capacity(club)), { size: 10.5 });
     return bb;
   };

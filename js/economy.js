@@ -7,8 +7,12 @@
   E.level = lv;
   E.WEEKS = 34; // Wirtschaftsjahr = 34 Spielwochen
 
-  E.capacity = function (club) { return lv(club, 'steh').cap + lv(club, 'sitz').cap + lv(club, 'vip').vip; };
-  E.capacityParts = function (club) { return { steh: lv(club, 'steh').cap, sitz: lv(club, 'sitz').cap, vip: lv(club, 'vip').vip }; };
+  function plan(club) { return R.stadium && R.stadium.has(club); }
+  E.capacity = function (club) { var p = E.capacityParts(club); return p.steh + p.sitz + p.vip; };
+  E.capacityParts = function (club) { if (plan(club)) { var q = R.stadium.parts(club); return { steh: q.steh, sitz: q.sitz, vip: q.vip, biz: q.business }; } return { steh: lv(club, 'steh').cap, sitz: lv(club, 'sitz').cap, vip: lv(club, 'vip').vip }; };
+  E.PLAN_KEYS = ['steh', 'sitz', 'vip']; // ersetzt durch den Stadionplan
+  // Gästeblock: Kapazität (Stadionplan) bzw. 8 % der Stehplätze/Sitzplätze bei Vereinen ohne Plan
+  E.guestCap = function (club) { if (plan(club)) return R.stadium.guestCap(club); var p = E.capacityParts(club); return Math.round((p.steh + p.sitz) * 0.08); };
   E.transportCap = function (club) {
     return lv(club, 'oepnv').fans + Math.min(lv(club, 'parken').cars * 2.6, lv(club, 'strasse').fans);
   };
@@ -54,7 +58,7 @@
     var sport = E.sportFactor(st, home);
     var oppF = 0.88 + (away ? away.reputation : 50) / 100 * 0.3;
     var derby = away && home.rivals.indexOf(away.id) >= 0 ? 1.35 : 1;
-    var compF = comp === 'cup' ? 1.05 : comp === 'releg' ? 1.4 : comp === 'final' ? 2 : 1;
+    var compF = comp === 'cup' ? 1.05 : comp === 'releg' ? 1.4 : comp === 'final' ? 2 : comp === 'friendly' ? 0.22 : 1;
     var attr = E.attractiveness(home);
     var attrF = 0.7 + 0.5 * (1 - Math.exp(-attr / 35));
     var fanCare = [0.97, 1, 1.04][home.budgets.fans];
@@ -63,7 +67,20 @@
     var promoF = home.ticketPromo > 0 ? 1.05 : 1;
     var demand = home.fans * 1.05 * leagueF * sport * oppF * derby * compF * attrF * fanCare * mkt * trustF * promoF;
     var parts = E.capacityParts(home), ref = E.refPrices[home.league], prices = home.tickets;
-    if (home.blockedArea && comp !== 'final') { parts = { steh: Math.round(parts.steh * 0.8), sitz: Math.round(parts.sitz * 0.8), vip: parts.vip }; }
+    if (home.blockedArea && comp !== 'final') { parts = { steh: Math.round(parts.steh * 0.8), sitz: Math.round(parts.sitz * 0.8), vip: parts.vip, biz: parts.biz }; }
+    // Gästefans: je höher die Liga und je größer/besser der Gegner, desto mehr reisen an (Derby: noch mehr)
+    var gDemand = 0, gCap = 0, gType = 'steh', guests = 0;
+    if (away && comp !== 'final') {
+      var lgF = { 1: 0.05, 2: 0.034, 3: 0.022 }[home.league] || 0.02;
+      gDemand = away.fans * lgF * (0.55 + away.reputation / 110) * (derby > 1 ? 1.8 : 1) * (comp === 'cup' ? 1.25 : comp === 'releg' ? 1.6 : comp === 'friendly' ? 0.15 : 1) * (0.85 + E.sportFactor(st, away) * 0.15);
+      gCap = E.guestCap(home); if (home.blockedArea) gCap = Math.round(gCap * 0.8);
+      gType = plan(home) ? R.stadium.guestType(home) : 'steh';
+      var gk = gType === 'sitz' || gType === 'steh' ? gType : 'sitz';
+      gCap = Math.min(gCap, parts[gk] || 0);
+      guests = Math.round(Math.min(gCap, gDemand * priceFactor(prices[gk], ref[gk])));
+      parts = { steh: parts.steh - (gk === 'steh' ? gCap : 0), sitz: parts.sitz - (gk === 'sitz' ? gCap : 0), vip: parts.vip, biz: parts.biz };
+      gType = gk;
+    }
     var capNorm = parts.steh + parts.sitz || 1;
     var res = { steh: 0, sitz: 0, vip: 0 };
     ['steh', 'sitz'].forEach(function (k) {
@@ -71,9 +88,13 @@
       var d = demand * share * priceFactor(prices[k], ref[k]) * (k === 'sitz' ? 0.95 : 1.05);
       res[k] = Math.round(Math.min(parts[k], d));
     });
-    var vipD = parts.vip * (0.45 + home.reputation / 140) * sport * priceFactor(prices.vip, ref.vip) * (comp === 'final' ? 1.5 : 1);
-    res.vip = Math.round(Math.min(parts.vip, vipD));
-    var total = res.steh + res.sitz + res.vip;
+    // Logen (VIP-Preis) und Business-Plätze (35 % des VIP-Preises, breitere Nachfrage)
+    var bizCap = parts.biz || 0, logeCap = parts.vip - bizCap;
+    var vipD = logeCap * (0.45 + home.reputation / 140) * sport * priceFactor(prices.vip, ref.vip) * (comp === 'final' ? 1.5 : 1);
+    var bizD = bizCap * (0.35 + home.reputation / 180) * sport * priceFactor(prices.vip, ref.vip) * (comp === 'final' ? 1.5 : 1);
+    var resLoge = Math.round(Math.min(logeCap, vipD)), resBiz = Math.round(Math.min(bizCap, bizD));
+    res.vip = resLoge + resBiz;
+    var total = res.steh + res.sitz + res.vip + guests;
     // Verkehr: Engpass → Staus, Zuschauerverlust, Unzufriedenheit
     var tcap = E.transportCap(home);
     var congestion = 0;
@@ -81,16 +102,16 @@
       var lost = (total - tcap) * 0.45;
       congestion = R.clamp((total - tcap) / Math.max(1, total), 0, 1);
       var keep = (total - lost) / total;
-      res.steh = Math.round(res.steh * keep); res.sitz = Math.round(res.sitz * keep); res.vip = Math.round(res.vip * keep);
-      total = res.steh + res.sitz + res.vip;
+      res.steh = Math.round(res.steh * keep); res.sitz = Math.round(res.sitz * keep); resLoge = Math.round(resLoge * keep); resBiz = Math.round(resBiz * keep); res.vip = resLoge + resBiz; guests = Math.round(guests * keep);
+      total = res.steh + res.sitz + res.vip + guests;
     }
     var transitShare = Math.min(0.75, lv(home, 'oepnv').fans / Math.max(1, total));
     var carsUsed = Math.min(lv(home, 'parken').cars, total * (1 - transitShare) / 2.6);
-    var ticket = (res.steh * prices.steh + res.sitz * prices.sitz) * (home.ticketPromo > 0 ? 0.9 : 1) + res.vip * prices.vip;
+    var ticket = (res.steh * prices.steh + res.sitz * prices.sitz) * (home.ticketPromo > 0 ? 0.9 : 1) + resLoge * prices.vip + resBiz * prices.vip * 0.35 + guests * prices[gType];
     if (home.freeTickets) { var ft = Math.min(home.freeTickets, res.steh + res.sitz); ticket -= ft * prices.steh; }
-    var cater = total * (3 + (lv(home, 'hosp').att || 0) * 0.5) + res.vip * 40;
+    var cater = total * (3 + (lv(home, 'hosp').att || 0) * 0.5) + resLoge * 40 + resBiz * 15;
     var parking = carsUsed * (lv(home, 'parken').fee || 0);
-    return { total: total, parts: res, capacity: E.capacity(home), ticket: ticket, cater: cater, parking: parking, congestion: congestion, demand: Math.round(demand), satisfaction: R.clamp(Math.round(100 - congestion * 120 - Math.max(0, (prices.steh / ref.steh - 1) * 40)), 0, 100) };
+    return { total: total, parts: res, guests: guests, guestDemand: Math.round(gDemand), guestCap: gCap, capacity: E.capacity(home), ticket: ticket, cater: cater, parking: parking, congestion: congestion, demand: Math.round(demand), satisfaction: R.clamp(Math.round(100 - congestion * 120 - Math.max(0, (prices.steh / ref.steh - 1) * 40)), 0, 100) };
   };
 
   // ---------- Vereinsstadt ----------
@@ -131,7 +152,9 @@
   E.energySave = function (club) { return lv(club, 'solar').save || 0; };
   E.upkeepTotal = function (club) {
     var sum = 0;
-    Object.keys(D.facilities).forEach(function (k) { var l = lv(club, k); if (l) sum += l.up; });
+    var pl = plan(club);
+    Object.keys(D.facilities).forEach(function (k) { if (pl && E.PLAN_KEYS.indexOf(k) >= 0) return; var l = lv(club, k); if (l) sum += l.up; });
+    if (pl) sum += R.stadium.upkeep(club);
     return sum * (1 - E.energySave(club));
   };
   E.budgetCost = function (club, area) {
@@ -181,11 +204,14 @@
 
   // Öffentliche Zuschüsse hängen von der öffentlichen Wahrnehmung ab
   E.subRate = function (club, lvl) { if (!lvl || !lvl.sub) return 0; return Math.min(0.5, lvl.sub * (0.8 + (club.publicImage != null ? club.publicImage : 50) / 250)); };
+  // Gleichzeitige Bauvorhaben (Ausbaustufen + Tribünenprojekte im Stadionplan)
+  E.MAX_BUILDS = 10;
+  E.buildCount = function (club) { return club.construction.length + (club.stadium && club.stadium.jobs ? club.stadium.jobs.length : 0); };
   E.canBuild = function (st, club, key) {
     var f = D.facilities[key], cur = club.fac[key] != null ? club.fac[key] : (f.min || 0);
     if (!f.levels[cur + 1]) return { ok: false, why: 'Höchste Stufe erreicht' };
     if (club.construction.some(function (c) { return c.key === key; })) return { ok: false, why: 'Wird bereits ausgebaut' };
-    if (club.construction.length >= 4) return { ok: false, why: 'Maximal 4 Baustellen gleichzeitig' };
+    if (E.buildCount(club) >= E.MAX_BUILDS) return { ok: false, why: 'Maximal ' + E.MAX_BUILDS + ' Bauvorhaben gleichzeitig' };
     var cost = f.levels[cur + 1].cost * (1 - E.subRate(club, f.levels[cur + 1]));
     if (club.cash < cost) return { ok: false, why: 'Nicht genug Geld (' + R.fmtMoney(cost) + ')' };
     return { ok: true, cost: cost };
@@ -203,6 +229,7 @@
   };
   E.progressConstruction = function (st, club) {
     var done = [];
+    if (R.stadium) R.stadium.progress(st, club);
     club.construction.forEach(function (c) { c.weeks--; if (c.weeks <= 0) done.push(c); });
     done.forEach(function (c) {
       club.fac[c.key] = c.to;
@@ -224,7 +251,9 @@
   E.debt = function (club) { return R.sum(club.loans, function (l) { return l.amount; }); };
   E.facilityValue = function (club) {
     var v = 0;
-    Object.keys(D.facilities).forEach(function (k) { var f = D.facilities[k], cur = club.fac[k] || 0; for (var i = 1; i <= cur; i++) if (f.levels[i]) v += f.levels[i].cost; });
+    var pl = plan(club);
+    Object.keys(D.facilities).forEach(function (k) { if (pl && E.PLAN_KEYS.indexOf(k) >= 0) return; var f = D.facilities[k], cur = club.fac[k] || 0; for (var i = 1; i <= cur; i++) if (f.levels[i]) v += f.levels[i].cost; });
+    if (pl) v += R.stadium.value(club);
     return v;
   };
   E.revenueEstimate = function (st, club) {
@@ -333,6 +362,8 @@
     // Börsencrash in unregelmäßigen Abständen (ca. alle 1–2 Saisons), danach langsame Erholung
     var crash = R.chance(0.022 * chaos) ? R.randRange(0.12, 0.32) : 0;
     if (crash) st.news.unshift({ season: st.season, week: st.week, title: 'BÖRSENCRASH! Kurse brechen um bis zu ' + Math.round(crash * 100) + ' % ein', text: 'Panikverkäufe an allen Märkten. Mutige kaufen jetzt billig nach …', type: 'markt' });
+    var alerts = [];
+    if (crash) alerts.push({ k: 'crash', ic: '📉', t: 'Börsencrash!', x: 'Panikverkäufe an allen Märkten – die Kurse brechen um bis zu ' + Math.round(crash * 100) + ' % ein. Kryptowährungen trifft es besonders hart. Danach erholen sich die Kurse meist langsam.' });
     st.market.recovery = crash ? crash * 0.5 : (st.market.recovery || 0) * 0.9;
     var bvb = E.bvbClub(st);
     D.stocks.forEach(function (s) {
@@ -351,8 +382,8 @@
     D.cryptos.forEach(function (s) {
       var m = st.market.crypto[s.id];
       var r = s.drift + s.vol * chaos * R.gauss(0, 1);
-      if (R.chance(0.03)) { r -= R.randRange(0.3, 0.6); st.news.unshift({ season: st.season, week: st.week, title: s.name + ' crasht!', text: 'Panik an den Kryptomärkten.', type: 'markt' }); }
-      else if (R.chance(0.03)) { r += R.randRange(0.3, 0.7); st.news.unshift({ season: st.season, week: st.week, title: s.name + ' explodiert!', text: 'Spekulationsblase oder Revolution?', type: 'markt' }); }
+      if (R.chance(0.03)) { var dn = R.randRange(0.3, 0.6); r -= dn; st.news.unshift({ season: st.season, week: st.week, title: s.name + ' crasht!', text: 'Panik an den Kryptomärkten.', type: 'markt' }); alerts.push({ k: 'ccrash', ic: '🪙', t: s.name + ' crasht!', x: 'Panik an den Kryptomärkten: ' + s.name + ' verliert binnen einer Woche rund ' + Math.round((1 - Math.exp(-dn)) * 100) + ' %.', sym: s.id }); }
+      else if (R.chance(0.03)) { var up = R.randRange(0.3, 0.7); r += up; st.news.unshift({ season: st.season, week: st.week, title: s.name + ' explodiert!', text: 'Spekulationsblase oder Revolution?', type: 'markt' }); alerts.push({ k: 'cboom', ic: '🚀', t: s.name + ' explodiert!', x: 'Spekulationsblase oder Revolution? ' + s.name + ' legt binnen einer Woche rund ' + Math.round((Math.exp(up) - 1) * 100) + ' % zu.', sym: s.id }); }
       // Mean-Reversion gegen Extremwerte
       r -= 0.02 * Math.log(m.price / s.price);
       if (crash) r -= crash * R.randRange(1.2, 1.8);
@@ -360,6 +391,36 @@
       E.marketPush(m, crash ? 'Crash' : null, st, s.id);
     });
     st.savingsRate = R.clamp(st.savingsRate + R.gauss(0, 0.001), 0.005, 0.04);
+    E.marketRecords(st, alerts);
+    if (alerts.length) { st.marketAlerts = (st.marketAlerts || []).concat(alerts).slice(-8); }
+  };
+  // Rekordhöhen: Marktindex (Aktien), einzelne Werte im eigenen Depot, Depotwert des eigenen Vereins
+  E.marketIndex = function (st) {
+    var lg = 0, n = 0;
+    D.stocks.forEach(function (s) { if (s.club) return; var m = st.market.stocks[s.id]; if (m) { lg += Math.log(m.price / s.price); n++; } });
+    return n ? Math.round(1000 * Math.exp(lg / n)) : 1000;
+  };
+  E.marketRecords = function (st, alerts) {
+    var mk = st.market, idx = E.marketIndex(st);
+    if (mk.indexAth == null) mk.indexAth = idx;
+    if (idx > mk.indexAth * 1.005) {
+      if (!mk.indexAthTick || (st.tick || 0) - mk.indexAthTick >= 4) alerts.push({ k: 'ath', ic: '🏛', t: 'Rekordhoch am Aktienmarkt!', x: 'Der ANPFIFF-Aktienindex steigt auf ' + R.fmtNum(idx) + ' Punkte – so hoch stand er noch nie. Die Stimmung an der Börse ist euphorisch.' });
+      mk.indexAth = idx; mk.indexAthTick = st.tick || 0;
+    }
+    var uc = R.season.userClub(st); if (!uc) return;
+    Object.keys(uc.portfolio).forEach(function (sym) {
+      var m = mk.stocks[sym] || mk.crypto[sym], def = E.marketDef(sym); if (!m || !def) return;
+      var ath = Math.max.apply(null, m.hist.slice(0, -1));
+      if (m.price > ath * 1.01 && (!m.athTick || (st.tick || 0) - m.athTick >= 4)) {
+        m.athTick = st.tick || 0;
+        alerts.push({ k: 'pfath', ic: '⭐', t: def.name + ' auf Rekordhoch', x: 'Ihr Depotwert ' + def.name + ' notiert bei ' + (m.price >= 1 ? m.price.toFixed(2).replace('.', ',') : m.price.toFixed(4).replace('.', ',')) + ' € – höher als je zuvor in den letzten zwei Jahren. Ihr Bestand ist jetzt ' + R.fmtMoney(uc.portfolio[sym].qty * m.price) + ' wert.' });
+      }
+    });
+    var pv = E.portfolioValue(st, uc);
+    if (pv >= 50000 && pv > (uc.pfAth || 0) * 1.03) {
+      if (uc.pfAth && (!uc.pfAthTick || (st.tick || 0) - uc.pfAthTick >= 4)) alerts.push({ k: 'pfrec', ic: '💼', t: 'Depot auf Rekordstand!', x: 'Ihr Wertpapierdepot ist jetzt ' + R.fmtMoney(pv) + ' wert – so viel wie nie zuvor.' });
+      uc.pfAth = pv; uc.pfAthTick = st.tick || 0;
+    }
   };
   E.buyAsset = function (st, club, sym, qty) {
     E.ensureMarkets(st);
@@ -434,15 +495,22 @@
   // Geheimer Cheat: das Schild „BANKDIREKTOR“
   // Jeder Klick bringt 100.000 €. Ob ein Spruch erscheint, entscheidet die Oberfläche (nur beim ersten Klick je Sitzung).
   E.CHEAT_AMOUNT = 100000;
-  E.bankCheat = function (st, club) {
+  // Zufallsbetrag je Klick (Wahrscheinlichkeit in %): je höher der Betrag, desto seltener
+  E.CHEAT_TABLE = [[100000, 35], [200000, 15], [250000, 12], [500000, 10], [750000, 8], [1000000, 7], [1500000, 6], [2000000, 5], [5000000, 2]];
+  E.cheatAmount = function (rnd) {
+    var x = (rnd == null ? Math.random() : rnd) * 100, acc = 0;
+    for (var i = 0; i < E.CHEAT_TABLE.length; i++) { acc += E.CHEAT_TABLE[i][1]; if (x < acc) return E.CHEAT_TABLE[i][0]; }
+    return E.CHEAT_TABLE[0][0];
+  };
+  E.bankCheat = function (st, club, rnd) {
     if (!st.settings.cheatEnabled || !club) return null;
-    var firstEver = !st.cheatUsed;
+    var firstEver = !st.cheatUsed, amt = E.cheatAmount(rnd); // eigener Zufall (Math.random), der Spielzufall bleibt unberührt
     st.cheatClicks = (st.cheatClicks || 0) + 1;
-    club.cash += E.CHEAT_AMOUNT; E.book(club, 'Sonstiges', E.CHEAT_AMOUNT);
-    st.cheatUsed = true; st.cheatTotal = (st.cheatTotal || 0) + E.CHEAT_AMOUNT;
+    club.cash += amt; E.book(club, 'Sonstiges', amt);
+    st.cheatUsed = true; st.cheatTotal = (st.cheatTotal || 0) + amt;
     R.season.achieve(st, 'bankdirector');
     return {
-      paid: E.CHEAT_AMOUNT, first: firstEver,
+      paid: amt, first: firstEver, jackpot: amt >= 5000000,
       lines: firstEver ? ['Sie haben versehentlich den geheimen Buchhaltungskeller geöffnet.', 'Herr Buchungsfehler hat eine Überweisung gefunden, die offenbar seit 1991 auf Bearbeitung wartet.']
         : [R.pick(D.cheatMessages)]
     };

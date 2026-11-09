@@ -38,9 +38,9 @@
     h += '<div class="panel"><div class="panel-h"><h2>Nächstes Spiel</h2><button class="sm" data-act="nav" data-s="spieltag">Spieltagsvorbereitung</button></div>';
     if (nx.length) nx.forEach(function (fx) {
       var H = st.clubs[fx.h], A = st.clubs[fx.a];
-      h += '<div class="row" style="justify-content:center;gap:18px;padding:8px 0"><div class="row" style="flex-direction:column;gap:4px;width:180px">' + U.crest(H, 54) + '<b>' + esc(H.name) + '</b><span class="muted small">' + (H.league === c.league ? E.leaguePos(st, H) + '. Platz' : D.leagueNames[H.league]) + '</span></div><div class="mono" style="font-size:22px;font-weight:900">VS</div><div class="row" style="flex-direction:column;gap:4px;width:180px">' + U.crest(A, 54) + '<b>' + esc(A.name) + '</b><span class="muted small">' + (A.league === c.league ? E.leaguePos(st, A) + '. Platz' : D.leagueNames[A.league]) + '</span></div></div><p class="muted small" style="text-align:center">' + (fx.comp === 'league' ? (st.phase === 'preseason' ? 1 : st.week + 1) + '. Spieltag' : fx.comp === 'releg' ? 'Relegation' : 'Pokal – ' + st.cup.rounds[S.CUP_WEEKS.indexOf(st.phase === 'preseason' ? 1 : st.week + 1)].name) + (H.rivals.indexOf(A.id) >= 0 ? ' · <span class="warn">DERBY!</span>' : '') + '</p>';
+      h += '<div class="row" style="justify-content:center;gap:18px;padding:8px 0"><div class="row" style="flex-direction:column;gap:4px;width:180px">' + U.crest(H, 54) + '<b>' + esc(H.name) + '</b><span class="muted small">' + (H.league === c.league ? E.leaguePos(st, H) + '. Platz' : D.leagueNames[H.league]) + '</span></div><div class="mono" style="font-size:22px;font-weight:900">VS</div><div class="row" style="flex-direction:column;gap:4px;width:180px">' + U.crest(A, 54) + '<b>' + esc(A.name) + '</b><span class="muted small">' + (A.league === c.league ? E.leaguePos(st, A) + '. Platz' : D.leagueNames[A.league]) + '</span></div></div><p class="muted small" style="text-align:center">' + S.fxLabel(st, fx) + (H.rivals.indexOf(A.id) >= 0 ? ' · <span class="warn">DERBY!</span>' : '') + '</p>';
     });
-    else h += '<p class="muted">' + (st.phase === 'seasonEnd' ? 'Die Saison ist beendet.' : 'Diese Woche kein Spiel für Ihren Verein.') + '</p>';
+    else h += '<p class="muted">' + (st.phase === 'seasonEnd' ? 'Die Saison ist beendet.' : (S.isBreak(st) ? S.calText(st) + ' – diese Woche kein Spiel. ' + (U.can('business') ? '<a href="#" data-act="nav" data-s="training">Testspiel oder Trainingslager planen ›</a>' : '') : 'Diese Woche kein Spiel für Ihren Verein.')) + '</p>';
     h += '</div>';
     // Zeitung
     h += '<div class="panel"><h2>Fußball-Zeitung</h2>' + st.news.slice(0, 12).map(function (n) {
@@ -281,9 +281,9 @@
   // ---------- Verhandlungen (Kauf & Verlängerung) ----------
   U.acts.buyStart = function (d) {
     var st = U.st, p = st.players[d.id], c = U.club();
-    if (p.clubId && !T.windowOpen(st)) { U.modal('Transferfenster geschlossen', '<p>Transfers sind in der Saisonvorbereitung, an den Spieltagen 1–4 und in der Winterpause (Spieltag 16–19) möglich. Vertragslose Spieler können jederzeit verpflichtet werden.</p>'); return; }
+    if (T.isPending(st, p)) { U.toast('Mit diesem Spieler ist bereits ein Wechsel vereinbart.'); return; }
     if (!T.willingness(st, p, c)) { U.modal('Kein Interesse', '<p>' + esc(W.playerName(p)) + ' möchte nicht zu ' + esc(c.short) + ' wechseln – die Liga oder der Ruf des Vereins passen nicht.</p>'); return; }
-    U.nego = { pid: p.id, stage: p.clubId ? 'fee' : 'contract', fee: p.clubId ? R.round(p.value, 50000) : 0, wage: T.wageDemand(st, p, c), years: 3, signOn: 0, bonus: 0, msg: '', rounds: 0 };
+    U.nego = { future: !!p.clubId && !T.windowOpen(st), pid: p.id, stage: p.clubId ? 'fee' : 'contract', fee: p.clubId ? R.round(p.value, 50000) : 0, wage: T.wageDemand(st, p, c), years: 3, signOn: 0, bonus: 0, msg: '', rounds: 0 };
     U.showNego();
   };
   U.acts.renew = function (d) {
@@ -295,6 +295,7 @@
     var st = U.st, n = U.nego, p = st.players[n.pid], c = U.club(), h = '', f = '';
     var budgetInfo = st.manager.role === 'trainer' ? '<p class="small">Ihr Transferbudget: <b>' + money(st.manager.transferBudget || 0) + '</b></p>' : '<p class="small">Kontostand: <b>' + money(c.cash) + '</b></p>';
     h += '<p><b>' + esc(W.playerName(p)) + '</b> (' + p.pos + ', ' + p.age + ' J., Stärke ' + p.ovr + ') · Marktwert ' + money(p.value) + '</p>' + budgetInfo;
+    if (n.future) h += '<div class="help" style="margin-bottom:8px">🗓 Das Transferfenster ist geschlossen. Sie verhandeln einen <b>Wechsel zur neuen Saison</b>: Der Spieler kommt zum Start der Saisonvorbereitung, Ablöse und Handgeld werden erst dann fällig.</div>';
     if (n.stage === 'fee') {
       h += '<h3>Schritt 1: Ablöse mit ' + esc(st.clubs[p.clubId].name) + '</h3>' + U.field('Ihr Angebot (€)', '<input type="number" id="feeIn" value="' + n.fee + '" step="50000">');
       f = '<button data-act="closeModal">Abbrechen</button><button class="primary" data-act="negoFee">Angebot abgeben</button>';
@@ -330,7 +331,7 @@
     n.rounds++;
     var r = T.negotiate(st, p, c, n);
     if (r.result === 'accept') {
-      if (n.renew) { p.wage = n.wage; p.contract = n.years; p.bonus = n.bonus; if (n.signOn) { c.cash -= n.signOn; E.book(c, 'Handgelder', -n.signOn); } p.morale = Math.min(100, p.morale + 8); n.stage = 'done'; n.msg = W.playerName(p) + ' verlängert bis ' + (st.season + n.years) + '.'; }
+      if (n.renew) { p.wage = n.wage; p.contract = n.years; p.bonus = n.bonus; if (n.signOn) { c.cash -= n.signOn; E.book(c, 'Handgelder', -n.signOn); } p.morale = Math.min(100, p.morale + 8); n.stage = 'done'; n.msg = W.playerName(p) + ' verlängert bis ' + (st.season + n.years) + '.'; U.render(); if (U.autosave) U.autosave(); }
       else {
         var med = T.medicalCheck(st, c, p);
         if (med) { n.medical = med; n.stage = 'medical'; }
@@ -342,6 +343,7 @@
   };
   U.acts.negoFinish = function () {
     var st = U.st, n = U.nego, p = st.players[n.pid], c = U.club();
+    if (n.future) { T.addPending(st, p, c, n); n.stage = 'done'; n.msg = W.playerName(p) + ' wechselt zur neuen Saison zu ' + c.name + '.'; U.showNego(); U.render(); return; }
     if (c.cash < n.fee + n.signOn && st.manager.role !== 'trainer') { n.msg = 'Nicht genug Geld auf dem Konto.'; n.stage = 'done'; return U.showNego(); }
     T.executeTransfer(st, p, c, n.fee, n.wage, n.years, { signOn: n.signOn, bonus: n.bonus });
     if (st.manager.role === 'trainer') st.manager.transferBudget = Math.max(0, (st.manager.transferBudget || 0) - n.fee - n.signOn);
@@ -357,10 +359,11 @@
   };
 
   // ---------- Transfermarkt ----------
-  U.mf = { q: '', pos: '', league: '', club: '', ageMin: 16, ageMax: 40, ovrMin: 0, potMin: 0, valueMax: 0, wageMax: 0, contractMax: 9, status: 'all' };
+  U.mf = { q: '', pos: '', league: '', club: '', ageMin: 16, ageMax: 40, ovrMin: 0, potMin: 0, valueMax: 0, wageMax: 0, contractMax: 9, status: 'all', reach: false };
   U.screens.transfer = function () {
     var st = U.st, f = U.mf, c = U.club();
-    var h = '<h1>Transfermarkt</h1><div class="row" style="margin-bottom:10px"><span class="tag ' + (T.windowOpen(st) ? 'green' : 'red') + '">Transferfenster ' + (T.windowOpen(st) ? 'offen' : 'geschlossen') + '</span>' + (st.manager.role === 'trainer' ? '<span class="muted">Transferbudget: <b>' + money(st.manager.transferBudget || 0) + '</b></span>' : '<span class="muted">Kontostand: <b>' + money(c.cash) + '</b></span>') + '<span class="muted small">Kader: ' + W.squad(st, c.id).length + ' Spieler</span></div>';
+    var ws = T.windowStatus(st);
+    var h = '<h1>Transfermarkt</h1><div class="row" style="margin-bottom:10px"><span class="tag ' + (ws.open ? 'green' : 'red') + '" title="' + esc(T.WINDOW_TEXT) + '">' + esc(ws.text) + '</span>' + (st.manager.role === 'trainer' ? '<span class="muted">Transferbudget: <b>' + money(st.manager.transferBudget || 0) + '</b></span>' : '<span class="muted">Kontostand: <b>' + money(c.cash) + '</b></span>') + '<span class="muted small">Kader: ' + W.squad(st, c.id).length + ' Spieler</span></div>';
     h += '<div class="panel" style="margin-bottom:12px"><div class="row">' +
       '<input type="text" placeholder="🔎 Name suchen" data-inp="mf" data-k="q" value="' + esc(f.q) + '" style="width:180px">' +
       U.sel('pos', [['', 'Alle Positionen']].concat(D.positions.map(function (p) { return [p, D.posNames[p]]; }))) +
@@ -369,7 +372,10 @@
       U.sel('status', [['all', 'Alle Spieler'], ['listed', 'Transferliste'], ['free', 'Vertragslos'], ['loan', 'Leihkandidaten'], ['expiring', 'Auslaufende Verträge'], ['young', 'Talente (≤ 21)'], ['fav', 'Favoriten']]) +
       '</div><div class="row" style="margin-top:8px">' +
       U.num('ageMin', 'Alter ab') + U.num('ageMax', 'bis') + U.num('ovrMin', 'Stärke ab') + U.num('potMin', 'Potenzial ab') + U.num('valueMax', 'Marktwert bis (Mio.)') + U.num('wageMax', 'Gehalt bis (Tsd.)') + U.num('contractMax', 'Vertrag bis (J.)') +
+      '<label class="row small" style="gap:6px"><input type="checkbox" data-chg="mfReach"' + (f.reach ? ' checked' : '') + '> Nur erreichbare Spieler</label>' +
       '<button data-act="mfReset">Filter zurücksetzen</button></div></div>';
+    var pend = (st.pendingTransfers || []).filter(function (x) { return x.to === c.id; });
+    if (pend.length) h += '<div class="panel" style="margin-bottom:12px"><h2>📝 Vereinbart zur neuen Saison</h2>' + pend.map(function (x) { var p = st.players[x.pid]; return p ? '<div class="news-item row between"><div><div class="h">' + esc(W.playerName(p)) + ' (' + p.pos + ', ' + p.ovr + ')</div><div class="tx">' + (x.from && st.clubs[x.from] ? esc(st.clubs[x.from].name) + ' · ' : '') + 'Ablöse ' + money(x.fee) + ' · ' + money(x.wage) + '/Jahr · ' + x.years + ' J.</div></div><button class="sm danger" data-act="pendCancel" data-id="' + p.id + '">Zurückziehen</button></div>' : ''; }).join('') + '</div>';
     var list = [];
     st.favs = st.favs || {};
     for (var id in st.players) {
@@ -389,6 +395,7 @@
       if (f.status === 'young' && p.age > 21) continue;
       if (f.status === 'fav' && !st.favs[p.id]) continue;
       if (f.status === 'loan' && (!p.clubId || p.ovr > R.avg(W.squad(st, p.clubId), function (x) { return x.ovr; }) - 2)) continue;
+      if (f.reach && !T.reachable(st, p, c)) continue;
       list.push(p);
     }
     var total = list.length;
@@ -400,14 +407,19 @@
   U.sel = function (k, opts) { return '<select data-chg="mfSel" data-k="' + k + '">' + opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(U.mf[k]) === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>'; };
   U.num = function (k, l) { return '<label class="f" style="width:96px">' + l + '<input type="number" data-chg="mfNum" data-k="' + k + '" value="' + U.mf[k] + '"></label>'; };
   U.acts.mfSel = function (d, el) { U.mf[d.k] = el.value; U.render(); };
+  U.acts.mfReach = function (d, el) { U.mf.reach = el.checked; U.render(); };
+  U.acts.pendCancel = function (d) { T.cancelPending(U.st, d.id); U.toast('Vereinbarung zurückgezogen.'); U.render(); };
   U.acts.mfNum = function (d, el) { U.mf[d.k] = +el.value || 0; U.render(); };
   U.acts.mf = function (d, el) { U.mf.q = el.value; clearTimeout(U._mft); U._mft = setTimeout(function () { U.render(); var i = document.querySelector('[data-inp=mf]'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 300); };
   U.acts.mfReset = function () { U.mf = { q: '', pos: '', league: '', club: '', ageMin: 16, ageMax: 40, ovrMin: 0, potMin: 0, valueMax: 0, wageMax: 0, contractMax: 9, status: 'all' }; U.sortState.market = null; U.render(); };
 
   // ---------- Training ----------
   U.screens.training = function () {
-    var st = U.st, c = U.club(), can = U.can('sport');
-    var h = '<h1>Training</h1>' + U.roleNote('sport') + '<div class="sec-h">🏋️ Trainingsschwerpunkt <span class="ts" style="margin-left:auto">gilt jede Woche, bis Sie ihn ändern</span></div><div class="tiles big">';
+    var st = U.st, c = U.club(), gf = st.manager.role === 'gf', can = U.can('sport') || gf;
+    var h = '<h1>Training</h1>';
+    if (gf) h += '<div class="help" style="margin-bottom:12px">🤝 <b>Mitspracherecht des Geschäftsführers:</b> ' + (c.trainingByUser ? 'Sie geben den Trainingsschwerpunkt vor – ' + esc(U.coachName(c)) + ' und sein Stab setzen ihn um.' : esc(U.coachName(c)) + ' wählt den Schwerpunkt selbst. Tippen Sie auf eine Kachel, um ihn vorzugeben.') +
+      (c.trainingByUser ? ' <button class="sm" data-act="trainingToCoach">Wieder dem Trainer überlassen</button>' : '') + '</div>';
+    h += U.planPanel(st, c) + '<div class="sec-h">🏋️ Trainingsschwerpunkt <span class="ts" style="margin-left:auto">gilt jede Woche, bis Sie ihn ändern</span></div><div class="tiles big">';
     var arrows = function (v) { return v === 0 ? '<span class="arr nu">●</span>' : '<span class="arr ' + (v > 0 ? 'up' : 'dn') + '">' + (v > 0 ? '▲' : '▼').repeat(Math.abs(v)) + '</span>'; };
     Object.keys(D.training).forEach(function (k) {
       var t = D.training[k];
@@ -418,12 +430,42 @@
     h += '</div><p class="muted small" style="margin-top:8px">▲ steigt · ▼ sinkt · ● neutral. Bei der Verletzungsgefahr ist ▼ gut (grün). Trainingszentrum: <b>' + esc(E.level(c, 'training').n) + '</b> · Trainingsorganisation: <b>' + D.budgetLevels[c.budgets.trainorg] + '</b> · Trainer: <b>' + esc(U.coachName(c)) + '</b>' + (E.staffLvl(c, 'co') ? ' · Co-Trainer ' + U.stars(E.staffLvl(c, 'co'), 3) : '') + (E.staffLvl(c, 'fitness') ? ' · Fitnesstrainer ' + U.stars(E.staffLvl(c, 'fitness'), 3) : '') + '</p>';
     var avgFit = Math.round(R.avg(sq, function (p) { return p.fitness; })), avgMor = Math.round(R.avg(sq, function (p) { return p.morale; })), injN = sq.filter(function (p) { return p.inj; }).length;
     h += '<div class="grid g2" style="margin-top:14px"><div class="panel"><h2>Zustand der Mannschaft</h2><div class="grid g2">' + U.ikpi('energy', 'Ø Frische', avgFit, '', U.bar(avgFit, 100, avgFit < 70 ? '#ef4444' : avgFit < 85 ? '#f5b301' : '#22c55e')) + U.ikpi('heart', 'Ø Moral', avgMor, '', U.bar(avgMor, 100, '#a78bfa')) + U.ikpi('fans', 'Teamchemie', Math.round(c.chemistry), '', U.bar(c.chemistry)) + U.ikpi('heart', 'Verletzte', injN, injN > 3 ? 'neg' : '') + '</div></div>';
-    var campOk = st.phase === 'preseason' || (st.week >= 16 && st.week <= 18);
-    h += '<div class="panel"><h2>Trainingslager</h2>' + (st.campDone ? '<p class="muted">In dieser Saison bereits absolviert.</p>' : !campOk ? '<p class="muted">Trainingslager sind in der Saisonvorbereitung und in der Winterpause (Spieltag 16–18) möglich.</p>' : '') +
-      D.camps.map(function (cp) { return '<div class="news-item row between"><div><div class="h">' + cp.name + ' – ' + money(cp.cost) + '</div><div class="tx">' + cp.desc + '</div></div>' + (can && campOk && !st.campDone ? '<button class="sm primary" data-act="camp" data-k="' + cp.id + '">Buchen</button>' : '') + '</div>'; }).join('') + '</div></div>';
+    h += '<div class="panel"><h2>Trainingslager-Ziele</h2>' + D.camps.map(function (cp) { return '<div class="news-item"><div class="h">' + cp.name + ' – ' + money(cp.cost) + '</div><div class="tx">' + cp.desc + '</div></div>'; }).join('') + '<p class="muted small">Gebucht wird im Vorbereitungs- bzw. Winterpausenplan oben (je ein Trainingslager pro Pause, dauert eine Woche).</p></div></div>';
     return h;
   };
-  U.acts.setTraining = function (d) { U.club().training = d.k; U.render(); U.toast('Trainingsschwerpunkt: ' + D.training[d.k].n); };
+  U.acts.setTraining = function (d) { var c = U.club(); c.training = d.k; if (U.st.manager.role === 'gf') c.trainingByUser = true; U.render(); U.toast('Trainingsschwerpunkt: ' + D.training[d.k].n); };
+  U.acts.trainingToCoach = function () { U.club().trainingByUser = false; S.aiCoachDuties(U.st, U.club()); U.render(); U.toast('Der Trainer entscheidet wieder selbst.'); };
+  // Vorbereitungs-/Winterpausenplan: je Woche Training, Testspiel oder Trainingslager
+  U.planPanel = function (st, c) {
+    var weeks = S.planWeeks(st); if (!weeks.length) return '';
+    var can = S.planOwnerIsUser(st) && U.can('business') || st.manager.role === 'manager';
+    var cur = S.isBreak(st) ? S.breakKey(st) : null, opps = S.friendlyOpponents(st, c), plan = st.plan || {};
+    var title = weeks[0].k.charAt(0) === 'p' ? 'Saisonvorbereitung planen' : 'Winterpause planen';
+    var h = '<div class="panel" style="margin-bottom:14px"><div class="panel-h"><h2>🗓 ' + title + '</h2><span class="muted small">' + (can ? 'Planung: Sie (' + S.roleName(st.manager.role) + ')' : 'Planung: Vereinsführung') + '</span></div><table class="t plan-t"><tr><th>Woche</th><th>Programm</th><th></th></tr>';
+    weeks.forEach(function (w) {
+      var it = plan[w.k], past = w.past || (it && it.done), now = cur === w.k;
+      var desc = w.cup ? '🏆 1. Pokalrunde' + (it && it.type === 'camp' ? ' + ' : '') : '';
+      if (it && it.type === 'test') { var o = st.clubs[it.opp]; desc += '⚽ Testspiel ' + (it.home ? 'gegen ' : 'bei ') + (o ? esc(o.name) : '?') + (o ? ' <span class="muted small">(' + D.leagueNames[o.league] + ')</span>' : ''); }
+      else if (it && it.type === 'camp') { var cp = D.camps.filter(function (x) { return x.id === it.camp; })[0]; desc += '🏕 Trainingslager ' + (cp ? cp.name + ' (' + money(cp.cost) + ')' : ''); }
+      else if (!w.cup) desc = '<span class="muted">🏋️ Nur Training</span>';
+      var ctrl = '';
+      if (can && !past) {
+        ctrl = '<select data-chg="planSet" data-k="' + w.k + '"><option value="">Nur Training</option>' +
+          (w.cup ? '' : '<optgroup label="Testspiel (Heim)">' + opps.map(function (o) { return '<option value="test:' + o.id + ':1"' + (it && it.type === 'test' && it.opp === o.id && it.home ? ' selected' : '') + '>' + esc(o.short) + ' · ' + D.leagueNames[o.league] + '</option>'; }).join('') + '</optgroup><optgroup label="Testspiel (Auswärts)">' + opps.map(function (o) { return '<option value="test:' + o.id + ':0"' + (it && it.type === 'test' && it.opp === o.id && !it.home ? ' selected' : '') + '>bei ' + esc(o.short) + '</option>'; }).join('') + '</optgroup>') +
+          '<optgroup label="Trainingslager">' + D.camps.map(function (cp) { return '<option value="camp:' + cp.id + '"' + (it && it.type === 'camp' && it.camp === cp.id ? ' selected' : '') + '>' + cp.name + ' · ' + money(cp.cost) + '</option>'; }).join('') + '</optgroup></select>';
+      }
+      h += '<tr class="' + (now ? 'plan-now' : past ? 'muted' : '') + '"><td>' + (now ? '▶ ' : past ? '✓ ' : '') + esc(w.n) + '</td><td>' + desc + '</td><td class="num">' + ctrl + '</td></tr>';
+    });
+    h += '</table><p class="muted small" style="margin-top:6px">Testspiele bringen Spielpraxis und Teamchemie (keine Tabellen, keine Sperren, kleine Einnahme bei Heimspielen). Trainingslager stärken Fitness, Moral und Teamchemie. Ungeplante Wochen sind reine Trainingswochen.</p></div>';
+    return h;
+  };
+  U.acts.planSet = function (d, el) {
+    var v = el.value, item = null;
+    if (v.indexOf('test:') === 0) { var a = v.split(':'); item = { type: 'test', opp: a[1], home: a[2] === '1' }; }
+    else if (v.indexOf('camp:') === 0) item = { type: 'camp', camp: v.slice(5) };
+    var r = S.setPlan(U.st, d.k, item);
+    if (!r.ok) U.toast(r.why); U.render();
+  };
   U.acts.camp = function (d) { var r = S.applyCamp(U.st, U.club(), d.k); if (!r.ok) U.toast(r.why); else U.modal('Trainingslager', '<p>' + esc(r.text) + '</p>', '<button class="primary" data-act="closeModal">OK</button>'); U.render(); };
 
   // ---------- Ausbaukarte (gemeinsam für Abteilungen, Stadion, Stadt) ----------

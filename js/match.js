@@ -385,9 +385,10 @@
       if (countsForStats) {
         p.stats.apps++; p.stats.rsum += rt; p.stats.goals += m.goals[pid] || 0; p.stats.assists += m.assists[pid] || 0;
         p.career.apps++; p.career.goals += m.goals[pid] || 0; p.career.assists += m.assists[pid] || 0;
-      } else {
+      } else if (m.comp !== 'friendly') {
         p.stats.cupGoals = (p.stats.cupGoals || 0) + (m.goals[pid] || 0);
       }
+      if (m.comp === 'friendly') { if (m.injured[pid]) { p.inj = m.injured[pid]; p.inj.weeks = Math.min(p.inj.weeks, 3); p.inj.total = p.inj.weeks; } return; } // Testspiel: keine Karten/Sperren
       if (m.yellows[pid] && !m.sentOff[pid]) {
         p.stats.yc++; p.yellow++;
         if (p.yellow >= 5) { p.yellow = 0; p.susp = Math.max(p.susp, 1); }

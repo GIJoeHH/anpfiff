@@ -203,7 +203,7 @@ html.native-ipad #app { height: 100dvh; }
 /* ---- Retro-Bank (Säulenfassade + Fenster mit blauen Titelleisten) ---- */
 .bank-scene { position: relative; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); margin-bottom: 14px; padding: 26px 4% 30px; min-height: 360px; }
 .bank-facade { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.bank-scene .director-sign { position: absolute; right: 2.5%; top: 14px; z-index: 3; }
+.bank-scene .director-sign { position: absolute; left: 2.5%; right: auto; top: 14px; z-index: 3; }
 .rw { position: relative; z-index: 2; max-width: 980px; margin: 0 auto; background: rgba(246,240,222,.94); border: 3px solid #0b2a7a; box-shadow: 0 0 0 2px #e8e2cf, 0 10px 30px rgba(0,0,0,.45); color: #10215c; font-family: "Tahoma", "Verdana", var(--sans); }
 .rw-title { background: linear-gradient(180deg, #1c3e9e, #0b2a7a); color: #fff; text-align: center; font-weight: 700; padding: 6px; font-size: 16px; letter-spacing: .5px; border-bottom: 2px solid #e8e2cf; }
 .rw-body { padding: 12px; }
@@ -281,3 +281,34 @@ html.touch #nav { padding-left: env(safe-area-inset-left, 0px); padding-bottom: 
 html.touch #main { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); padding-right: max(22px, env(safe-area-inset-right, 0px)); }
 html.touch #modal { padding-top: calc(20px + env(safe-area-inset-top, 0px)); padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
 html.touch #toast { bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+
+/* ---- Zahleneingabe: lesbarer Betrag + Zahlenpad (iPad) ---- */
+.num-hint { display: block; font-size: 11.5px; color: var(--muted); margin-top: 3px; font-family: var(--mono); min-height: 14px; }
+input.np-field { caret-color: transparent; cursor: pointer; }
+#numpad { position: fixed; inset: 0; z-index: 9000; background: rgba(3,8,18,.55); display: none; align-items: flex-end; justify-content: center; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+#numpad .np-box { width: 340px; max-width: 100%; background: #101a30; border: 1px solid #3a5288; border-radius: 16px; padding: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.6); }
+#numpad .np-t { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+#numpad .np-d { background: #0a1222; border: 1px solid #2a3b60; border-radius: 10px; padding: 10px 12px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+#numpad .np-v { font: 800 28px var(--mono); color: #fff; }
+#numpad .np-u { font-size: 13px; color: #9fd8b0; }
+#numpad .np-mul, #numpad .np-act { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+#numpad .np-act { grid-template-columns: 1fr 1.4fr; margin: 8px 0 0; }
+#numpad .np-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#numpad button { min-height: 52px; font-size: 22px; font-weight: 700; border-radius: 10px; }
+#numpad .np-mul button { min-height: 42px; font-size: 16px; }
+#numpad .np-mul button.on { background: var(--green); color: #fff; border-color: var(--green); }
+#numpad .np-act button { font-size: 16px; min-height: 48px; }
+/* Vorbereitungsplan */
+.plan-t select { max-width: 240px; }
+.plan-t tr.plan-now td { background: rgba(34,197,94,.10); font-weight: 600; }
+/* Stadionplan */
+.splan .splan-sec { cursor: pointer; }
+.splan .splan-sec:hover rect { filter: brightness(1.15); }
+.plan-opts { display: grid; gap: 6px; max-height: 360px; overflow-y: auto; }
+.plan-opt { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.02); }
+/* Börsen-Eilmeldungen */
+.market-alerts { display: grid; gap: 10px; }
+.market-alerts .ma { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
+.market-alerts .ma.neg { border-color: #7f1d1d; background: rgba(239,68,68,.08); }
+.market-alerts .ma.pos { border-color: #14532d; background: rgba(34,197,94,.08); }
+.market-alerts .ma-ic { font-size: 30px; line-height: 1; }

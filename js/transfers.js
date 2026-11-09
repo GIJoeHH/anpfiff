@@ -3,7 +3,45 @@
   var D = R.data, W = R.world, E = R.econ;
   var T = R.transfers = {};
 
-  T.windowOpen = function (st) { return st.phase === 'preseason' || st.phase === 'seasonEnd' || st.week <= 4 || (st.week >= 16 && st.week <= 19); };
+  // Transferfenster: Vorbereitung, Spieltage 1–3, Spieltage 17–19 inkl. Winterpause, Saisonende.
+  // Außerhalb lassen sich Wechsel zur neuen Saison vereinbaren (T.pending).
+  T.windowOpen = function (st) {
+    if (st.phase === 'preseason' || st.phase === 'winter' || st.phase === 'seasonEnd') return true;
+    if (st.phase === 'releg') return false;
+    return st.week <= 2 || (st.week >= 16 && st.week <= 18);
+  };
+  T.WINDOW_TEXT = 'Transfers sind in der Saisonvorbereitung, bis einschließlich 3. Spieltag, in der Winterpause und bis einschließlich 19. Spieltag möglich. Außerhalb dieser Zeiten können Sie Wechsel zur neuen Saison vereinbaren. Vertragslose Spieler können jederzeit verpflichtet werden.';
+  T.windowStatus = function (st) {
+    if (T.windowOpen(st)) {
+      var until = st.phase === 'season' && st.week <= 2 ? 'bis einschl. 3. Spieltag' : st.phase === 'season' && st.week >= 16 ? 'bis einschl. 19. Spieltag' : st.phase === 'winter' ? 'Winterpause, bis einschl. 19. Spieltag' : st.phase === 'preseason' ? 'Vorbereitung, bis einschl. 3. Spieltag' : '';
+      return { open: true, text: 'Transferfenster offen' + (until ? ' (' + until + ')' : '') };
+    }
+    return { open: false, text: 'Transferfenster geschlossen – Wechsel zur neuen Saison möglich' + (st.phase === 'season' && st.week < 16 ? ' · Winterfenster öffnet vor dem 17. Spieltag' : '') };
+  };
+  // Vereinbarte Wechsel zur neuen Saison: { pid, to, fee, wage, years, signOn, bonus, from }
+  T.addPending = function (st, p, club, n) {
+    st.pendingTransfers = st.pendingTransfers || [];
+    st.pendingTransfers = st.pendingTransfers.filter(function (x) { return x.pid !== p.id; });
+    st.pendingTransfers.push({ pid: p.id, to: club.id, from: p.clubId, fee: n.fee || 0, wage: n.wage, years: n.years, signOn: n.signOn || 0, bonus: n.bonus || 0, season: st.season });
+    p.reservedFor = club.id;
+    R.season.news(st, 'Einigung: ' + W.playerName(p) + ' kommt zur neuen Saison', (p.clubId ? st.clubs[p.clubId].name + ' → ' : '') + club.name + (n.fee ? ' für ' + R.fmtMoney(n.fee) : ' ablösefrei') + '. Der Wechsel wird zum Start der Saisonvorbereitung vollzogen.', 'transfer');
+  };
+  T.isPending = function (st, p) { return (st.pendingTransfers || []).some(function (x) { return x.pid === p.id; }); };
+  T.cancelPending = function (st, pid) { var p = st.players[pid]; if (p) p.reservedFor = null; st.pendingTransfers = (st.pendingTransfers || []).filter(function (x) { return x.pid !== pid; }); };
+  T.executePending = function (st, beforeContracts) {
+    (st.pendingTransfers || []).forEach(function (x) {
+      var p = st.players[x.pid], to = st.clubs[x.to];
+      if (!p || !to) return;
+      p.reservedFor = null;
+      var freed = !p.clubId && x.from; // Vertrag ausgelaufen → ablösefrei
+      if (freed) x.fee = 0;
+      if (p.retired || (!freed && (p.clubId || null) !== (x.from || null))) { R.season.news(st, 'Wechsel geplatzt: ' + W.playerName(p), 'Der Spieler steht nicht mehr zur Verfügung.', 'transfer'); return; }
+      if (to.cash < x.fee + x.signOn && to.userControlled && st.manager.role !== 'trainer') { R.season.news(st, 'Wechsel geplatzt: ' + W.playerName(p), 'Nicht genug Geld für die vereinbarte Ablöse von ' + R.fmtMoney(x.fee) + '.', 'transfer'); return; }
+      T.executeTransfer(st, p, to, x.fee, x.wage, x.years + (beforeContracts ? 1 : 0), { signOn: x.signOn, bonus: x.bonus }); // +1: Laufzeit wird gleich beim Saisonwechsel gezählt
+      if (to.userControlled) to.manualLineup = false;
+    });
+    st.pendingTransfers = [];
+  };
 
   // Was verlangt der abgebende Verein?
   T.askingPrice = function (st, p) {
@@ -42,6 +80,13 @@
     if (club.league > from.league + 1 && p.ovr > 62) return false;
     if (club.reputation + 25 < from.reputation && p.ovr > 70) return false;
     return true;
+  };
+  // Für den Nutzer erreichbar? (Wechselwille + Ablöse im Rahmen von Kontostand bzw. Transferbudget)
+  T.reachable = function (st, p, club) {
+    if (!T.willingness(st, p, club) || p.reservedFor) return false;
+    var budget = st.manager.role === 'trainer' ? (st.manager.transferBudget || 0) : club.cash;
+    var fee = p.clubId ? T.askingPrice(st, p) * W.diffSettings[st.settings.difficulty].nego * 0.82 : 0;
+    return fee <= Math.max(0, budget);
   };
   // Vertragsverhandlung: offer {wage, years, signOn, bonus}
   T.negotiate = function (st, p, club, offer) {
@@ -112,6 +157,8 @@
 
   // KI: Angebote für gelistete Spieler des Nutzers erzeugen
   T.generateOffersForUser = function (st, club) {
+    // Außerhalb des Transferfensters keine Angebote; abgelaufene entfernen
+    if (!T.windowOpen(st)) { st.inbox = st.inbox.filter(function (o) { return o.type !== 'offer'; }); return; }
     var listed = W.squad(st, club.id).filter(function (p) { return p.listed; });
     listed.forEach(function (p) {
       if (!R.chance(0.35)) return;
@@ -121,7 +168,7 @@
       var b = R.pick(buyers);
       var amount = R.round(Math.min(b.cash * 0.6, p.value * R.randRange(0.75, 1.2)), 5000);
       if (p.asking && amount < p.asking * 0.7) amount = R.round(p.asking * R.randRange(0.75, 0.95), 5000);
-      st.inbox.unshift({ id: W.nextId(st, 'offer'), type: 'offer', pid: p.id, from: b.id, amount: amount, week: st.week, season: st.season });
+      st.inbox.unshift({ id: W.nextId(st, 'offer'), type: 'offer', pid: p.id, from: b.id, amount: amount, week: st.week, season: st.season, tick: st.tick || 0 });
     });
     // Gelegentlich Angebote für Leistungsträger
     if (R.chance(0.08)) {
@@ -131,17 +178,18 @@
         var rich = Object.keys(st.clubs).map(function (k) { return st.clubs[k]; }).filter(function (c) { return !c.userControlled && c.league <= club.league && c.cash > sp.value * 1.5; });
         if (rich.length) {
           var rb = R.pick(rich);
-          st.inbox.unshift({ id: W.nextId(st, 'offer'), type: 'offer', pid: sp.id, from: rb.id, amount: R.round(sp.value * R.randRange(1.1, 1.5), 50000), week: st.week, season: st.season });
+          st.inbox.unshift({ id: W.nextId(st, 'offer'), type: 'offer', pid: sp.id, from: rb.id, amount: R.round(sp.value * R.randRange(1.1, 1.5), 50000), week: st.week, season: st.season, tick: st.tick || 0 });
         }
       }
     }
-    st.inbox = st.inbox.filter(function (o) { return o.type !== 'offer' || (o.season === st.season && st.week - o.week <= 2); }).slice(0, 30);
+    st.inbox = st.inbox.filter(function (o) { return o.type !== 'offer' || (o.tick != null ? (st.tick || 0) - o.tick <= 2 : o.season === st.season && st.week - o.week <= 2); }).slice(0, 30);
   };
   T.acceptOffer = function (st, offerId) {
     var o = st.inbox.filter(function (x) { return x.id === offerId; })[0];
     if (!o) return { ok: false };
     var p = st.players[o.pid], buyer = st.clubs[o.from];
     if (!p || p.clubId !== st.manager.clubId) { st.inbox.splice(st.inbox.indexOf(o), 1); return { ok: false, why: 'Spieler nicht mehr verfügbar' }; }
+    if (!T.windowOpen(st)) { st.inbox.splice(st.inbox.indexOf(o), 1); return { ok: false, why: 'Transferfenster geschlossen' }; }
     if (W.squad(st, p.clubId).length <= 16) return { ok: false, why: 'Kader zu klein (mindestens 16 Spieler)' };
     T.executeTransfer(st, p, buyer, o.amount, Math.max(p.wage, W.fairWage(p)), R.randInt(2, 4));
     st.inbox = st.inbox.filter(function (x) { return x.pid !== o.pid; });
@@ -156,7 +204,7 @@
     var wageBudget = income * 0.62;
     // Verkaufen bei Geldnot oder zu großem Kader
     if ((club.cash < -income * 0.1 || squad.length > 28) && squad.length > 18) {
-      var sell = squad.slice().sort(function (a, b) { return club.cash < 0 ? b.value - a.value : a.ovr - b.ovr; })[club.cash < 0 ? 1 : 0];
+      var sell = squad.filter(function (x) { return !x.reservedFor; }).sort(function (a, b) { return club.cash < 0 ? b.value - a.value : a.ovr - b.ovr; })[club.cash < 0 ? 1 : 0];
       if (sell) {
         var buyer = T.findAIBuyer(st, sell, club);
         if (buyer) T.executeTransfer(st, sell, buyer, R.round(sell.value * R.randRange(0.8, 1.1), 5000), Math.max(sell.wage, W.fairWage(sell)), R.randInt(1, 4));
@@ -183,7 +231,7 @@
     var cands = [];
     for (var id in st.players) {
       var p = st.players[id];
-      if (p.pos !== weakest || p.youth || p.retired || p.clubId === club.id) continue;
+      if (p.pos !== weakest || p.youth || p.retired || p.clubId === club.id || p.reservedFor) continue;
       if (p.clubId && st.clubs[p.clubId].userControlled && !p.listed) continue;
       if (p.ovr < targetMin || p.ovr > avgOvr + 12) continue;
       if (p.age > 32) continue;
@@ -200,7 +248,7 @@
     var c = cands[0];
     if (c.p.clubId && st.clubs[c.p.clubId].userControlled) {
       // Angebot an den Nutzer statt direktem Transfer
-      st.inbox.unshift({ id: W.nextId(st, 'offer'), type: 'offer', pid: c.p.id, from: club.id, amount: R.round(c.fee, 5000), week: st.week, season: st.season });
+      st.inbox.unshift({ id: W.nextId(st, 'offer'), type: 'offer', pid: c.p.id, from: club.id, amount: R.round(c.fee, 5000), week: st.week, season: st.season, tick: st.tick || 0 });
       return;
     }
     T.executeTransfer(st, c.p, club, R.round(c.fee, 5000), R.round(c.wage, 1000), R.randInt(2, 4));

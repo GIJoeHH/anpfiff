@@ -227,6 +227,7 @@
   U.acts.edClubSave = function (d) {
     var g = function (k) { var el = document.getElementById(k); return el ? el.value : null; };
     var fac = {}; ['steh', 'sitz', 'vip', 'oepnv', 'strasse', 'parken', 'medizin', 'jugend', 'training'].forEach(function (k) { fac[k] = +g('ef_' + k); });
+    var cl = U.st.clubs[d.id]; if (cl && cl.stadium && ['steh', 'sitz', 'vip'].some(function (k) { return fac[k] !== cl.fac[k]; })) cl.stadium = null; // Stadionplan aus den neuen Stufen neu aufbauen
     var r = ED.updateClub(U.st, d.id, { name: g('ec_name'), short: g('ec_short'), city: g('ec_city'), stadiumName: g('ec_stadiumName'), color1: g('ec_color1'), color2: g('ec_color2'), fans: g('ec_fans'), reputation: g('ec_reputation'), cash: g('ec_cash'), fac: fac, league: +g('ec_league') });
     U.toast(r.ok ? 'Verein gespeichert.' : r.why); U.render();
   };

@@ -135,9 +135,9 @@
   // ---------- Kopfzeile & Navigation ----------
   U.renderTop = function () {
     var st = U.st, c = U.club(), el = document.getElementById('topbar');
-    var btnLabel = st.phase === 'seasonEnd' ? 'NEUE SAISON ▶' : st.phase === 'releg' ? 'RELEGATION ▶' : 'NÄCHSTER SPIELTAG ▶';
+    var btnLabel = st.phase === 'seasonEnd' ? 'NEUE SAISON ▶' : st.phase === 'releg' ? 'RELEGATION ▶' : S.isBreak(st) ? 'NÄCHSTE WOCHE ▶' : 'NÄCHSTER SPIELTAG ▶';
     if (!c) {
-      el.innerHTML = '<div class="tb-club"><div><div class="name">' + esc(st.manager.name) + ' – vereinslos</div><div class="sub">Saison ' + st.season + '/' + String(st.season + 1).slice(2) + ' · ' + (st.phase === 'season' ? st.week + '. Spieltag' : st.phase) + '</div></div></div><div class="tb-spacer"></div><button class="btn-next" data-act="next">' + (st.phase === 'seasonEnd' ? 'NEUE SAISON ▶' : 'WOCHE ABWARTEN ▶') + '</button>';
+      el.innerHTML = '<div class="tb-club"><div><div class="name">' + esc(st.manager.name) + ' – vereinslos</div><div class="sub">Saison ' + st.season + '/' + String(st.season + 1).slice(2) + ' · ' + S.calText(st) + '</div></div></div><div class="tb-spacer"></div><button class="btn-next" data-act="next">' + (st.phase === 'seasonEnd' ? 'NEUE SAISON ▶' : 'WOCHE ABWARTEN ▶') + '</button>';
       return;
     }
     var pos = E.leaguePos(st, c);
@@ -148,11 +148,11 @@
     var opp = nxt ? st.clubs[nxt.h === c.id ? nxt.a : nxt.h] : null;
     el.innerHTML = '<div class="tb-club">' + U.crest(c, 40) + '<div><div class="name">' + esc(c.name) + (st.cheatUsed ? ' <span class="cheat-tag" title="Spielstand mit Cheat">CHEAT</span>' : '') + '</div><div class="sub">' + D.leagueNames[c.league] + ' · ' + S.roleName(st.manager.role) + ' · Saison ' + st.season + '/' + String(st.season + 1).slice(2) + '</div></div></div>' +
       '<div class="tb-stat">Platz<b>' + (st.week > 0 ? pos + '.' : '–') + '</b></div>' +
-      '<div class="tb-stat">Spieltag<b>' + (st.phase === 'preseason' ? 'Vorb.' : st.phase === 'season' ? st.week + '/34' : st.phase === 'releg' ? 'Releg.' : 'Ende') + '</b></div>' +
+      '<div class="tb-stat">' + (S.isBreak(st) ? 'Woche' : 'Spieltag') + '<b>' + S.calText(st, true) + '</b></div>' +
       '<div class="tb-stat">Kontostand<b class="' + U.moneyCls(c.cash) + '">' + money(c.cash) + '</b></div>' +
       '<div class="tb-stat">Stärke<b>' + strength + '</b></div>' +
       '<div class="tb-stat">Stimmung<b>' + (mood >= 70 ? '😀' : mood >= 50 ? '🙂' : mood >= 35 ? '😐' : '😠') + ' ' + mood + '</b></div>' +
-      '<div class="tb-stat">Nächster Gegner<b>' + (opp ? esc(opp.short) + (nxt.comp !== 'league' ? ' (' + (nxt.comp === 'releg' ? 'Rel.' : 'Pokal') + ')' : '') + (nxt.h === c.id ? ' (H)' : ' (A)') : '—') + '</b></div>' +
+      '<div class="tb-stat">Nächster Gegner<b>' + (opp ? esc(opp.short) + (nxt.comp !== 'league' ? ' (' + (nxt.comp === 'releg' ? 'Rel.' : nxt.comp === 'friendly' ? 'Test' : 'Pokal') + ')' : '') + (nxt.h === c.id ? ' (H)' : ' (A)') : '—') + '</b></div>' +
       '<div class="tb-spacer"></div>' +
       (U.autoRun ? '<button class="sm danger" data-act="autoStop">■ Automatik stoppen</button>' : '<button class="sm ghost" data-act="autoStart" title="Spieltage automatisch mit Sofortergebnis durchspielen, bis etwas Wichtiges passiert">⏩ Auto</button>') +
       '<button class="btn-next" data-act="next"' + (U.busy ? ' disabled' : '') + '>' + btnLabel + '</button>';
@@ -226,9 +226,9 @@
   // Ereigniskarten
   U.showEvent = function () {
     var pe = U.st.pendingEvent; if (!pe) return;
-    var ev = (pe.chaos ? D.chaosEvents : D.events)[pe.idx];
+    var ev = pe.custom || (pe.chaos ? D.chaosEvents : D.events)[pe.idx];
     U.modalLock = true;
-    U.modal('Ereigniskarte', '<div class="event-card">' + esc(ev.t) + '</div>', ev.o.map(function (o, i) {
+    U.modal('Ereigniskarte', '<div class="event-card">' + (ev.ic ? '<div style="font-size:42px;line-height:1;margin-bottom:6px">' + ev.ic + '</div>' : '') + esc(ev.t) + '</div>', ev.o.map(function (o, i) {
       var eff = []; if (o.cash) eff.push((o.cash > 0 ? '+' : '') + money(o.cash)); if (o.mor) eff.push('Moral ' + (o.mor > 0 ? '+' : '') + o.mor); if (o.fans) eff.push('Fans ' + (o.fans > 0 ? '+' : '') + o.fans + '%');
       return '<button data-act="eventPick" data-i="' + i + '">' + esc(o.l) + (eff.length ? ' <span class="muted small">(' + eff.join(', ') + (o.chance || o.lottery ? ', Risiko' : '') + ')</span>' : (o.lottery ? ' <span class="muted small">(Risiko)</span>' : '')) + '</button>';
     }).join(''));
@@ -257,7 +257,7 @@
       list.sort(function (a, b) { return (b.saved || '').localeCompare(a.saved || ''); });
       el.innerHTML = list.length ? U.table('slots', [
         { k: 'slot', l: 'Slot', f: function (r) { return esc(r.slot === 'autosave' ? 'Autosave' : r.slot); } }, { k: 'club', l: 'Verein', f: function (r) { return esc(r.club) + (r.cheat ? ' <span class="cheat-tag">CHEAT</span>' : '') + (r.pending ? ' <span class="tag amber">wird aus iCloud geladen…</span>' : ''); } },
-        { k: 'manager', l: 'Manager' }, { k: 'season', l: 'Saison', f: function (r) { return r.season + '/' + String(r.season + 1).slice(2) + ', ' + (r.phase === 'preseason' ? 'Vorbereitung' : r.week + '. Spieltag'); } },
+        { k: 'manager', l: 'Manager' }, { k: 'season', l: 'Saison', f: function (r) { return r.season + '/' + String(r.season + 1).slice(2) + ', ' + (r.phase === 'preseason' ? 'Vorbereitung' : r.phase === 'winter' ? 'Winterpause' : r.week + '. Spieltag'); } },
         { k: 'saved', l: 'Gespeichert', f: function (r) { return r.saved ? new Date(r.saved).toLocaleString('de-DE') : ''; } },
         { k: 'x', l: '', nosort: true, f: function (r) { return '<button class="sm primary" data-act="loadSlot" data-slot="' + esc(r.slot) + '">Laden</button> <button class="sm danger" data-act="delSlot" data-slot="' + esc(r.slot) + '">Löschen</button>'; } }
       ], list) : '<p class="muted">Noch keine Spielstände vorhanden.</p>';

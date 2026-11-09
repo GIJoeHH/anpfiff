@@ -21,7 +21,7 @@
         return '<div class="panel" style="text-align:center">' + U.crest(x, 64) + '<h3 style="margin-top:6px">' + esc(x.name) + '</h3><div class="muted small">' + D.leagueNames[x.league] + (x.league === c.league && st.week ? ' · ' + E.leaguePos(st, x) + '. Platz' : '') + '</div><div style="margin:8px 0">' + U.formDots(x.form) + '</div>' +
           '<table class="t small"><tr><td>Stärke (Elf)</td><td class="num">' + U.ovrBadge(M.squadStrength(st, x)) + '</td></tr><tr><td>Trainer</td><td class="num">' + esc(U.coachName(x)) + ' <span class="muted">(' + esc(x.coach.profile) + ')</span></td></tr><tr><td>Formation</td><td class="num">' + x.tactic.formation + '</td></tr><tr><td>Ausfälle</td><td class="num">' + (inj.length ? inj.map(function (p) { return esc(p.last); }).join(', ') : 'keine') + '</td></tr><tr><td>Schlüsselspieler</td><td class="num">' + best.map(function (p) { return esc(p.last) + ' (' + p.ovr + ')'; }).join(', ') + '</td></tr></table></div>';
       }
-      h += '<div class="panel" style="margin-bottom:14px"><h2>' + (fx.comp === 'league' ? (st.phase === 'preseason' ? 1 : st.week + 1) + '. Spieltag – ' + D.leagueNames[c.league] : fx.comp === 'releg' ? 'Relegation – ' + (st.relegLeg === 0 ? 'Hinspiel' : 'Rückspiel') : 'Pokal – ' + st.cup.rounds[S.CUP_WEEKS.indexOf(st.phase === 'preseason' ? 1 : st.week + 1)].name) + (H.rivals.indexOf(A.id) >= 0 ? ' · <span class="warn">DERBY</span>' : '') + '</h2><div class="grid g2">' + teamBox(H) + teamBox(A) + '</div>' +
+      h += '<div class="panel" style="margin-bottom:14px"><h2>' + (fx.comp === 'league' ? (st.week + 1) + '. Spieltag – ' + D.leagueNames[c.league] : fx.comp === 'releg' ? 'Relegation – ' + (st.relegLeg === 0 ? 'Hinspiel' : 'Rückspiel') : S.fxLabel(st, fx)) + (H.rivals.indexOf(A.id) >= 0 ? ' · <span class="warn">DERBY</span>' : '') + '</h2><div class="grid g2">' + teamBox(H) + teamBox(A) + '</div>' +
         '<p class="small" style="margin-top:10px">' + (est ? 'Erwartete Zuschauer: <b>' + R.fmtNum(est.total) + '</b> von ' + R.fmtNum(est.capacity) + (est.total >= est.capacity * 0.98 ? ' – <span class="pos">AUSVERKAUFT</span>' : '') : 'Endspiel auf neutralem Platz') + '</p>' +
         '<div class="help">Gegneranalyse: ' + esc(opp.short) + ' spielt meist ' + opp.tactic.formation + ', Trainertyp „' + esc(opp.coach.profile) + '“. ' + (M.squadStrength(st, opp) > M.squadStrength(st, c) + 3 ? 'Klar favorisiert – kompakt stehen und kontern?' : M.squadStrength(st, opp) < M.squadStrength(st, c) - 3 ? 'Sie sind Favorit – mutig nach vorne spielen!' : 'Ein Duell auf Augenhöhe.') + '</div></div>';
     });
@@ -107,13 +107,30 @@
   };
   U.acts.matchSpeed = function (d) { U.st.settings.matchSpeed = d.v; if (d.v === 'sofort') U.acts.matchSkip(); else U.liveUpdate([]); };
 
+  // Trikotfarben fürs Live-Spiel: Heim in Vereinsfarben, Gast weicht bei ähnlichen Farben auf Zweitfarbe
+  // bzw. Ausweichtrikot (Weiß oder Dunkel) aus – nie mehr „Rot gegen Rot“
+  function rgb(h) { h = String(h || '#888').replace('#', ''); if (h.length === 3) h = h.replace(/(.)/g, '$1$1'); var n = parseInt(h, 16) || 0; return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function cdist(a, b) { var x = rgb(a), y = rgb(b), rm = (x[0] + y[0]) / 2, dr = x[0] - y[0], dg = x[1] - y[1], db = x[2] - y[2]; return Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db); }
+  function lum(h) { var c = rgb(h); return (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000; }
+  U.matchKits = function (H, A) {
+    var hk = { fill: H.colors[0], stroke: H.colors[1] || '#ffffff' };
+    var MIN = 190, cand = [[A.colors[0], A.colors[1]], [A.colors[1], A.colors[0]], ['#ffffff', A.colors[0]], ['#111827', A.colors[0]], ['#facc15', '#111827'], ['#0ea5e9', '#ffffff']];
+    var ak = null;
+    for (var i = 0; i < cand.length && !ak; i++) if (cand[i][0] && cdist(cand[i][0], hk.fill) >= MIN && cdist(cand[i][0], hk.stroke) >= 90) ak = { fill: cand[i][0], stroke: cand[i][1] || '#ffffff', alt: i > 0 };
+    if (!ak) ak = { fill: lum(hk.fill) > 140 ? '#111827' : '#ffffff', stroke: A.colors[0], alt: true };
+    if (cdist(ak.stroke, ak.fill) < 80) ak.stroke = lum(ak.fill) > 140 ? '#111827' : '#ffffff';
+    [hk, ak].forEach(function (k) { k.text = lum(k.fill) > 150 ? '#111' : '#fff'; });
+    hk.gk = '#111111'; ak.gk = cdist('#111111', ak.fill) < 120 || cdist('#111111', hk.fill) < 120 ? '#a3e635' : '#f97316';
+    if (cdist(hk.gk, ak.fill) < 120 || cdist(hk.gk, hk.fill) < 120) hk.gk = '#7c3aed';
+    return [hk, ak];
+  };
   U.screens.match = function () {
     var L = U.live; if (!L) return U.screens.spieltag();
-    var st = U.st, m = L.m, H = st.clubs[m.clubs[0]], A = st.clubs[m.clubs[1]];
+    var st = U.st, m = L.m, H = st.clubs[m.clubs[0]], A = st.clubs[m.clubs[1]], K = L.kits = U.matchKits(H, A);
     var h = '<div class="match-grid"><div style="position:relative"><canvas id="pitchCv" class="match-canvas" width="680" height="1000"></canvas><div id="flashBox"></div></div><div class="grid" style="align-content:start">';
     h += '<div class="scoreboard"><div class="sb-top"><span>' + esc(m.neutral ? 'Neutraler Platz' : H.stadiumName).toUpperCase() + '</span><span id="sbMin">0\'</span></div>' +
-      '<div class="sb-row" style="background:' + H.colors[0] + ';color:' + (H.colors[0] === '#ffffff' || H.colors[0] === '#facc15' ? '#111' : '#fff') + '"><span>' + esc(H.short) + '</span><span class="g" id="sbH">0</span></div>' +
-      '<div class="sb-row" style="background:' + A.colors[0] + ';color:' + (A.colors[0] === '#ffffff' || A.colors[0] === '#facc15' ? '#111' : '#fff') + '"><span>' + esc(A.short) + '</span><span class="g" id="sbA">0</span></div></div>';
+      '<div class="sb-row" style="background:' + K[0].fill + ';color:' + K[0].text + ';box-shadow:inset 6px 0 0 ' + K[0].stroke + '"><span>' + esc(H.short) + '</span><span class="g" id="sbH">0</span></div>' +
+      '<div class="sb-row" style="background:' + K[1].fill + ';color:' + K[1].text + ';box-shadow:inset 6px 0 0 ' + K[1].stroke + '"><span>' + esc(A.short) + (K[1].alt ? ' <small style="opacity:.7;font-size:10px">Ausweichtrikot</small>' : '') + '</span><span class="g" id="sbA">0</span></div></div>';
     h += '<div class="panel" style="padding:10px"><div class="row" id="liveCtl"><button data-act="matchPause" id="pauseBtn">⏸ Pause</button><div class="seg">' + [['normal', 'Normal'], ['schnell', 'Schnell'], ['sofort', 'Sofort']].map(function (x) { return '<button class="sm ' + (st.settings.matchSpeed === x[0] ? 'on' : '') + '" data-act="matchSpeed" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div><button data-act="matchSkip">⏭ Überspringen</button>' + (m.userSide >= 0 && U.can('sport') ? '<button data-act="liveTactics">🔁 Wechsel/Taktik</button>' : '<span class="muted small">' + (m.userSide >= 0 ? 'Als Geschäftsführer verfolgen Sie das Spiel von der Tribüne.' : '') + '</span>') + '</div></div>';
     h += '<div class="panel" style="padding:10px"><div class="row between small"><span>Ballbesitz</span><span id="stPoss">50 : 50</span></div><div class="row between small"><span>Torschüsse</span><span id="stShots">0 : 0</span></div><div class="row between small"><span>Chancen</span><span id="stCh">0 : 0</span></div></div>';
     h += '<div class="ticker" id="ticker"></div></div></div>';
@@ -232,8 +249,9 @@
           if (s === a.poss && sl[0] !== 'TW' && (!targetsBall || Math.random() < 0.004)) targetsBall = P;
           var x = mg + P.x * pw, y = mg + P.y * ph;
           ctx.beginPath(); ctx.arc(x, y + 3, 15, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fill();
-          ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fillStyle = sl[0] === 'TW' ? '#111' : club.colors[0]; ctx.fill();
-          ctx.lineWidth = 3; ctx.strokeStyle = sl[0] === 'TW' ? club.colors[0] : club.colors[1]; ctx.stroke();
+          var kit = (U.live && U.live.kits || U.matchKits(st.clubs[m.clubs[0]], st.clubs[m.clubs[1]]))[s];
+          ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fillStyle = sl[0] === 'TW' ? kit.gk : kit.fill; ctx.fill();
+          ctx.lineWidth = 3; ctx.strokeStyle = sl[0] === 'TW' ? kit.fill : kit.stroke; ctx.stroke();
           ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Menlo, monospace'; ctx.textAlign = 'center';
           if (U.st.settings.matchSpeed === 'normal') ctx.fillText(st.players[pid].last.slice(0, 9), x, y - 20);
         });

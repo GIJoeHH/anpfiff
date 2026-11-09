@@ -87,7 +87,18 @@
     if (st.pendingEvent) { U.showEvent(); return; }
     if (st.dealReport) { U.showDealReport(); return; }
     if (st.deal && st.dealPopup) { U.showDeal(); return; }
+    if (st.marketAlerts && st.marketAlerts.length) { U.showMarketAlerts(); return; }
   };
+  // Börsenereignisse (Crash, Kurssprünge, Rekordhöhen)
+  U.showMarketAlerts = function () {
+    var st = U.st, a = st.marketAlerts || []; st.marketAlerts = [];
+    if (!a.length) return;
+    var bad = a.some(function (x) { return /crash/.test(x.k); });
+    U.modal(bad ? '📉 Börsen-Eilmeldung' : '📈 Börsen-Eilmeldung', '<div class="market-alerts">' + a.map(function (x) {
+      return '<div class="ma ' + (/crash/.test(x.k) ? 'neg' : 'pos') + '"><span class="ma-ic">' + x.ic + '</span><div><b>' + esc(x.t) + '</b><div class="small">' + esc(x.x) + '</div></div></div>';
+    }).join('') + '</div>', '<button data-act="closeModal">OK</button><button class="primary" data-act="maGo">Zur Börse</button>');
+  };
+  U.acts.maGo = function () { U.closeModal(); U.go('bank', { tab: 'aktien' }); };
 
   // Übersicht im Vereinsmanagement
   U.dealPanel = function (c) {

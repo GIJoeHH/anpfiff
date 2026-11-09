@@ -138,7 +138,8 @@
 
   // ---------- Stadion ----------
   U.screens.stadion = function () {
-    var st = U.st, c = U.club(), tab = U.p.tab || 'stadion';
+    var st = U.st, c = U.club(), tab = U.p.tab || 'plan';
+    if (R.stadium && c) R.stadium.ensure(c);
     var parts = E.capacityParts(c), att = E.attractiveness(c), tcap = E.transportCap(c);
     var avg = c.attendanceHist.length ? R.avg(c.attendanceHist) : 0;
     var h = '<h1 class="row" style="gap:10px">' + U.crest(c, 34) + esc(c.stadiumName) + '</h1>' + U.roleNote('business');
@@ -148,21 +149,102 @@
     var ref = E.refPrices[c.league], fakeAway = st.clubs[st.leagues[c.league].clubIds.filter(function (x) { return x !== c.id; })[0]];
     var est = E.attendance(st, c, fakeAway, 'league');
     h += '<div class="panel"><h2>Eintrittspreise</h2>' + ['steh', 'sitz', 'vip'].map(function (k) {
-      return '<div class="row between" style="margin-bottom:6px"><span>' + { steh: 'Stehplatz', sitz: 'Sitzplatz', vip: 'VIP' }[k] + ' <span class="muted small">(' + R.fmtNum(parts[k]) + ' Plätze, üblich ~' + ref[k] + ' €)</span></span><span><input type="number" style="width:80px" data-chg="ticket" data-k="' + k + '" value="' + c.tickets[k] + '" min="1"' + (U.can('business') ? '' : ' disabled') + '> €</span></div>';
+      return '<div class="row between" style="margin-bottom:6px"><span>' + { steh: 'Stehplatz', sitz: 'Sitzplatz', vip: parts.biz ? 'Logen (Business 35 %)' : 'VIP' }[k] + ' <span class="muted small">(' + R.fmtNum(parts[k]) + ' Plätze, üblich ~' + ref[k] + ' €)</span></span><span><input type="number" style="width:80px" data-chg="ticket" data-k="' + k + '" value="' + c.tickets[k] + '" min="1"' + (U.can('business') ? '' : ' disabled') + '> €</span></div>';
     }).join('') + '<div class="help small">Prognose gegen einen Durchschnittsgegner: <b>' + R.fmtNum(est.total) + '</b> Zuschauer (' + Math.round(est.total / Math.max(1, est.capacity) * 100) + ' %), Erlös ' + money(est.ticket + est.cater + est.parking) + ', Nachfrage ' + R.fmtNum(est.demand) + ', Zufriedenheit ' + est.satisfaction + '/100' + (est.congestion > 0.05 ? '<br><span class="warn">⚠️ Verkehrsengpass: Staus kosten Zuschauer und Fanzufriedenheit.</span>' : '') + '</div></div>';
     h += '<div class="panel"><h2>Zuschauerverlauf</h2>' + (c.attendanceHist.length > 1 ? U.sparkline(c.attendanceHist, 300, 90, '#3b82f6') : '<p class="muted small">Noch keine Heimspiele.</p>') + '<p class="muted small">Rekord: ' + R.fmtNum(c.records.attendance) + '</p></div></div></div>';
-    h += '<div class="seg" style="margin:16px 0 12px">' + [['stadion', 'Stadionausbau'], ['infra', 'Verkehrsinfrastruktur']].map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="tab" data-s="stadion" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
+    h += '<div class="seg" style="margin:16px 0 12px">' + [['plan', 'Stadionplan (Tribünen)'], ['stadion', 'Ausstattung'], ['infra', 'Verkehrsinfrastruktur']].map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="tab" data-s="stadion" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
     var effects = { steh: 'Mehr günstige Plätze – mehr Stimmung.', sitz: 'Mehr Sitzplätze: höhere Erlöse, mehr Komfort.', dach: 'Komfort und Attraktivität.', vip: 'Hohe Erlöse pro Platz, Hospitality.', licht: 'Abendspiele und Attraktivität.', video: 'Attraktivität.', rasen: 'Attraktivität und Spielqualität.', sanitaer: 'Zufriedenheit der Zuschauer.', hosp: 'Höherer Umsatz pro Zuschauer.', technik: 'Moderner Komfort.', oepnv: 'Transportiert viele Fans – ersetzt Parkplatzbedarf. Große Projekte mit städtischem Zuschuss.', strasse: 'Begrenzt, wie viele Autos ankommen können.', parken: 'Parkplätze bringen Parkgebühren, benötigen aber eine gute Straße.' };
-    h += '<div class="grid g3">' + D.facilityOrder[tab === 'infra' ? 'infra' : 'stadion'].map(function (k) { return U.facilityCard(k, { effect: effects[k] }); }).join('') + '</div>';
+    if (tab === 'plan') h += U.stadiumPlanPanel(st, c);
+    else h += '<div class="grid g3">' + D.facilityOrder[tab === 'infra' ? 'infra' : 'stadion'].filter(function (k) { return !(R.stadium && R.stadium.has(c) && E.PLAN_KEYS.indexOf(k) >= 0); }).map(function (k) { return U.facilityCard(k, { effect: effects[k] }); }).join('') + '</div>';
     if (tab === 'infra') h += '<div class="help" style="margin-top:12px">Verkehrskapazität = ÖPNV (' + R.fmtNum(E.level(c, 'oepnv').fans) + ') + min(Parkplätze × 2,6 = ' + R.fmtNum(E.level(c, 'parken').cars * 2.6) + ', Straße = ' + R.fmtNum(E.level(c, 'strasse').fans) + '). Sie müssen nicht alle drei Zweige ausbauen – eine starke S-Bahn ersetzt viele Parkplätze.</div>';
     return h;
   };
   U.acts.ticket = function (d, el) { if (!U.can('business')) return; U.club().tickets[d.k] = R.clamp(Math.round(+el.value || 1), 1, 2000); U.render(); };
   U.acts.stadiumPart = function (d) {
     var k = d.k; if (!k || !D.facilities[k]) return;
+    if (R.stadium && R.stadium.has(U.club()) && E.PLAN_KEYS.indexOf(k) >= 0) { U.go('stadion', { tab: 'plan' }); return; }
     U.modal(D.facilities[k].name, U.facilityCard(k), '<button data-act="closeModal">Schließen</button>');
   };
   U.acts['nav-stadion'] = function () { U.go('stadion'); };
+
+  // ---------- Stadionplan: Grundriss mit Sektoren ----------
+  U.stadiumPlanSVG = function (c, sel) {
+    var SP = R.stadium, plan = c.stadium, W_ = 640, H_ = 470, px0 = 190, px1 = 450, py0 = 165, py1 = 305, gap = 8, B = 36;
+    var s = '<svg class="splan" viewBox="0 0 ' + W_ + ' ' + H_ + '" style="width:100%;display:block">';
+    s += '<rect x="0" y="0" width="' + W_ + '" height="' + H_ + '" rx="12" fill="#0d1a2e"/>';
+    // Spielfeld
+    s += '<rect x="' + px0 + '" y="' + py0 + '" width="' + (px1 - px0) + '" height="' + (py1 - py0) + '" fill="#2f8a3c" stroke="#e9f5ea" stroke-width="2"/>';
+    s += '<line x1="' + (px0 + px1) / 2 + '" y1="' + py0 + '" x2="' + (px0 + px1) / 2 + '" y2="' + py1 + '" stroke="#e9f5ea" stroke-width="1.5"/><circle cx="' + (px0 + px1) / 2 + '" cy="' + (py0 + py1) / 2 + '" r="20" fill="none" stroke="#e9f5ea" stroke-width="1.5"/>';
+    [[px0, 1], [px1, -1]].forEach(function (e) { s += '<rect x="' + (e[1] > 0 ? e[0] : e[0] - 40) + '" y="' + (py0 + 30) + '" width="40" height="80" fill="none" stroke="#e9f5ea" stroke-width="1.5"/>'; });
+    function band(id, ti, size, type) {
+      var sec = SP.sec(id), d0 = gap + ti * B, d1 = d0 + B * size - 2, r;
+      var i, n;
+      if (sec.side === 'N' || sec.side === 'S') { i = +id.charAt(1) - 1; n = 3; var w = (px1 - px0) / n, x = px0 + i * w + 2; r = sec.side === 'N' ? [x, py0 - d1, w - 4, d1 - d0] : [x, py1 + d0, w - 4, d1 - d0]; }
+      else if (sec.side === 'W' || sec.side === 'E') { i = +id.charAt(1) - 1; n = 2; var hh = (py1 - py0) / n, y = py0 + i * hh + 2; r = sec.side === 'W' ? [px0 - d1, y, d1 - d0, hh - 4] : [px1 + d0, y, d1 - d0, hh - 4]; }
+      else { var sx = id.charAt(1) === 'W' ? -1 : 1, sy = id.charAt(0) === 'N' ? -1 : 1, cx = sx < 0 ? px0 : px1, cy = sy < 0 ? py0 : py1, dd = d1 - d0 + B * 0; r = [sx < 0 ? cx - d1 : cx + d0, sy < 0 ? cy - d1 : cy + d0, d1 - d0, d1 - d0]; if (ti > 0) { r = [sx < 0 ? cx - d1 : cx + gap, sy < 0 ? cy - d1 : cy + gap, d1 - gap, d1 - gap]; } }
+      return r;
+    }
+    var secIds = SP.SECTORS.map(function (x) { return x.id; });
+    secIds.forEach(function (id) {
+      var sec = SP.sec(id), tiers = plan.sectors[id].tiers, job = SP.jobOf(plan, id), on = sel === id, guest = plan.guest === id;
+      var g = '<g class="iso-click splan-sec' + (on ? ' on' : '') + '" data-act="planSel" data-k="' + id + '"><title>' + esc(sec.n) + '</title>';
+      // leere Fläche (klickbar)
+      var e = band(id, 0, 1, 'steh'); g += '<rect x="' + e[0] + '" y="' + e[1] + '" width="' + e[2] + '" height="' + e[3] + '" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.18)" stroke-dasharray="4 3"/>';
+      for (var ti = tiers.length - 1; ti >= 0; ti--) {
+        var t = tiers[ti], r = band(id, ti, t.size, t.type), col = SP.TYPES[t.type].col;
+        g += '<rect x="' + r[0].toFixed(1) + '" y="' + r[1].toFixed(1) + '" width="' + Math.max(1, r[2]).toFixed(1) + '" height="' + Math.max(1, r[3]).toFixed(1) + '" rx="3" fill="' + col + '" stroke="' + (on ? '#fbbf24' : '#0d1a2e') + '" stroke-width="' + (on ? 2.5 : 1.2) + '"' + (job && job.tier === ti ? ' opacity=".55"' : '') + '/>';
+      }
+      if (job) { var jr = band(id, job.tier, 1, job.type); g += '<rect x="' + jr[0] + '" y="' + jr[1] + '" width="' + jr[2] + '" height="' + jr[3] + '" fill="url(#hatch)" stroke="#f5b301" stroke-width="1.5" stroke-dasharray="5 3"/>'; }
+      var lab = band(id, 0, Math.max(1, tiers.length) * 0.999 / 1, 'steh'), cap = SP.secCap(plan, id).total;
+      var lx = lab[0] + lab[2] / 2, ly = lab[1] + lab[3] / 2;
+      if (sec.side === 'N') ly = py0 - gap - 13; if (sec.side === 'S') ly = py1 + gap + 16; if (sec.side === 'W') lx = px0 - gap - 17; if (sec.side === 'E') lx = px1 + gap + 17;
+      if (sec.side !== 'C') g += '<text x="' + lx + '" y="' + ly + '" text-anchor="middle" font-size="11" font-weight="800" fill="#fff" style="paint-order:stroke" stroke="#0d1a2e" stroke-width="3">' + id + (guest ? ' · <tspan fill="#fca5a5">GÄSTE</tspan>' : cap ? ' · ' + R.fmtNum(cap) : '') + '</text>';
+      if (guest) { var gr = band(id, 0, 1, 'steh'); g += '<rect x="' + (gr[0] - 2) + '" y="' + (gr[1] - 2) + '" width="' + (gr[2] + 4) + '" height="' + (gr[3] + 4) + '" fill="none" stroke="#ef4444" stroke-width="2.5"/>' + (sec.side === 'C' ? '<text x="' + (gr[0] + gr[2] / 2) + '" y="' + (gr[1] + gr[3] / 2 + 4) + '" text-anchor="middle" font-size="9" font-weight="900" fill="#fecaca" style="paint-order:stroke" stroke="#7f1d1d" stroke-width="3">GÄSTE</text>' : ''); }
+      s += g + '</g>';
+    });
+    s += '<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="rgba(245,179,1,.15)"/><line x1="0" y1="0" x2="0" y2="8" stroke="#f5b301" stroke-width="3"/></pattern></defs>';
+    // Legende
+    var lx2 = 14; Object.keys(SP.TYPES).forEach(function (k) { s += '<rect x="' + lx2 + '" y="' + (H_ - 22) + '" width="12" height="12" rx="2" fill="' + SP.TYPES[k].col + '"/><text x="' + (lx2 + 16) + '" y="' + (H_ - 12) + '" font-size="11" fill="#cbd5e1">' + SP.TYPES[k].n + '</text>'; lx2 += 96; });
+    s += '<text x="' + (W_ - 14) + '" y="' + (H_ - 12) + '" font-size="11" fill="#9fb0d0" text-anchor="end">innen Unterrang · außen Oberränge</text>';
+    s += '<text x="' + (px0 + px1) / 2 + '" y="20" text-anchor="middle" font-size="12" font-weight="800" fill="#9fb0d0" letter-spacing="1">HAUPTTRIBÜNE</text><text x="' + (px0 + px1) / 2 + '" y="' + (H_ - 34) + '" text-anchor="middle" font-size="12" font-weight="800" fill="#9fb0d0" letter-spacing="1">GEGENGERADE</text>';
+    return s + '</svg>';
+  };
+  U.stadiumPlanPanel = function (st, c) {
+    var SP = R.stadium, plan = SP.ensure(c), sel = U.p.sec || plan.guest || 'N2', sec = SP.sec(sel), can = U.can('business');
+    var parts = SP.parts(c), full = SP.parts(c, { live: false }), gs = c.guestStats;
+    var h = '<div class="grid g21"><div class="panel">' + U.stadiumPlanSVG(c, sel) + '<p class="muted small" style="margin-top:6px">Sektor antippen, um ihn auszubauen. 2 Sektoren je Hintertor, 3 je Längsseite, 4 Ecken; bis zu 3 Ränge (Ecken 2). Das Stadionbild passt sich automatisch an.</p></div><div class="grid" style="align-content:start">';
+    h += '<div class="panel"><h2>Kapazität</h2><div class="grid g2">' + U.ikpi('fans', 'Stehplätze', R.fmtNum(parts.steh)) + U.ikpi('stadium', 'Sitzplätze', R.fmtNum(parts.sitz)) + U.ikpi('stocks', 'Business', R.fmtNum(parts.business)) + U.ikpi('star', 'Logenplätze', R.fmtNum(parts.loge)) + '</div>' +
+      (full.steh + full.sitz + full.vip > parts.steh + parts.sitz + parts.vip ? '<p class="small warn" style="margin-top:6px">🚧 Wegen Umbau gesperrt: ' + R.fmtNum(full.steh + full.sitz + full.vip - parts.steh - parts.sitz - parts.vip) + ' Plätze</p>' : '') +
+      '<p class="small" style="margin-top:6px">Gästeblock: <b>' + esc(SP.sec(plan.guest).n) + '</b> · ' + R.fmtNum(SP.guestCap(c)) + ' Plätze' + (gs && gs.season === st.season ? ' · zuletzt ' + R.fmtNum(gs.last) + ' Gästefans' + (gs.short ? ' <span class="warn">(zu klein – Nachfrage ' + R.fmtNum(gs.demand) + ')</span>' : '') : '') + '</p>' +
+      '<div class="row between small"><span>Abnutzung Gästeblock</span><b>' + Math.round(plan.wear || 0) + ' %</b></div>' + U.bar(plan.wear || 0, 100, (plan.wear || 0) > 60 ? '#ef4444' : (plan.wear || 0) > 30 ? '#f5b301' : '#22c55e') +
+      (can && (plan.wear || 0) >= 5 ? '<button class="sm" style="margin-top:6px" data-act="planRepair">Gästeblock sanieren (' + money(SP.repairCost(c)) + ')</button>' : '') +
+      '<p class="muted small" style="margin-top:6px">Je höher die Liga und je größer der Gegner, desto mehr Gästefans reisen an – mehr Einnahmen, aber auch mehr Abnutzung und Randale-Gefahr. Gute Sanitäranlagen und eine regelmäßige Sanierung senken das Risiko.</p></div>';
+    // Sektor-Details
+    var tiers = plan.sectors[sel].tiers, job = SP.jobOf(plan, sel), cap = SP.secCap(plan, sel);
+    h += '<div class="panel"><div class="panel-h"><h2>' + esc(sec.n) + ' <span class="muted small">' + sel + '</span></h2><b class="mono">' + R.fmtNum(cap.total) + ' Plätze</b></div>';
+    h += tiers.length ? '<table class="t small">' + tiers.map(function (t, ti) { return '<tr><td>' + SP.TIER_NAMES[ti] + '</td><td>' + SP.TYPES[t.type].ic + ' ' + SP.TYPES[t.type].n + '</td><td class="num">' + Math.round(t.size * 100) + ' %</td><td class="num">' + R.fmtNum(SP.tierCap(sec, ti, t.type, t.size)) + '</td></tr>'; }).join('') + '</table>' : '<p class="muted small">Noch keine Tribüne – hier ist nur Rasen.</p>';
+    if (job) h += '<div class="help small" style="margin-top:8px">🚧 Im Bau: <b>' + esc(job.n) + '</b> – noch ' + job.weeks + ' von ' + job.total + ' Wochen.' + U.bar(job.total - job.weeks, job.total, '#f5b301') + '</div>';
+    if (plan.guest !== sel && tiers.length && can) h += '<button class="sm" style="margin-top:8px" data-act="planGuest" data-k="' + sel + '">🔴 Als Gästeblock festlegen</button>';
+    if (can && !job) {
+      var opts = SP.options(st, c, sel);
+      if (opts.length) h += '<h3 style="margin-top:12px">Ausbau planen</h3><div class="plan-opts">' + opts.map(function (o, i) {
+        var afford = c.cash >= o.cost;
+        return '<div class="plan-opt"><div><b>' + esc(o.n) + '</b><div class="muted small">' + (o.cap ? (o.cap > 0 ? '+' : '') + R.fmtNum(o.cap) + ' Plätze · ' : '') + o.weeks + ' Wochen Bauzeit' + (o.action === 'convert' || o.action === 'grow' ? ' · Rang während des Umbaus gesperrt' : '') + '</div></div><button class="sm ' + (afford ? 'primary' : '') + '" data-act="planBuild" data-k="' + sel + '" data-v="' + i + '"' + (afford ? '' : ' disabled') + '>' + (o.cost ? money(o.cost) : 'Kostenlos') + '</button></div>';
+      }).join('') + '</div>';
+    }
+    h += '</div></div></div>';
+    if (plan.jobs.length) h += '<div class="panel" style="margin-top:14px"><h2>Laufende Tribünen-Bauprojekte</h2>' + plan.jobs.map(function (j) { return '<div class="row between small" style="margin-bottom:6px"><span>' + esc(SP.sec(j.sec).n) + ': ' + esc(j.n) + '</span><span class="muted">noch ' + j.weeks + ' Wo.</span></div>' + U.bar(j.total - j.weeks, j.total, '#f5b301'); }).join('') + '</div>';
+    return h;
+  };
+  U.acts.planSel = function (d) { U.p.sec = d.k; U.render(); };
+  U.acts.planGuest = function (d) { if (R.stadium.setGuest(U.club(), d.k)) U.toast('Gästeblock: ' + R.stadium.sec(d.k).n); U.render(); };
+  U.acts.planRepair = function () { var r = R.stadium.repair(U.club()); U.toast(r.ok ? 'Gästeblock saniert (' + money(r.cost) + ').' : r.why); U.render(); };
+  U.acts.planBuild = function (d) {
+    var st = U.st, c = U.club(), o = R.stadium.options(st, c, d.k)[+d.v]; if (!o) return;
+    U.confirm('Stadionausbau', '<p><b>' + esc(R.stadium.sec(d.k).n) + '</b>: ' + esc(o.n) + '</p><p>Kosten ' + money(o.cost) + ' · Bauzeit ' + o.weeks + ' Wochen' + (o.cap ? ' · ' + (o.cap > 0 ? '+' : '') + R.fmtNum(o.cap) + ' Plätze' : '') + '</p>', function () {
+      var r = R.stadium.start(st, c, d.k, +d.v); U.closeModal(); U.toast(r.ok ? 'Baustart: ' + r.opt.n : r.why); U.render();
+    });
+  };
 
   // ---------- Vereinsstadt ----------
   U.screens.stadt = function () {
@@ -317,9 +399,9 @@
     if (U.cheatSessionSt !== st) {
       // erster Klick dieser Sitzung: Spruch
       U.cheatSessionSt = st;
-      U.modal('🔐 Geheimer Buchhaltungskeller', r.lines.map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') + '<p class="pos"><b>+' + money(r.paid) + '</b> wurden Ihrem Vereinskonto gutgeschrieben.</p><p class="muted small">Jeder weitere Klick aufs Schild bringt nochmal ' + money(r.paid) + '.' + (r.first ? ' Dieser Spielstand ist jetzt als „mit Cheat“ markiert. Der Cheat kann in den Einstellungen deaktiviert werden.' : '') + '</p>', '<button class="primary" data-act="closeModal">Danke, Herr Buchungsfehler!</button>');
+      U.modal('🔐 Geheimer Buchhaltungskeller', r.lines.map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('') + '<p class="pos"><b>+' + money(r.paid) + '</b> wurden Ihrem Vereinskonto gutgeschrieben.</p><p class="muted small">Jeder weitere Klick aufs Schild bringt einen zufälligen Betrag zwischen 100.000 € und 5 Mio. € (je höher, desto seltener).' + (r.first ? ' Dieser Spielstand ist jetzt als „mit Cheat“ markiert. Der Cheat kann in den Einstellungen deaktiviert werden.' : '') + '</p>', '<button class="primary" data-act="closeModal">Danke, Herr Buchungsfehler!</button>');
     } else {
-      U.toast('+' + money(r.paid) + ' · Kontostand ' + money(U.club().cash));
+      U.toast((r.jackpot ? '🎰 JACKPOT! ' : r.paid >= 2000000 ? '💰 ' : '') + '+' + money(r.paid) + ' · Kontostand ' + money(U.club().cash));
       var k = document.querySelector('#main .rw-cash'); if (k) k.textContent = money(U.club().cash);
     }
   };

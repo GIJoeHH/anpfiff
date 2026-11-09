@@ -3,7 +3,35 @@
   var D = R.data, W = R.world, E = R.econ, M = R.match, T = R.transfers;
   var S = R.season = {};
 
-  S.CUP_WEEKS = [2, 7, 12, 18, 24, 30];
+  // Pokalrunden: 1. Runde am Ende der Vorbereitung (Woche 4, Wert 0), danach Spielwochen der Liga
+  S.CUP_WEEKS = [0, 7, 12, 18, 24, 30];
+  S.PREP_WEEKS = 4;      // Saisonvorbereitung
+  S.WINTER_AFTER = 17;   // Winterpause nach dem 17. Spieltag …
+  S.WINTER_WEEKS = 6;    // … für 6 Wochen
+  // Pokalrunde dieser Woche (Index) oder -1
+  S.cupRoundNow = function (st) {
+    if (st.phase === 'preseason') return (st.prep || 1) === S.PREP_WEEKS ? 0 : -1;
+    // ältere Spielstände: 1. Runde noch offen → im nächsten Ligaspiel nachholen
+    if (st.phase === 'season' && st.cup && st.cup.rounds.length === 1 && !st.cup.rounds[0].ties.every(function (t) { return t.winner; })) return 0;
+    if (st.phase === 'season') { var w = st.week + 1, i = S.CUP_WEEKS.indexOf(w); return w >= 1 && i > 0 ? i : -1; }
+    return -1;
+  };
+  // Kalendertext: „Vorbereitung 2/4“, „7. Spieltag“, „Winterpause 3/6“
+  S.calText = function (st, short) {
+    if (st.phase === 'preseason') return (short ? 'Vorb. ' : 'Vorbereitung ') + (st.prep || 1) + '/' + S.PREP_WEEKS;
+    if (st.phase === 'winter') return (short ? 'Winter ' : 'Winterpause ') + (st.winter || 1) + '/' + S.WINTER_WEEKS;
+    if (st.phase === 'season') return short ? st.week + '/34' : st.week + '. Spieltag';
+    return st.phase === 'releg' ? 'Relegation' : 'Saisonende';
+  };
+  S.fxLabel = function (st, fx) {
+    if (fx.comp === 'league') return (st.week + 1) + '. Spieltag';
+    if (fx.comp === 'friendly') return 'Testspiel (' + S.calText(st) + ')';
+    if (fx.comp === 'releg') return 'Relegation';
+    var ci = S.cupRoundNow(st); return 'Pokal – ' + (st.cup.rounds[ci] ? st.cup.rounds[ci].name : '');
+  };
+  S.isBreak = function (st) { return st.phase === 'preseason' || st.phase === 'winter'; };
+  // Wochen-Schlüssel für die Planung der Vorbereitung/Winterpause
+  S.breakKey = function (st) { return st.phase === 'winter' ? 'w' + (st.winter || 1) : 'p' + (st.prep || 1); };
   S.CUP_NAMES = ['1. Runde', '2. Runde', 'Achtelfinale', 'Viertelfinale', 'Halbfinale', 'Finale'];
   S.CUP_PRIZE = [150000, 300000, 600000, 1200000, 2500000, 5000000];
   S.LEAGUE_PRIZE = { 1: [12000000, 3000000], 2: [3000000, 800000], 3: [1000000, 200000] };
@@ -102,7 +130,8 @@
       st.leagues[l].weeks = S.weekPlan(st.leagues[l].fixtures.length);
     });
     S.drawCup(st, 0);
-    st.releg = null; st.week = 0; st.phase = 'preseason'; st.campDone = false;
+    st.releg = null; st.week = 0; st.phase = 'preseason'; st.prep = 1; st.winter = 0; st.campDone = false; st.winterCampDone = false;
+    var keep = {}; Object.keys(st.plan || {}).forEach(function (k) { if (k.charAt(0) === 'p' && !st.plan[k].done) keep[k] = st.plan[k]; }); st.plan = keep;
     // Saisonziele / Vorstandserwartung
     [1, 2, 3].forEach(function (l) {
       var cl = W.clubsInLeague(st, l).map(function (c) { M.autoBest(st, c); return { c: c, s: M.squadStrength(st, c) }; }).sort(function (a, b) { return b.s - a.s; });
@@ -126,6 +155,13 @@
   };
 
   // ---------- Pokal ----------
+  // Nach einer gespielten Pokalrunde: nächste Runde auslosen bzw. Pokalsieger ehren
+  S.advanceCup = function (st) {
+    if (!st.cup || !st.cup.rounds.length || st.cup.winner) return;
+    var n = st.cup.rounds.length, last = st.cup.rounds[n - 1];
+    if (!last.ties.every(function (t) { return t.winner; })) return;
+    if (n < 6) S.drawCup(st, n); else S.cupFinished(st);
+  };
   S.drawCup = function (st, round) {
     if (round === 0) {
       var all = Object.keys(st.clubs);
@@ -155,14 +191,20 @@
   // Liefert alle Partien der Woche; Partien mit Beteiligung des Nutzers werden markiert.
   S.prepareWeek = function (st) {
     var list = [], uc = st.manager.unemployed ? null : st.manager.clubId;
-    if (st.phase === 'preseason' || st.phase === 'season') {
-      var week = st.phase === 'preseason' ? 1 : st.week + 1;
-      if (week > S.SEASON_WEEKS) return { list: [], week: week };
-      var ci = S.CUP_WEEKS.indexOf(week);
+    if (st.phase === 'preseason' || st.phase === 'season' || st.phase === 'winter') {
+      var week = st.week + 1;
+      if (st.phase === 'season' && week > S.SEASON_WEEKS) return { list: [], week: week };
+      var ci = S.cupRoundNow(st);
       if (ci >= 0 && st.cup.rounds[ci]) st.cup.rounds[ci].ties.forEach(function (t, i) {
         list.push({ key: 'C-' + ci + '-' + i, comp: ci === 5 ? 'final' : 'cup', h: t.h, a: t.a, neutral: t.neutral, extraTime: true });
       });
-      [1, 2, 3].forEach(function (l) {
+      // Testspiel aus dem Vorbereitungsplan des Nutzers
+      if (S.isBreak(st) && uc) {
+        var pl = st.plan && st.plan[S.breakKey(st)];
+        if (pl && pl.type === 'test' && st.clubs[pl.opp] && !list.some(function (x) { return x.h === uc || x.a === uc; }))
+          list.push({ key: 'F-' + S.breakKey(st), comp: 'friendly', h: pl.home ? uc : pl.opp, a: pl.home ? pl.opp : uc });
+      }
+      if (st.phase === 'season') [1, 2, 3].forEach(function (l) {
         S.roundsOf(st, l, week).forEach(function (r) {
           st.leagues[l].fixtures[r].forEach(function (f, i) { list.push({ key: 'L-' + l + '-' + r + '-' + i, comp: 'league', h: f.h, a: f.a }); });
         });
@@ -191,10 +233,11 @@
     var prep = S.prepareWeek(st);
     var results = [];
     var suspendedAtStart = {};
+    var ucPlan = S.userClub(st); if (ucPlan && R.stadium) R.stadium.ensure(ucPlan); // Stadionplan für den eigenen Verein
     Object.keys(st.players).forEach(function (id) { if (st.players[id].susp > 0) suspendedAtStart[id] = true; });
-    if (st.phase === 'preseason') { st.phase = 'season'; st.week = 0; }
     var isLeagueWeek = st.phase === 'season';
     if (isLeagueWeek) st.week++;
+    st.tick = (st.tick || 0) + 1; // fortlaufende Kalenderwoche (auch Vorbereitung/Winterpause)
 
     prep.list.forEach(function (fx) {
       var m = played[fx.key];
@@ -203,12 +246,17 @@
       var home = st.clubs[fx.h], away = st.clubs[fx.a];
       // Zuschauer & Einnahmen
       var att;
-      if (fx.neutral) {
+      if (fx.comp === 'friendly') {
+        // Testspiel: kleine Kulisse, kleine Einnahme, keine Tabellen/Sperren
+        att = E.attendance(st, home, away, 'friendly');
+        if (home.userControlled) E.matchdayIncome(st, home, att);
+      } else if (fx.neutral) {
         att = { total: 68000, ticket: 3200000, cater: 400000, parking: 0, capacity: 70000, parts: {} };
         [home, away].forEach(function (c) { c.cash += 1800000; E.book(c, 'Eintrittsgelder', 1800000); });
       } else {
         att = E.attendance(st, home, away, fx.comp);
         E.matchdayIncome(st, home, att);
+        if (home.userControlled) S.guestAftermath(st, home, away, att, fx);
         home.attendanceHist.push(att.total);
         home.congestion = (home.congestion || 0) * 0.8 + att.congestion * 0.2;
         home.lastDemand = att.demand;
@@ -219,21 +267,37 @@
       M.finalize(m);
       var sum = M.summary(m);
       var resH = sum.hg - sum.ag;
-      E.fanGrowthWeekly(st, home, resH, fx.neutral ? null : att);
-      E.fanGrowthWeekly(st, away, -resH, null);
-      S.storeResult(st, fx, sum, m);
+      if (fx.comp !== 'friendly') {
+        E.fanGrowthWeekly(st, home, resH, fx.neutral ? null : att);
+        E.fanGrowthWeekly(st, away, -resH, null);
+        S.storeResult(st, fx, sum, m);
+      } else S.friendlyAftermath(st, fx, sum, m);
       results.push({ fx: fx, sum: sum, match: m });
-      if (fx.user) S.userMatchAftermath(st, fx, sum, m);
+      if (fx.user && fx.comp !== 'friendly') S.userMatchAftermath(st, fx, sum, m);
     });
     // Nach dem Spieltag: Sperren abbauen (nur wer zu Beginn gesperrt war)
     Object.keys(suspendedAtStart).forEach(function (id) { var p = st.players[id]; if (p && p.susp > 0) p.susp--; });
 
     if (st.phase === 'season') {
       S.weeklyUpdate(st);
-      var ci = S.CUP_WEEKS.indexOf(st.week);
-      if (ci >= 0 && ci < 5 && st.cup.rounds[ci]) S.drawCup(st, ci + 1);
-      if (ci === 5) S.cupFinished(st);
+      S.advanceCup(st);
       if (st.week >= S.SEASON_WEEKS) S.toRelegation(st);
+      else if (st.week === S.WINTER_AFTER) {
+        st.phase = 'winter'; st.winter = 1; st.winterCampDone = false;
+        S.news(st, 'Winterpause!', 'Nach dem ' + S.WINTER_AFTER + '. Spieltag ruht der Ball für ' + S.WINTER_WEEKS + ' Wochen. Zeit für Trainingslager, Testspiele und Transfers (Transferfenster bis einschließlich 19. Spieltag).', 'liga');
+      }
+    } else if (st.phase === 'preseason' || st.phase === 'winter') {
+      S.breakWeek(st);
+      if (st.phase === 'preseason') {
+        if ((st.prep || 1) >= S.PREP_WEEKS) {
+          S.advanceCup(st);
+          st.phase = 'season'; st.week = 0;
+          S.news(st, 'Die Saison beginnt!', 'Die Vorbereitung ist abgeschlossen – am Wochenende steigt der 1. Spieltag. Das Transferfenster ist noch bis einschließlich 3. Spieltag offen.', 'liga');
+        } else st.prep = (st.prep || 1) + 1;
+      } else {
+        if ((st.winter || 1) >= S.WINTER_WEEKS) { st.phase = 'season'; S.news(st, 'Die Rückrunde beginnt!', 'Ende der Winterpause. Das Transferfenster schließt nach dem 19. Spieltag.', 'liga'); }
+        else st.winter = (st.winter || 1) + 1;
+      }
     } else if (st.phase === 'releg') {
       st.relegLeg++;
       Object.keys(st.clubs).forEach(function (k) { S.trainingWeek(st, st.clubs[k]); });
@@ -296,6 +360,116 @@
   };
 
   // ---------- Wöchentliche Prozesse ----------
+  // Gästefans: Abnutzung des Gästeblocks, Schäden (z. B. zerstörte Toilette) als Ereigniskarte
+  S.guestAftermath = function (st, home, away, att, fx) {
+    var g = att.guests || 0; if (!g || !R.stadium) return;
+    R.stadium.ensure(home);
+    var plan = home.stadium, derby = home.rivals.indexOf(away.id) >= 0, lgF = { 1: 1.3, 2: 1, 3: 0.8 }[home.league] || 1;
+    plan.wear = Math.min(100, (plan.wear || 0) + g / 1800 * (derby ? 2 : 1) * (fx.comp === 'friendly' ? 0.3 : 1));
+    home.guestStats = { season: st.season, last: g, demand: att.guestDemand, cap: att.guestCap, short: att.guestDemand > att.guestCap * 1.15 && g >= att.guestCap * 0.97 };
+    var san = E.level(home, 'sanitaer') ? home.fac.sanitaer || 0 : 0;
+    var p = Math.min(0.35, g / 1000 * 0.014 * (derby ? 2.2 : 1) * lgF * (1 + plan.wear / 45) * (1 - san * 0.12));
+    if (st.pendingEvent || fx.comp === 'friendly' || !R.chance(p)) return;
+    var type = S.forceDamageType || (R.chance(0.6) ? 'wc' : R.stadium.guestType(home) === 'steh' ? 'zaun' : 'sitze');
+    var dmg = R.round({ wc: 6000 + san * 9000, zaun: 9000, sitze: 4000 }[type] * (1 + g / 2500) * (derby ? 1.5 : 1), 1000);
+    var A = away.short;
+    var texts = {
+      wc: 'Nach dem Spiel gegen ' + away.name + ' ist die Toilettenanlage im Gästeblock ein Trümmerfeld: Waschbecken herausgerissen, Kabinen eingetreten, Spülkästen verschwunden. Schaden: ' + R.fmtMoney(dmg) + '.',
+      zaun: 'Gästefans von ' + A + ' haben den Zaun im Gästeblock niedergerissen und Pyrotechnik gezündet. Schaden: ' + R.fmtMoney(dmg) + '.',
+      sitze: 'Im Gästeblock wurden nach dem Spiel gegen ' + A + ' reihenweise Sitzschalen herausgerissen. Schaden: ' + R.fmtMoney(dmg) + '.'
+    };
+    st.pendingEvent = { custom: { t: texts[type], ic: type === 'wc' ? '🚽' : type === 'zaun' ? '🚧' : '💺', o: [
+      { l: 'Sofort reparieren lassen', cash: -dmg, wear: -15 },
+      { l: 'Rechnung an ' + A + ' schicken', lottery: [[0.55, 0, A + ' übernimmt die Kosten zähneknirschend.'], [0.45, -Math.round(dmg * 1.15), A + ' weigert sich – Sie zahlen plus Anwaltskosten.']] },
+      { l: type === 'wc' ? 'Dixi-Klos aufstellen, später sanieren' : 'Notdürftig flicken', cash: -Math.round(dmg * 0.3), fans: -0.3, wear: 10 }
+    ] } };
+    S.news(st, (type === 'wc' ? 'Toiletten zerstört! ' : 'Randale im Gästeblock! ') + A + '-Anhang wütet', texts[type], 'event');
+  };
+
+  // Woche in Vorbereitung/Winterpause: kein Ligaspiel, keine laufenden Finanzen (die laufen über die 34 Spielwochen),
+  // aber Training, Trainingslager, Bauarbeiten, Transfers, Märkte und Ereignisse
+  S.breakWeek = function (st) {
+    var uc = S.userClub(st), key = S.breakKey(st);
+    Object.keys(st.clubs).forEach(function (k) {
+      var c = st.clubs[k];
+      E.progressConstruction(st, c);
+      S.trainingWeek(st, c);
+      if (!c.userControlled) { T.aiWeekly(st, c, st.phase === 'preseason' ? 0.6 : 0.35); if (st.phase === 'preseason' && (st.prep || 1) === 1) S.aiSponsors(st, c); }
+      else if (st.manager.role === 'gf') S.aiCoachDuties(st, c);
+    });
+    if (uc) {
+      if (st.manager.role === 'trainer' || !S.planOwnerIsUser(st)) S.autoPlan(st, uc);
+      var pl = st.plan && st.plan[key];
+      if (pl && pl.type === 'camp' && !pl.done) { var r = S.applyCamp(st, uc, pl.camp, true); pl.done = true; pl.result = r.ok ? 'ok' : r.why; if (!r.ok) S.news(st, 'Trainingslager abgesagt', r.why, 'training'); }
+    }
+    E.updateMarkets(st);
+    if (R.deals) R.deals.weekly(st);
+    if (uc) {
+      T.generateOffersForUser(st, uc);
+      S.maybeEvent(st, uc);
+      S.checkAchievements(st, uc);
+      if (st.manager.role !== 'manager') S.autoDelegate(st, uc);
+    }
+    if (st.manager.unemployed) S.careerWeek(st);
+  };
+  // Wer plant Vorbereitung/Winterpause? Manager und Geschäftsführer selbst, beim Trainer die Vereinsführung
+  S.planOwnerIsUser = function (st) { return st.manager.role !== 'trainer'; };
+  // Testspiel-Gegner: Vorschläge (stärker/ähnlich/schwächer)
+  S.friendlyOpponents = function (st, club) {
+    var all = Object.keys(st.clubs).map(function (k) { return st.clubs[k]; }).filter(function (c) { return c.id !== club.id; });
+    all.sort(function (a, b) { return b.reputation - a.reputation; });
+    var me = all.filter(function (c) { return c.league === club.league; });
+    var up = all.filter(function (c) { return c.league < club.league || (c.league === club.league && c.reputation > club.reputation + 8); });
+    var down = all.filter(function (c) { return c.league > club.league || (c.league === club.league && c.reputation < club.reputation - 8); });
+    var pick = function (arr, n, off) { var out = []; for (var i = 0; i < arr.length && out.length < n; i++) { var c = arr[(i + (off || 0)) % arr.length]; if (out.indexOf(c) < 0) out.push(c); } return out; };
+    var seed = (st.season * 7 + (st.phase === 'winter' ? 3 : 0)) % 11;
+    var res = pick(up.slice(0, 12), 3, seed).concat(pick(me, 3, seed)).concat(pick(down.slice(-20), 3, seed));
+    return res.filter(function (c, i) { return res.indexOf(c) === i; });
+  };
+  S.planWeeks = function (st) {
+    var keys = [];
+    if (st.phase === 'preseason' || st.phase === 'seasonEnd') for (var i = 1; i <= S.PREP_WEEKS; i++) keys.push({ k: 'p' + i, n: 'Vorbereitung Woche ' + i, cup: i === S.PREP_WEEKS, past: st.phase === 'preseason' && i < (st.prep || 1) });
+    if (st.phase === 'winter' || (st.phase === 'season' && st.week < S.WINTER_AFTER)) for (var j = 1; j <= S.WINTER_WEEKS; j++) keys.push({ k: 'w' + j, n: 'Winterpause Woche ' + j, past: st.phase === 'winter' && j < (st.winter || 1) });
+    return keys;
+  };
+  S.setPlan = function (st, key, item) {
+    st.plan = st.plan || {};
+    var old = st.plan[key];
+    if (old && old.done) return { ok: false, why: 'Diese Woche ist schon vorbei.' };
+    if (item && item.type === 'camp') {
+      var isW = key.charAt(0) === 'w';
+      var other = Object.keys(st.plan).filter(function (k) { return k !== key && k.charAt(0) === key.charAt(0) && st.plan[k] && st.plan[k].type === 'camp'; });
+      if (other.length) return { ok: false, why: 'Pro ' + (isW ? 'Winterpause' : 'Vorbereitung') + ' ist ein Trainingslager möglich.' };
+      if ((isW ? st.winterCampDone : st.campDone) && !(old && old.type === 'camp')) return { ok: false, why: 'Trainingslager bereits absolviert.' };
+    }
+    if (item && item.type === 'test' && key === 'p' + S.PREP_WEEKS) return { ok: false, why: 'In dieser Woche steht die 1. Pokalrunde an.' };
+    if (item) st.plan[key] = item; else delete st.plan[key];
+    return { ok: true };
+  };
+  // Automatische Planung (Trainer-Rolle bzw. falls der Nutzer nichts geplant hat, nur für die Trainer-Rolle)
+  S.autoPlan = function (st, club) {
+    st.plan = st.plan || {};
+    var pre = st.phase === 'preseason' ? 'p' : 'w', n = pre === 'p' ? S.PREP_WEEKS : S.WINTER_WEEKS;
+    if (Object.keys(st.plan).some(function (k) { return k.charAt(0) === pre; })) return;
+    var camp = D.camps.filter(function (c) { return c.cost < club.cash * 0.05; }).pop() || D.camps[0];
+    var opps = S.friendlyOpponents(st, club);
+    for (var i = 1; i <= n; i++) {
+      var k = pre + i;
+      if (i === 2) st.plan[k] = { type: 'camp', camp: camp.id };
+      else if (!(pre === 'p' && i === S.PREP_WEEKS) && opps.length) st.plan[k] = { type: 'test', opp: opps[(i * 2) % opps.length].id, home: i % 2 === 1 };
+    }
+  };
+  // Nach einem Testspiel: Teamchemie, keine Statistik
+  S.friendlyAftermath = function (st, fx, sum, m) {
+    [fx.h, fx.a].forEach(function (id) { var c = st.clubs[id]; if (c) c.chemistry = Math.min(100, (c.chemistry || 50) + 1.2); });
+    var uc = S.userClub(st);
+    if (fx.user && uc) {
+      var H = st.clubs[fx.h], A = st.clubs[fx.a];
+      S.news(st, 'Testspiel: ' + H.short + ' – ' + A.short + ' ' + sum.hg + ':' + sum.ag, 'Zuschauer: ' + R.fmtNum(m.attendance || 0) + '. Die Mannschaft sammelt Spielpraxis, die Teamchemie wächst.', 'match');
+      st.lastUserMatch = { key: fx.key, comp: fx.comp, h: fx.h, a: fx.a, sum: sum, att: m.attInfo, ratings: m.rating, side: fx.h === uc.id ? 0 : 1, events: m.events.slice(-60).map(function (e) { return { min: e.min, type: e.type, side: e.side, text: e.text }; }), stats: { poss: m.stats.poss, shots: m.stats.shots, onT: m.stats.onTarget, chances: m.stats.chances, corners: m.stats.corners, fouls: m.stats.fouls }, goals: m.goals, assists: m.assists, motm: m.motm, headline: 'TESTSPIEL: ' + H.short.toUpperCase() + ' ' + sum.hg + ':' + sum.ag + ' ' + A.short.toUpperCase() };
+    }
+  };
+
   S.weeklyUpdate = function (st, light) {
     var uc = S.userClub(st);
     Object.keys(st.clubs).forEach(function (k) {
@@ -384,11 +558,12 @@
   };
 
   S.applyCamp = function (st, club, campId) {
-    var c = D.camps.filter(function (x) { return x.id === campId; })[0];
-    if (!c || st.campDone) return { ok: false, why: 'Trainingslager bereits absolviert' };
-    if (club.cash < c.cost) return { ok: false, why: 'Nicht genug Geld' };
+    var c = D.camps.filter(function (x) { return x.id === campId; })[0], winter = st.phase === 'winter';
+    if (!c || (winter ? st.winterCampDone : st.campDone)) return { ok: false, why: 'Trainingslager bereits absolviert' };
+    if (!S.isBreak(st)) return { ok: false, why: 'Trainingslager nur in der Vorbereitung und in der Winterpause' };
+    if (club.cash < c.cost) return { ok: false, why: 'Nicht genug Geld für das Trainingslager in ' + c.name };
     club.cash -= c.cost; E.book(club, 'Trainingslager', -c.cost);
-    st.campDone = true;
+    if (winter) st.winterCampDone = true; else st.campDone = true;
     var msg = c.desc;
     W.squad(st, club.id).forEach(function (p) {
       p.morale = R.clamp(p.morale + c.mor, 0, 100);
@@ -433,9 +608,9 @@
       var reserve = rev * 0.25;
       var options = [];
       var cap = E.capacity(club), demand = club.lastDemand || 0;
-      if (demand > cap * 1.05) options.push(club.fac.sitz <= club.fac.steh ? 'sitz' : 'steh');
+      if (demand > cap * 1.05 && !(R.stadium && R.stadium.has(club))) options.push(club.fac.sitz <= club.fac.steh ? 'sitz' : 'steh');
       if (E.transportCap(club) < cap * 0.8) options.push(R.pick(['oepnv', 'parken', 'strasse']));
-      options.push(R.pick(['medizin', 'jugend', 'training', 'dach', 'sanitaer', 'hosp', 'fanshop', 'restaurant', 'museum', 'vip', 'licht']));
+      options.push(R.pick(['medizin', 'jugend', 'training', 'dach', 'sanitaer', 'hosp', 'fanshop', 'restaurant', 'museum', R.stadium && R.stadium.has(club) ? 'video' : 'vip', 'licht']));
       for (var i = 0; i < options.length; i++) {
         var pv = E.buildPreview(st, club, options[i]);
         if (!pv) continue;
@@ -489,7 +664,7 @@
   S.aiCoachDuties = function (st, club) {
     var prof = club.coach ? club.coach.profile : 'Ausgewogen';
     var tired = R.avg(W.squad(st, club.id), function (p) { return p.fitness; });
-    club.training = tired < 80 ? 'regeneration' : prof === 'Offensiv' ? 'angriff' : prof === 'Defensiv' ? 'defensive' : prof === 'Erfahrener Taktiker' ? 'taktik' : 'technik';
+    if (!club.trainingByUser) club.training = tired < 80 ? 'regeneration' : prof === 'Offensiv' ? 'angriff' : prof === 'Defensiv' ? 'defensive' : prof === 'Erfahrener Taktiker' ? 'taktik' : 'technik';
     // Jugend hochziehen
     W.youthOf(st, club.id).forEach(function (p) { if (p.ovr >= R.avg(W.squad(st, club.id), function (x) { return x.ovr; }) - 6 && W.squad(st, club.id).length < 26) p.youth = false; });
   };
@@ -519,7 +694,8 @@
   };
   S.resolveEvent = function (st, optIdx) {
     var pe = st.pendingEvent; if (!pe) return null;
-    var ev = (pe.chaos ? D.chaosEvents : D.events)[pe.idx], o = ev.o[optIdx], club = S.userClub(st);
+    var ev = pe.custom || (pe.chaos ? D.chaosEvents : D.events)[pe.idx], o = ev.o[optIdx], club = S.userClub(st);
+    if (o.wear && club && club.stadium) club.stadium.wear = R.clamp((club.stadium.wear || 0) + o.wear, 0, 100);
     st.pendingEvent = null;
     if (!club) return null;
     var msg = o.l + '.';
@@ -671,7 +847,7 @@
   };
 
   S.finishRelegation = function (st) {
-    st.phase = 'seasonEnd';
+    st.phase = 'seasonEnd'; st.plan = {}; // Vorbereitung der neuen Saison kann jetzt geplant werden
     st.seasonSummary = S.buildSummary(st);
   };
 
@@ -790,6 +966,8 @@
     // Saisonarchiv
     st.history.push({ season: st.season, champions: sum.champions, cup: sum.cup, promoted: sum.promoted, relegated: sum.relegated, scorers: sum.scorers, userClub: uc ? uc.id : null, userPos: userPos, userLeague: oldLeague });
 
+    // Vereinbarte Wechsel zur neuen Saison (vor dem Vertragsablauf, damit niemand dazwischenfunkt)
+    T.executePending(st, true);
     // Spieler: Verträge, Altern, Karriereende
     Object.keys(st.clubs).forEach(function (k) { var c = st.clubs[k]; if (!c.userControlled) T.aiRenewals(st, c); });
     T.returnLoans(st);
