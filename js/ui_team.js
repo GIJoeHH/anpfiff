@@ -108,7 +108,7 @@
     opts = opts || {};
     var st = U.st;
     var cols = [
-      { k: 'last', l: 'Name', v: function (p) { return p.last; }, f: function (p) { return (st.favs && st.favs[p.id] ? '★ ' : '') + esc(W.playerName(p)) + (p.homegrown ? ' <span title="Eigengewächs">🌱</span>' : '') + (p.loan ? ' <span class="tag">Leihe</span>' : ''); } },
+      { k: 'last', l: 'Name', v: function (p) { return p.last; }, f: function (p) { return (st.favs && st.favs[p.id] ? '★ ' : '') + esc(W.playerName(p)) + (p.homegrown ? ' <span title="Eigengewächs">🌱</span>' : '') + (p.loan ? ' <span class="tag">Leihe</span>' : '') + (p.trial ? ' <span class="tag" title="Nachwuchsspieler auf Probe">Probe</span>' : ''); } },
       { k: 'pos', l: 'Pos', f: function (p) { return U.posTag(p.pos) + (p.alt.length ? ' <span class="muted small">' + p.alt.join('/') + '</span>' : ''); } },
       { k: 'age', l: 'Alter', num: true }, { k: 'ovr', l: 'Stärke', num: true, f: function (p) { return U.ovrBadge(p.ovr); } },
       { k: 'pot', l: 'Pot.', num: true, f: function (p) { return U.potText(p); } }
@@ -157,7 +157,7 @@
     var squad = W.squad(st, c.id), inXI = {}, onBench = {};
     c.lineup.forEach(function (id) { inXI[id] = 1; }); c.bench.forEach(function (id) { onBench[id] = 1; });
     function prow(p, zone) {
-      return '<tr class="click ' + (sel.pid === p.id ? 'sel' : '') + '" data-act="linePid" data-id="' + p.id + '" data-drag="pid:' + p.id + '" data-drop="pid:' + p.id + '"><td>' + U.posTag(p.pos) + '</td><td>' + esc(W.playerName(p)) + '</td><td class="num">' + U.ovrBadge(p.ovr) + '</td><td>' + U.bar(p.fitness, 100, p.fitness < 70 ? '#f5b301' : null) + '</td><td>' + U.statusTags(p) + '</td></tr>';
+      return '<tr class="click ' + (sel.pid === p.id ? 'sel' : '') + '" data-act="linePid" data-id="' + p.id + '" data-drag="pid:' + p.id + '" data-drop="pid:' + p.id + '"><td>' + U.posTag(p.pos) + '</td><td>' + esc(W.playerName(p)) + (p.trial ? ' <span class="tag" title="Nachwuchsspieler auf Probe">Probe</span>' : '') + '</td><td class="num">' + U.ovrBadge(p.ovr) + '</td><td>' + U.bar(p.fitness, 100, p.fitness < 70 ? '#f5b301' : null) + '</td><td>' + U.statusTags(p) + '</td></tr>';
     }
     h += '<div class="grid"><div class="panel"><h2>Ersatzbank</h2><table class="t">' + c.bench.map(function (id) { return st.players[id] ? prow(st.players[id]) : ''; }).join('') + '</table></div>';
     h += '<div class="panel"><h2>Nicht im Kader</h2><table class="t">' + squad.filter(function (p) { return !inXI[p.id] && !onBench[p.id]; }).sort(function (a, b) { return b.ovr - a.ovr; }).map(function (p) { return prow(p); }).join('') + '</table></div>';
@@ -236,7 +236,7 @@
     h += '</div></div>';
     var f = '';
     if (own) {
-      if (U.can('sport')) f += p.youth ? '<button data-act="promoteYouth" data-id="' + p.id + '">In Profikader</button>' : '';
+      if (U.canYouth()) f += p.youth ? '<button class="primary" data-act="promoteYouth" data-id="' + p.id + '">In die 1. Mannschaft …</button>' : p.trial ? '<button class="primary" data-act="promoteYouth" data-id="' + p.id + '">Profivertrag …</button><button data-act="youthBack" data-id="' + p.id + '">Zurück in die Jugend</button>' : '';
       f += '<button data-act="toggleList" data-id="' + p.id + '">' + (p.listed ? 'Von Transferliste nehmen' : 'Auf Transferliste') + '</button><button data-act="renew" data-id="' + p.id + '">Vertrag verlängern</button><button data-act="loanOut" data-id="' + p.id + '">Ausleihen</button><button class="danger" data-act="releasePlayer" data-id="' + p.id + '">Entlassen</button>';
     } else if (c) {
       st.favs = st.favs || {};
@@ -247,7 +247,24 @@
     U.modal('Spieler', h, f + '<button data-act="closeModal">Schließen</button>', true);
   };
   U.acts.fav = function (d) { var st = U.st; st.favs = st.favs || {}; if (st.favs[d.id]) delete st.favs[d.id]; else st.favs[d.id] = 1; U.showPlayer(d.id); };
-  U.acts.promoteYouth = function (d) { var p = U.st.players[d.id]; p.youth = false; p.wage = Math.max(p.wage, Math.round(W.fairWage(p) * 0.6 / 1000) * 1000); U.closeModal(); U.render(); U.toast(W.playerName(p) + ' gehört jetzt zum Profikader.'); };
+  // Nachwuchs → 1. Mannschaft: zur Probe oder mit Profivertrag (jederzeit, auch außerhalb des Transferfensters)
+  U.canYouth = function () { return U.can('sport') || U.can('business'); };
+  U.acts.promoteYouth = function (d) {
+    var st = U.st, p = st.players[d.id], T_ = R.transfers, wage = T_.youthProWage(p);
+    var h = '<p><b>' + esc(W.playerName(p)) + '</b> (' + p.pos + ', ' + p.age + ' J., Stärke ' + p.ovr + ', Potenzial ' + p.pot + ')</p>' +
+      '<div class="grid g2">' +
+      (p.youth ? '<div class="panel"><h3>🧪 Zur Probe</h3><p class="small">Trainiert und spielt ' + T_.TRIAL_WEEKS + ' Wochen bei den Profis mit, behält sein Jugendgehalt (' + money(p.wage) + '/Jahr). Danach entscheiden Sie: Profivertrag – sonst kehrt er automatisch in die Jugend zurück.</p><button class="primary" data-act="youthTrial" data-id="' + p.id + '">Zur Probe hochziehen</button></div>' : '<div class="panel"><h3>🧪 Auf Probe</h3><p class="small">Noch ' + Math.max(0, p.trial.until - (st.tick || 0)) + ' Woche(n) Probezeit. Danach geht er zurück in die Jugend, wenn er keinen Vertrag bekommt.</p></div>') +
+      '<div class="panel"><h3>✍️ Profivertrag</h3>' + U.field('Jahresgehalt (€)', '<input type="number" id="ypW" value="' + wage + '" step="5000" data-money>') + U.field('Laufzeit (Jahre)', '<select id="ypY">' + [1, 2, 3, 4, 5].map(function (y) { return '<option' + (y === 3 ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>') +
+      '<p class="muted small">Vorschlag: ' + money(wage) + '/Jahr (60 % eines marktüblichen Gehalts). Eigengewächse unterschreiben ohne Verhandlung.</p><button class="primary" data-act="youthPro" data-id="' + p.id + '">Profivertrag unterschreiben</button></div></div>' +
+      '<p class="muted small">Beides ist jederzeit möglich – auch außerhalb des Transferfensters.</p>';
+    U.modal('In die 1. Mannschaft', h, '<button data-act="closeModal">Abbrechen</button>', true);
+  };
+  U.acts.youthTrial = function (d) { var p = U.st.players[d.id], r = R.transfers.youthTrial(U.st, p); U.closeModal(); U.render(); U.toast(r.ok ? W.playerName(p) + ' trainiert ' + R.transfers.TRIAL_WEEKS + ' Wochen zur Probe bei den Profis.' : r.why); if (U.autosave) U.autosave(); };
+  U.acts.youthPro = function (d) {
+    var p = U.st.players[d.id], w = +(document.getElementById('ypW') || {}).value || 0, y = +(document.getElementById('ypY') || {}).value || 3;
+    var r = R.transfers.youthPro(U.st, p, y, w); U.closeModal(); U.render(); U.toast(r.ok ? W.playerName(p) + ': Profivertrag bis ' + (U.st.season + p.contract) + '.' : r.why); if (U.autosave) U.autosave();
+  };
+  U.acts.youthBack = function (d) { var p = U.st.players[d.id], r = R.transfers.youthBack(U.st, p); U.closeModal(); U.render(); U.toast(r.ok ? W.playerName(p) + ' ist zurück in der Jugend.' : r.why); };
   U.acts.toggleList = function (d) {
     var p = U.st.players[d.id];
     if (p.listed) { p.listed = false; p.asking = 0; U.closeModal(); U.render(); return; }
@@ -501,8 +518,11 @@
     h += '<div class="panel tight"><div style="padding:12px 14px 0"><h2>Jugendspieler (' + youth.length + ')</h2></div>' + U.table('youth', [
       { k: 'last', l: 'Name', f: function (p) { return esc(W.playerName(p)); } }, { k: 'pos', l: 'Pos', f: function (p) { return U.posTag(p.pos); } }, { k: 'age', l: 'Alter', num: true },
       { k: 'ovr', l: 'Stärke', num: true, f: function (p) { return U.ovrBadge(p.ovr); } }, { k: 'pot', l: 'Potenzial', num: true, f: function (p) { return U.ovrBadge(p.pot); } },
-      { k: 'x', l: '', nosort: true, f: function (p) { return U.can('sport') ? '<button class="sm primary" data-act="promoteYouth" data-id="' + p.id + '">In Profikader</button>' : ''; } }
-    ], youth, { click: 'playerInfo', sort: { k: 'pot', d: -1 } }) + '</div></div>';
+      { k: 'x', l: '', nosort: true, f: function (p) { return U.canYouth() ? '<button class="sm primary" data-act="promoteYouth" data-id="' + p.id + '">In die 1. Mannschaft …</button>' : ''; } }
+    ], youth, { click: 'playerInfo', sort: { k: 'pot', d: -1 } }) + '</div>';
+    var trial = W.squad(st, c.id).filter(function (p) { return p.trial; });
+    if (trial.length) h += '<div class="panel" style="margin-top:14px"><h2>🧪 Zur Probe bei den Profis (' + trial.length + ')</h2>' + trial.map(function (p) { var left = Math.max(0, p.trial.until - (st.tick || 0)); return '<div class="news-item row between"><div><div class="h">' + esc(W.playerName(p)) + ' (' + p.pos + ', ' + p.age + ' J., ' + p.ovr + '/' + p.pot + ')</div><div class="tx">noch ' + left + ' Woche' + (left === 1 ? '' : 'n') + ' Probezeit</div></div>' + (U.canYouth() ? '<div class="row"><button class="sm primary" data-act="promoteYouth" data-id="' + p.id + '">Profivertrag …</button><button class="sm" data-act="youthBack" data-id="' + p.id + '">Zurück</button></div>' : '') + '</div>'; }).join('') + '</div>';
+    h += '</div>';
     return h;
   };
 

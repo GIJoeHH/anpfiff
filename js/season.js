@@ -303,6 +303,7 @@
       Object.keys(st.clubs).forEach(function (k) { S.trainingWeek(st, st.clubs[k]); });
       if (st.relegLeg >= 2) S.finishRelegation(st);
     }
+    T.checkTrials(st); // Probezeit von Nachwuchsspielern abgelaufen?
     st.lastResults = results.map(function (r) { return { key: r.fx.key, comp: r.fx.comp, h: r.fx.h, a: r.fx.a, hg: r.sum.hg, ag: r.sum.ag, pens: r.sum.pens, user: r.fx.user }; });
     st.rngState = R.rng.state;
     return results;

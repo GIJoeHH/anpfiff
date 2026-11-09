@@ -153,6 +153,36 @@
     });
   };
 
+  // ---------- Nachwuchs → Profikader (jederzeit, unabhängig vom Transferfenster) ----------
+  T.TRIAL_WEEKS = 4;
+  T.youthProWage = function (p) { return Math.max(p.wage || 0, Math.round(W.fairWage(p) * 0.6 / 1000) * 1000); };
+  // Zur Probe: spielt bei den Profis mit, behält Jugendgehalt; nach 4 Wochen Entscheidung (sonst zurück in die Jugend)
+  T.youthTrial = function (st, p) {
+    if (!p.youth) return { ok: false, why: 'Kein Jugendspieler' };
+    p.youth = false; p.trial = { until: (st.tick || 0) + T.TRIAL_WEEKS, wage: p.wage };
+    var c = st.clubs[p.clubId]; if (c) c.manualLineup = c.manualLineup && true;
+    return { ok: true };
+  };
+  // Dauerhafter Profivertrag
+  T.youthPro = function (st, p, years, wage) {
+    if (!p.youth && !p.trial) return { ok: false, why: 'Spieler ist bereits Profi' };
+    p.youth = false; p.trial = null; p.contract = R.clamp(years || 3, 1, 5); p.wage = Math.max(1000, Math.round(wage || T.youthProWage(p)));
+    p.morale = Math.min(100, p.morale + 10);
+    R.season.news(st, 'Profivertrag für ' + W.playerName(p), W.playerName(p) + ' (' + p.age + ', ' + p.pos + ') unterschreibt bis ' + (st.season + p.contract) + ' – ' + R.fmtMoney(p.wage) + ' pro Jahr.', 'transfer');
+    return { ok: true };
+  };
+  T.youthBack = function (st, p, auto) {
+    if (!p.trial) return { ok: false, why: 'Nur Spieler auf Probe können zurück' };
+    p.youth = true; p.wage = p.trial.wage != null ? p.trial.wage : p.wage; p.trial = null;
+    var c = st.clubs[p.clubId];
+    if (c) { if (c.lineup) c.lineup = c.lineup.map(function (id) { return id === p.id ? null : id; }); if (c.bench) c.bench = c.bench.filter(function (id) { return id !== p.id; }); c.manualLineup = false; }
+    if (auto && c && c.userControlled) R.season.news(st, 'Probezeit beendet: ' + W.playerName(p), W.playerName(p) + ' kehrt in die Jugend zurück. Mit einem Profivertrag hätte er bleiben können.', 'transfer');
+    return { ok: true };
+  };
+  T.checkTrials = function (st) {
+    Object.keys(st.players).forEach(function (id) { var p = st.players[id]; if (p.trial && (st.tick || 0) >= p.trial.until) T.youthBack(st, p, true); });
+  };
+
   T.freeAgents = function (st) { return Object.keys(st.players).map(function (k) { return st.players[k]; }).filter(function (p) { return !p.clubId && !p.retired; }); };
 
   // KI: Angebote für gelistete Spieler des Nutzers erzeugen
