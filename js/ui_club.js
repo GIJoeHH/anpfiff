@@ -220,7 +220,8 @@
     if (tab === 'uebersicht') {
       var lim = E.creditLimit(st, c), rate = E.loanRate(st, c);
       var row = function (ic, l, v, cls, sub, tone) { return '<div class="fin-row"><div class="ic-tile ' + (tone || '') + '">' + U.lc(ic, 19) + '</div><div class="fin-l"><span>' + l + '</span>' + (sub ? '<small>' + sub + '</small>' : '') + '</div><b class="' + (cls || '') + '">' + v + '</b></div>'; };
-      var labels = st.settings.cheatEnabled ? [{ x: -13, y: 21.35, z: 2.6, html: 'BANKDIREKTOR', cls: 'director-sign', act: 'bankSign' }] : [];
+      // Fiktives Banklogo im Erdgeschoss links neben dem Vordach (fest an der Fassade); bei aktivem Cheat ist es das geheime Bankdirektor-Schild
+      var labels = [{ x: -24, y: 21.3, z: 4.2, html: '<span class="bank-logo"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#d8b866" stroke-width="1.6"/><path d="M7 8l5 9 5-9" fill="none" stroke="#d8b866" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.2 8h5.6" stroke="#d8b866" stroke-width="1.4" stroke-linecap="round"/></svg><span><b>VEREINSBANK</b><i>' + esc(c.city) + '</i></span></span>', cls: 'bank-sign' + (st.settings.cheatEnabled ? ' cheat' : ''), act: st.settings.cheatEnabled ? 'bankSign' : null }];
       h += '<div class="bank-hero"><div class="panel tight bank-img">' + (R.s3d ? R.s3d.host('bank', { kind: 'bank', model: R.stadiumModel.build(c), cam: 'bank', labels: labels, interactive: true, ratio: '16/10',
         fallback: '<div class="bank-fb">' + U.lc('landmark', 48) + '<b>Vereinsbank ' + esc(c.city) + '</b>' + (st.settings.cheatEnabled ? '<div class="director-sign static" data-act="bankSign">BANKDIREKTOR</div>' : '') + '</div>' }) : '') + '</div>';
       h += '<div class="panel"><div class="panel-h"><h2>' + U.lc('landmark', 17) + ' Finanzstatus</h2><span class="muted small">' + esc(c.name) + '</span></div>' +
@@ -380,8 +381,8 @@
   U.acts.bankSign = function () {
     var st = U.st, r = E.bankCheat(st, U.club());
     if (!r) return;
-    var el = document.querySelector('.director-sign');
-    if (el) { el.classList.remove('wobble'); void el.offsetWidth; el.classList.add('wobble'); }
+    var el = document.querySelector('.bank-sign'); // kurzes Aufleuchten statt Wackeln – die Position bleibt fest
+    if (el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
     U.renderTop();
     if (U.cheatSessionSt !== st) {
       // erster Klick dieser Sitzung: Spruch

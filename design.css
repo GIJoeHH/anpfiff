@@ -456,3 +456,15 @@ table.t tr.sel td:first-child { box-shadow: inset 3px 0 var(--act); }
 @keyframes sitePulse { from { box-shadow: 0 0 0 0 rgba(233,180,75,.0); } to { box-shadow: 0 0 0 3px rgba(233,180,75,.25); } }
 .s3d-lbl.building { border-color: rgba(233,180,75,.75); }
 .lvlbar .site-ic { margin-left: 5px; }
+/* Bankschild: fiktives Logo an der Fassade (Erdgeschoss, links vom Vordach) – fest positioniert, kein Springen */
+.s3d-lbl.bank-sign { transform: translate(-50%, -50%); min-width: 0; padding: 3px 7px 3px 5px; border-radius: 4px; background: linear-gradient(180deg, #13284a, #0b1830); border: 1px solid #d8b866; box-shadow: 0 2px 6px rgba(0,0,0,.6); backdrop-filter: none; cursor: default; }
+.s3d-lbl.bank-sign::after { display: none; }
+.s3d-lbl.bank-sign.cheat { cursor: pointer; }
+.s3d-lbl.bank-sign:hover { background: linear-gradient(180deg, #13284a, #0b1830); border-color: #d8b866; }
+.s3d-lbl.bank-sign.cheat:hover { border-color: #f1d78c; }
+.bank-logo { display: flex; align-items: center; gap: 5px; }
+.bank-logo > span { display: flex; flex-direction: column; line-height: 1; }
+.bank-logo b { font-size: 8.5px; letter-spacing: 1.2px; color: #e8d39a; font-weight: 800; }
+.bank-logo i { font-style: normal; font-size: 7px; letter-spacing: .6px; color: #9fb0d0; margin-top: 1px; }
+.s3d-lbl.bank-sign.flash { animation: signFlash .45s ease-out; }
+@keyframes signFlash { 0% { box-shadow: 0 0 0 0 rgba(241,215,140,.9); } 100% { box-shadow: 0 0 0 10px rgba(241,215,140,0); } }
