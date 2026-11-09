@@ -303,10 +303,16 @@
   // Vertragsverlängerung (KI, zum Saisonende)
   T.aiRenewals = function (st, club) {
     var squad = W.squad(st, club.id);
-    squad.forEach(function (p) {
-      if (p.contract > 0) return;
-      var keep = p.age < 33 && (p.ovr >= R.avg(squad, function (x) { return x.ovr; }) - 4 || p.pot > p.ovr + 6) && squad.length <= 26;
-      if (keep) { p.contract = R.randInt(1, 3); p.wage = R.round(Math.max(p.wage, W.fairWage(p)), 1000); }
+    // Läuft vor dem Herunterzählen der Laufzeiten (season.js): Vertrag 1 = endet mit dieser Saison.
+    // Verlängert werden vor allem brauchbare, jüngere Spieler – aber nur bis zu einer Kadergröße von 23 und ohne Gehaltssprung.
+    var avg = R.avg(squad, function (x) { return x.ovr; }), LIMIT = 23;
+    var keepN = squad.filter(function (p) { return p.contract > 1 || p.youth || p.loan; }).length;
+    squad.filter(function (p) { return p.contract <= 1 && !p.youth && !p.loan; }).sort(function (a, b) { return b.ovr - a.ovr; }).forEach(function (p) {
+      if (keepN >= LIMIT) return;
+      var useful = p.ovr >= avg - 5 || p.pot > p.ovr + 6;
+      var chance = !useful ? 0.12 : p.age >= 33 ? 0.1 : p.age < 30 ? 0.85 : 0.5;
+      if (club.cash < 0) chance *= 0.5; // klamme Vereine verlängern seltener
+      if (R.chance(chance)) { p.contract = 1 + R.randInt(1, p.age <= 28 ? 3 : 2); keepN++; } // Verlängerung zu bisherigen Bezügen: KI-Finanzen bleiben stabil
     });
   };
 })(RFM);

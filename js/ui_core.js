@@ -16,9 +16,9 @@
   };
   U.roleNote = function (area) {
     if (U.can(area)) return '';
-    return '<div class="help" style="margin-bottom:12px">' + (area === 'sport' ? '🤖 Dieser Bereich wird vom KI-Trainer (' + esc(U.club().coach.name) + ', ' + esc(U.club().coach.profile) + ') verwaltet. Sie können alles einsehen.' : '🤖 Dieser Bereich wird von der KI-Geschäftsführung verwaltet. Sie können alles einsehen.') + '</div>';
+    return '<div class="help" style="margin-bottom:12px">' + (area === 'sport' ? '' + U.lc('bot', 15) + ' Dieser Bereich wird vom KI-Trainer (' + esc(U.club().coach.name) + ', ' + esc(U.club().coach.profile) + ') verwaltet. Sie können alles einsehen.' : '' + U.lc('bot', 15) + ' Dieser Bereich wird von der KI-Geschäftsführung verwaltet. Sie können alles einsehen.') + '</div>';
   };
-  U.go = function (screen, params) { U.screen = screen; U.p = params || {}; U.render(); var m = document.getElementById('main'); if (m) m.scrollTop = 0; };
+  U.go = function (screen, params) { U.screen = screen; U.p = params || {}; U.render(); var m = document.getElementById('main'); if (m) { m.scrollTop = 0; m.classList.remove('enter'); void m.offsetWidth; m.classList.add('enter'); clearTimeout(U._enterT); U._enterT = setTimeout(function () { m.classList.remove('enter'); }, 400); } };
   U.render = function () {
     var app = document.getElementById('app');
     var inGame = !!U.st && ['start', 'wizard', 'load'].indexOf(U.screen) < 0;
@@ -38,10 +38,12 @@
   };
   U.modal = function (title, body, footer, wide) {
     var m = document.getElementById('modal');
-    m.innerHTML = '<div class="dlg' + (wide ? ' wide' : '') + '"><div class="dlg-h"><span>' + title + '</span><button class="sm ghost" data-act="closeModal">✕</button></div><div class="dlg-b">' + body + '</div>' + (footer ? '<div class="dlg-f">' + footer + '</div>' : '') + '</div>';
-    m.classList.remove('hidden');
+    m.innerHTML = '<div class="dlg' + (wide ? ' wide' : '') + '" role="dialog" aria-label="' + esc(String(title).replace(/<[^>]+>/g, '')) + '"><div class="dlg-h"><span>' + title + '</span><button class="sm ghost" data-act="closeModal" aria-label="Schließen">' + (U.lc ? U.lc('x', 16) : '✕') + '</button></div><div class="dlg-b">' + body + '</div>' + (footer ? '<div class="dlg-f">' + footer + '</div>' : '') + '</div>';
+    m.classList.remove('drawer'); m.classList.remove('hidden');
   };
-  U.closeModal = function () { var m = document.getElementById('modal'); m.classList.add('hidden'); m.innerHTML = ''; U.modalLock = false; };
+  // Seitliches Detailpanel (z. B. Spielerprofil) – gleiche Bedienung wie ein Dialog
+  U.drawer = function (title, body, footer) { U.modal(title, body, footer); document.getElementById('modal').classList.add('drawer'); };
+  U.closeModal = function () { var m = document.getElementById('modal'); m.classList.add('hidden'); m.classList.remove('drawer'); m.innerHTML = ''; U.modalLock = false; };
   U.acts.closeModal = function () { if (!U.modalLock) U.closeModal(); };
   U.confirm = function (title, text, onYes) {
     U._confirmYes = onYes;
@@ -64,6 +66,7 @@
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !document.getElementById('modal').classList.contains('hidden')) U.acts.closeModal();
+    if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.getAttribute && e.target.getAttribute('data-act') && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && e.target.hasAttribute('tabindex')) { e.preventDefault(); e.target.click(); return; } // Tastaturbedienung für Navigation und Karten
     if (e.key === ' ' && U.screen === 'match' && U.acts.matchPause && e.target.tagName !== 'INPUT') { e.preventDefault(); U.acts.matchPause(); }
   });
   document.addEventListener('input', function (e) {
@@ -136,9 +139,11 @@
   // ---------- Kopfzeile & Navigation ----------
   U.renderTop = function () {
     var st = U.st, c = U.club(), el = document.getElementById('topbar');
-    var btnLabel = st.phase === 'seasonEnd' ? 'NEUE SAISON ▶' : st.phase === 'releg' ? 'RELEGATION ▶' : S.isBreak(st) ? 'NÄCHSTE WOCHE ▶' : 'NÄCHSTER SPIELTAG ▶';
+    var nextSub = st.phase === 'seasonEnd' ? 'Neue Saison' : st.phase === 'releg' ? 'Relegation' : S.isBreak(st) ? 'Nächste Woche' : 'Nächster Spieltag';
+    function chip(icon, label, val, cls, opt) { return '<div class="tb-chip' + (opt ? ' opt' : '') + '">' + U.lc(icon, 18) + '<div><span>' + label + '</span><b class="' + (cls || '') + '">' + val + '</b></div></div>'; }
+    var nextBtn = function (sub) { return '<button class="btn-next" data-act="next"' + (U.busy ? ' disabled' : '') + '><span class="bn-txt">Weiter<small>' + sub + '</small></span>' + U.lc('chevron-right', 20) + '</button>'; };
     if (!c) {
-      el.innerHTML = '<div class="tb-club"><div><div class="name">' + esc(st.manager.name) + ' – vereinslos</div><div class="sub">Saison ' + st.season + '/' + String(st.season + 1).slice(2) + ' · ' + S.calText(st) + '</div></div></div><div class="tb-spacer"></div><button class="btn-next" data-act="next">' + (st.phase === 'seasonEnd' ? 'NEUE SAISON ▶' : 'WOCHE ABWARTEN ▶') + '</button>';
+      el.innerHTML = '<div class="tb-club"><div><div class="name">' + esc(st.manager.name) + ' – vereinslos</div><div class="sub">Saison ' + st.season + '/' + String(st.season + 1).slice(2) + ' · ' + S.calText(st) + '</div></div></div><div class="tb-spacer"></div>' + nextBtn(st.phase === 'seasonEnd' ? 'Neue Saison' : 'Woche abwarten');
       return;
     }
     var pos = E.leaguePos(st, c);
@@ -148,21 +153,21 @@
     var prep = S.prepareWeek(st), nxt = prep.list.filter(function (x) { return x.user; })[0];
     var opp = nxt ? st.clubs[nxt.h === c.id ? nxt.a : nxt.h] : null;
     el.innerHTML = '<div class="tb-club">' + U.crest(c, 40) + '<div><div class="name">' + esc(c.name) + (st.cheatUsed ? ' <span class="cheat-tag" title="Spielstand mit Cheat">CHEAT</span>' : '') + '</div><div class="sub">' + D.leagueNames[c.league] + ' · ' + S.roleName(st.manager.role) + ' · Saison ' + st.season + '/' + String(st.season + 1).slice(2) + '</div></div></div>' +
-      '<div class="tb-stat">Platz<b>' + (st.week > 0 ? pos + '.' : '–') + '</b></div>' +
-      '<div class="tb-stat">' + (S.isBreak(st) ? 'Woche' : 'Spieltag') + '<b>' + S.calText(st, true) + '</b></div>' +
-      '<div class="tb-stat">Kontostand<b class="' + U.moneyCls(c.cash) + '">' + money(c.cash) + '</b></div>' +
-      '<div class="tb-stat">Stärke<b>' + strength + '</b></div>' +
-      '<div class="tb-stat">Stimmung<b>' + (mood >= 70 ? '😀' : mood >= 50 ? '🙂' : mood >= 35 ? '😐' : '😠') + ' ' + mood + '</b></div>' +
-      '<div class="tb-stat">Nächster Gegner<b>' + (opp ? esc(opp.short) + (nxt.comp !== 'league' ? ' (' + (nxt.comp === 'releg' ? 'Rel.' : nxt.comp === 'friendly' ? 'Test' : 'Pokal') + ')' : '') + (nxt.h === c.id ? ' (H)' : ' (A)') : '—') + '</b></div>' +
+      chip('trophy', 'Tabellenplatz', st.week > 0 ? pos + '.' : '–') +
+      chip('calendar-days', S.isBreak(st) ? 'Woche' : 'Spieltag', S.calText(st, true)) +
+      chip('wallet', 'Kontostand', money(c.cash), c.cash < 0 ? 'neg' : '') +
+      chip('users', 'Fanbasis', R.fmtNum(c.fans || 0), '', true) +
+      chip('gauge', 'Stärke · Moral', strength + ' · ' + mood, '', true) +
+      chip('shield', 'Nächster Gegner', opp ? esc(opp.short) + (nxt.comp !== 'league' ? ' (' + (nxt.comp === 'releg' ? 'Rel.' : nxt.comp === 'friendly' ? 'Test' : 'Pokal') + ')' : '') + (nxt.h === c.id ? ' · H' : ' · A') : '—', '', true) +
       '<div class="tb-spacer"></div>' +
-      (U.autoRun ? '<button class="sm danger" data-act="autoStop">■ Automatik stoppen</button>' : '<button class="sm ghost" data-act="autoStart" title="Spieltage automatisch mit Sofortergebnis durchspielen, bis etwas Wichtiges passiert">⏩ Auto</button>') +
-      '<button class="btn-next" data-act="next"' + (U.busy ? ' disabled' : '') + '>' + btnLabel + '</button>';
+      (U.autoRun ? '<button class="sm danger" data-act="autoStop">' + U.lc('square', 14) + 'Automatik stoppen</button>' : '<button class="sm ghost" data-act="autoStart" title="Spieltage automatisch mit Sofortergebnis durchspielen, bis etwas Wichtiges passiert">' + U.lc('fast-forward', 15) + 'Auto</button>') +
+      nextBtn(nextSub);
   };
   U.navItems = function () {
     var st = U.st, offers = st.inbox.filter(function (o) { return o.type === 'offer'; }).length, sp = st.inbox.filter(function (o) { return o.type === 'sponsor'; }).length;
-    var items = [['zentrale', '🏠', 'Zentrale', offers + sp], ['mannschaft', '👕', 'Mannschaft'], ['transfer', '🔄', 'Transfermarkt'], ['training', '🏃', 'Training'], ['verein', '🏢', 'Vereinsmanagement', sp],
-      ['stadion', '🏟️', 'Stadion'], ['stadt', '🏙️', 'Vereinsstadt'], ['nachwuchs', '🌱', 'Nachwuchs'], ['medizin', '⚕️', 'Medizin'], ['bank', '🏦', 'Bank & Finanzen'],
-      ['spieltag', '⚽', 'Spieltag'], ['liga', '📊', 'Liga & Statistiken'], ['karriere', '👔', 'Managerkarriere', st.manager.unemployed ? st.manager.offers.length : 0], ['editor', '✏️', 'Editor'], ['einstellungen', '⚙️', 'Einstellungen']];
+    var items = [['zentrale', 'layout-dashboard', 'Zentrale', offers + sp, 'Sport'], ['mannschaft', 'shirt', 'Mannschaft'], ['transfer', 'arrow-left-right', 'Transfermarkt'], ['training', 'dumbbell', 'Training'], ['nachwuchs', 'graduation-cap', 'Nachwuchs'], ['medizin', 'stethoscope', 'Medizin'],
+      ['verein', 'briefcase', 'Vereinsmanagement', sp, 'Verein'], ['stadion', 'stadium', 'Stadion'], ['stadt', 'building-2', 'Vereinsstadt'], ['bank', 'landmark', 'Bank & Finanzen'],
+      ['spieltag', 'calendar-days', 'Spieltag', 0, 'Wettbewerb'], ['liga', 'chart-column', 'Liga & Statistiken'], ['karriere', 'user-round', 'Managerkarriere', st.manager.unemployed ? st.manager.offers.length : 0], ['editor', 'pencil', 'Editor', 0, 'System'], ['einstellungen', 'settings', 'Einstellungen']];
     if (st.manager.unemployed) items = items.filter(function (i) { return ['liga', 'karriere', 'editor', 'einstellungen'].indexOf(i[0]) >= 0; });
     return items;
   };
@@ -170,8 +175,8 @@
     var cur = U.screen;
     var map = { bericht: 'spieltag', match: 'spieltag', saisonende: 'liga', spieler: 'mannschaft' };
     document.getElementById('nav').innerHTML = U.navItems().map(function (i) {
-      return (i[0] === 'spieltag' || i[0] === 'editor' ? '<div class="nav-sep"></div>' : '') + '<div class="nav-item ' + ((map[cur] || cur) === i[0] ? 'active' : '') + '" data-act="nav" data-s="' + i[0] + '"><span class="ic">' + i[1] + '</span>' + i[2] + (i[3] ? '<span class="badge">' + i[3] + '</span>' : '') + '</div>';
-    }).join('') + '<div class="nav-sep"></div><div class="nav-item" data-act="saveQuick"><span class="ic">💾</span>Speichern</div><div class="nav-item" data-act="toTitle"><span class="ic">⏏︎</span>Hauptmenü</div>';
+      return (i[4] ? '<div class="nav-group">' + i[4] + '</div>' : '') + '<div class="nav-item ' + ((map[cur] || cur) === i[0] ? 'active' : '') + '" data-act="nav" data-s="' + i[0] + '" tabindex="0" role="link"><span class="ic">' + U.lc(i[1], 18) + '</span>' + i[2] + (i[3] ? '<span class="badge">' + i[3] + '</span>' : '') + '</div>';
+    }).join('') + '<div class="nav-sep"></div><div class="nav-item" data-act="saveQuick" tabindex="0" role="button"><span class="ic">' + U.lc('save', 18) + '</span>Speichern</div><div class="nav-item" data-act="toTitle" tabindex="0" role="button"><span class="ic">' + U.lc('log-out', 18) + '</span>Hauptmenü</div>';
   };
   U.acts.nav = function (d) { if (U.screen === 'match' && U.liveActive) { U.toast('Das Spiel läuft – bitte erst beenden.'); return; } U.go(d.s); };
 
@@ -244,8 +249,8 @@
   U.screens.start = function () {
     return '<div class="title-screen"><div class="title-box"><div class="logo">ANPFIFF!<small>DER FUSSBALL GEHÖRT DIR</small><span class="logo-sub">Vom Bolzplatz zum Fußballimperium</span></div>' +
       '<div class="menu-btns">' + (U.st ? '<button class="primary" data-act="resume" style="display:flex;align-items:center;justify-content:center;gap:10px">' + (U.club() ? U.crest(U.club(), 26) : '') + '▶ Weiterspielen' + (U.club() ? ' <span style="font-weight:400;opacity:.85">· ' + esc(U.club().short) + '</span>' : '') + '</button>' : '') +
-      '<button class="' + (U.st ? '' : 'primary') + '" data-act="newCareer">Neue Karriere</button><button data-act="loadScreen">Spielstand laden</button><button data-act="importSave">Spielstand importieren</button>' + (R.dbimport && D.real ? '<button data-act="realDbPick" title="Neue Spieler-CSV (ANPFIFF-Format oder EA-players.csv) für neue Karrieren übernehmen">🔄 Spielerdaten aktualisieren</button>' : '') + '</div>' +
-      '<p class="muted small" style="margin-top:26px" id="storeInfo">' + (R.save.isNative ? '💾 Spielstände werden im iCloud-Sync-Ordner gespeichert.' : '💾 Browser-Modus: Spielstände liegen in diesem Browser. Zum Abgleich mit Mac/iPad: Speichern → „In iCloud sichern“ bzw. „Spielstand importieren“.' + (R.save.lastSync() ? ' Zuletzt in iCloud gesichert: ' + new Date(R.save.lastSync()).toLocaleString('de-DE') + '.' : '')) + '</p>' +
+      '<button class="' + (U.st ? '' : 'primary') + '" data-act="newCareer">Neue Karriere</button><button data-act="loadScreen">Spielstand laden</button><button data-act="importSave">Spielstand importieren</button>' + (R.dbimport && D.real ? '<button data-act="realDbPick" title="Neue Spieler-CSV (ANPFIFF-Format oder EA-players.csv) für neue Karrieren übernehmen">' + U.lc('refresh-cw', 15) + ' Spielerdaten aktualisieren</button>' : '') + '</div>' +
+      '<p class="muted small" style="margin-top:26px" id="storeInfo">' + (R.save.isNative ? '' + U.lc('save', 15) + ' Spielstände werden im iCloud-Sync-Ordner gespeichert.' : '' + U.lc('save', 15) + ' Browser-Modus: Spielstände liegen in diesem Browser. Zum Abgleich mit Mac/iPad: Speichern → „In iCloud sichern“ bzw. „Spielstand importieren“.' + (R.save.lastSync() ? ' Zuletzt in iCloud gesichert: ' + new Date(R.save.lastSync()).toLocaleString('de-DE') + '.' : '')) + '</p>' +
       '<p class="muted small">' + R.versionText(true) + '</p></div></div>';
   };
   U.acts.resume = function () { U.go('zentrale'); };
@@ -285,7 +290,7 @@
   };
   U.showSaveDialog = function () {
     var slots = ['Spielstand 1', 'Spielstand 2', 'Spielstand 3', 'Spielstand 4', 'Spielstand 5'];
-    U.modal('Speichern', '<p class="muted">Nach jedem Spieltag wird automatisch gespeichert. Zusätzlich können Sie hier manuell sichern.</p><div class="grid g2">' + slots.map(function (s) { return '<button data-act="saveSlot" data-slot="' + s + '">💾 ' + s + '</button>'; }).join('') + '</div>' +
+    U.modal('Speichern', '<p class="muted">Nach jedem Spieltag wird automatisch gespeichert. Zusätzlich können Sie hier manuell sichern.</p><div class="grid g2">' + slots.map(function (s) { return '<button data-act="saveSlot" data-slot="' + s + '">' + U.lc('save', 15) + ' ' + s + '</button>'; }).join('') + '</div>' +
       (R.save.isNative ? '' : '<p class="muted small" style="margin-top:12px">☁︎ <b>In iCloud sichern</b> speichert den Spielstand als <i>autosave.json</i> + <i>autosave.meta</i>. ' + (R.save.isTouch ? 'Im Teilen-Menü „In Dateien sichern“ wählen → iCloud Drive › Privat › DH › KI › Fußball-Manager › <b>Spielstände</b> → Sichern (bei Nachfrage „Ersetzen“).' : 'Die beiden Dateien aus dem Download-Ordner nach iCloud Drive › … › Fußball-Manager › <b>Spielstände</b> verschieben.') + ' Danach in der Mac-App „Weiterspielen“.</p>'),
       (R.save.isNative ? '' : '<button class="primary" data-act="syncExport">☁︎ In iCloud sichern</button>') + '<button data-act="exportSave">Als JSON-Datei exportieren</button><button data-act="closeModal">Schließen</button>');
   };
@@ -312,9 +317,9 @@
   };
   U.roleChoices = function (w) {
     return '<div class="grid g3">' +
-      U.choice('role', 'manager', w.role, '👔 Manager', 'Klassischer Komplettmodus: Sport und Wirtschaft. Empfohlen.') +
-      U.choice('role', 'trainer', w.role, '📋 Trainer', 'Aufstellung, Training, Taktik, Transferwünsche. Die KI-Geschäftsführung verwaltet die Finanzen.') +
-      U.choice('role', 'gf', w.role, '💼 Geschäftsführer', 'Finanzen, Stadion, Vereinsstadt, Bank. Ein KI-Trainer übernimmt das Sportliche.') + '</div>';
+      U.choice('role', 'manager', w.role, '' + U.lc('user-round', 15) + ' Manager', 'Klassischer Komplettmodus: Sport und Wirtschaft. Empfohlen.') +
+      U.choice('role', 'trainer', w.role, '' + U.lc('activity', 15) + ' Trainer', 'Aufstellung, Training, Taktik, Transferwünsche. Die KI-Geschäftsführung verwaltet die Finanzen.') +
+      U.choice('role', 'gf', w.role, '' + U.lc('briefcase', 15) + ' Geschäftsführer', 'Finanzen, Stadion, Vereinsstadt, Bank. Ein KI-Trainer übernimmt das Sportliche.') + '</div>';
   };
   U.screens.wizard = function () {
     var w = U.wiz, h = '';
@@ -322,12 +327,12 @@
     h += '<div class="title-screen" style="align-items:flex-start"><div class="title-box" style="width:min(1100px,100%);text-align:left"><h1>Neue Karriere</h1><div class="wiz-step">' + steps.map(function (s, i) { return '<span class="' + (w.step === i + 1 ? 'on' : '') + '">' + (i + 1) + '. ' + s + '</span>'; }).join('') + '</div>';
     if (w.step === 1) {
       h += '<div class="grid g3">' +
-        U.choice('mode', 'existing', w.mode, '🏟️ Verein übernehmen', 'Übernehmen Sie einen beliebigen Verein aus allen drei Ligen.') +
-        U.choice('mode', 'found', w.mode, '🛠️ Eigenen Verein gründen', 'Präsident + Geschäftsführer + Trainer in einer Person. Start in der 3. Liga, unkündbar.') +
-        U.choice('mode', 'project', w.mode, '🚀 Vom Drittligisten zum Spitzenclub', 'Schnellstart mit einem schwachen Drittligisten als Aufbauprojekt.') + '</div>';
+        U.choice('mode', 'existing', w.mode, '' + U.lc('stadium', 18) + ' Verein übernehmen', 'Übernehmen Sie einen beliebigen Verein aus allen drei Ligen.') +
+        U.choice('mode', 'found', w.mode, '' + U.lc('wrench', 15) + ' Eigenen Verein gründen', 'Präsident + Geschäftsführer + Trainer in einer Person. Start in der 3. Liga, unkündbar.') +
+        U.choice('mode', 'project', w.mode, '' + U.lc('rocket', 15) + ' Vom Drittligisten zum Spitzenclub', 'Schnellstart mit einem schwachen Drittligisten als Aufbauprojekt.') + '</div>';
       if (W.hasRealWorld()) h += '<div class="panel" style="margin-top:14px"><h2>Spielwelt</h2><div class="grid g2">' +
         U.choice('world', 'real', w.world, '🇩🇪 Echte Vereine 2026/27', '56 Vereine (18/18/20) mit ' + R.fmtNum(D.real.players.length) + ' echten Spielern. Daten: ' + esc(D.real.source) + '.') +
-        U.choice('world', 'fiktiv', w.world, '🎲 Fiktive Vereine', '54 erfundene Vereine (18/18/18) mit zufällig erzeugten Spielern.') + '</div></div>';
+        U.choice('world', 'fiktiv', w.world, '' + U.lc('dices', 15) + ' Fiktive Vereine', '54 erfundene Vereine (18/18/18) mit zufällig erzeugten Spielern.') + '</div></div>';
       h += '<div class="row" style="margin-top:18px"><button data-act="toStart">← Zurück</button><div class="tb-spacer"></div><button class="primary" data-act="wizNext"' + (w.mode ? '' : ' disabled') + '>Weiter →</button></div>';
     } else if (w.step === 2) {
       var st = U.wizPreview();
@@ -364,7 +369,7 @@
           U.field('Startkapital: <b id="capLbl">' + money(nc.capital) + '</b>', '<input type="range" min="500000" max="5000000" step="100000" value="' + nc.capital + '" data-inp="wizCap">') +
           U.field('Wappenform', '<div class="seg">' + ['Schild', 'Kreis', 'Raute', 'Wappen'].map(function (n, i) { return '<button class="' + (nc.crestShape === i ? 'on' : '') + '" data-act="wizCrest" data-k="crestShape" data-v="' + i + '">' + n + '</button>'; }).join('') + '</div>') +
           U.field('Wappensymbol', '<div class="seg">' + ['Initialen', 'Stern', 'Ball', 'Streifen', 'Winkel', 'Krone'].map(function (n, i) { return '<button class="' + (nc.crestSymbol === i ? 'on' : '') + '" data-act="wizCrest" data-k="crestSymbol" data-v="' + i + '">' + n + '</button>'; }).join('') + '</div>') +
-          '</div><div class="row" style="margin-top:10px"><button data-act="wizCrestImg">🖼️ Eigenes Wappenbild hochladen</button>' + (nc.crestImage ? '<button data-act="wizCrestImgDel">Bild entfernen</button>' : '') + '</div><p class="help" style="margin-top:12px">Als Gründer und Präsident können Sie nicht entlassen werden. Start mit kleinem Stadion, Schotterweg, Würstchenbude und Vereinsschamane.</p></div>' +
+          '</div><div class="row" style="margin-top:10px"><button data-act="wizCrestImg">' + U.lc('image', 15) + ' Eigenes Wappenbild hochladen</button>' + (nc.crestImage ? '<button data-act="wizCrestImgDel">Bild entfernen</button>' : '') + '</div><p class="help" style="margin-top:12px">Als Gründer und Präsident können Sie nicht entlassen werden. Start mit kleinem Stadion, Schotterweg, Würstchenbude und Vereinsschamane.</p></div>' +
           '<div class="panel" style="text-align:center"><h2>Vorschau</h2><div id="crestPrev">' + U.crest(prevClub, 140) + '</div><div style="font-weight:800;font-size:18px;margin-top:10px" id="namePrev">' + esc(nc.name) + '</div></div></div>' +
           '<div class="panel" style="margin-top:14px"><h2>Spielmodus: Ihre Rolle</h2><p class="muted small">Als Präsident bestimmen Sie selbst, welche Aufgaben Sie übernehmen. Den Rest erledigt die KI. Die Rolle können Sie später unter „Karriere“ jederzeit wechseln.</p>' + U.roleChoices(w) + '</div>';
       } else {
@@ -379,7 +384,7 @@
         U.choice('difficulty', 'schwer', w.difficulty, 'Schwer', 'Knappere Finanzen, stärkere Konkurrenz, strengere Ziele.') +
         U.choice('difficulty', 'chaos', w.difficulty, 'Chaos-Modus', 'Mehr verrückte Ereignisse und Retro-Überraschungen.') + '</div></div>' +
         '<div class="panel" style="margin-top:14px"><h2>Ihr Name</h2><input type="text" data-inp="wizName" value="' + esc(w.name) + '" maxlength="30"></div>';
-      h += '<div class="row" style="margin-top:18px"><button data-act="wizBack">← Zurück</button><div class="tb-spacer"></div><button class="primary" data-act="wizStart" style="padding:12px 24px;font-size:15px">⚽ Karriere starten</button></div>';
+      h += '<div class="row" style="margin-top:18px"><button data-act="wizBack">← Zurück</button><div class="tb-spacer"></div><button class="primary" data-act="wizStart" style="padding:12px 24px;font-size:15px">' + U.lc('ball', 15) + ' Karriere starten</button></div>';
     }
     return h + '</div></div>';
   };

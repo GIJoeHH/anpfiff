@@ -1,6 +1,6 @@
 // ANPFIFF! – Stadionplan: Grundriss mit Sektoren und Rängen, Gästeblock, Abnutzung
 // 14 Sektoren: je 2 hinter den Toren (West/Ost), je 3 an den Längsseiten (Haupttribüne/Gegengerade), 4 Ecken.
-// Jeder Sektor hat bis zu 3 Ränge (Ecken 2). Ein Rang ist Stehplatz, Sitzplatz, Business oder Logen und kann
+// Jeder Sektor hat bis zu 4 Ränge (Ecken 3). Ein Rang ist Stehplatz, Sitzplatz, Business oder Logen und kann
 // teilweise ausgebaut sein (Größe 5 … 100 %). Überdachung, Technik, Flutlicht usw. laufen weiter über die
 // bisherigen Ausbaustufen. Ältere Spielstände werden aus den alten Kapazitäten übernommen.
 (function (R) {
@@ -15,15 +15,15 @@
     { id: 'NW', side: 'C', kind: 'corner', n: 'Ecke Nordwest' }, { id: 'NE', side: 'C', kind: 'corner', n: 'Ecke Nordost' },
     { id: 'SW', side: 'C', kind: 'corner', n: 'Ecke Südwest' }, { id: 'SE', side: 'C', kind: 'corner', n: 'Ecke Südost' }
   ];
-  SP.BASE = { long: [2000, 2600, 3000], goal: [2400, 3000, 3400], corner: [900, 1300] }; // Stehplatz-Äquivalent je Rang
+  SP.BASE = { long: [2000, 2600, 3000, 7200], goal: [2400, 3000, 3400, 6600], corner: [900, 1300, 3600] }; // Stehplatz-Äquivalent je Rang (4. Rang = großer Oberring, Vollausbau ≈ 95.000 Sitzplätze)
   SP.TYPES = {
     steh: { n: 'Stehplatz', f: 1, cost: 110, up: 5, col: '#8d8676', ic: '🧍' },
     sitz: { n: 'Sitzplatz', f: 0.55, cost: 260, up: 9, col: '#2f5fb3', ic: '💺' },
     business: { n: 'Business', f: 0.35, cost: 1100, up: 30, col: '#0f766e', ic: '💼' },
     loge: { n: 'Logen', f: 0.12, cost: 5200, up: 150, col: '#a16207', ic: '🥂' }
   };
-  SP.TIER_COST = [1, 1.35, 1.8];
-  SP.TIER_NAMES = ['Unterrang', 'Oberrang', '3. Rang'];
+  SP.TIER_COST = [1, 1.35, 1.8, 2.3];
+  SP.TIER_NAMES = ['Unterrang', 'Oberrang', '3. Rang', '4. Rang'];
   SP.sec = function (id) { return SP.SECTORS.filter(function (s) { return s.id === id; })[0]; };
   SP.maxTiers = function (sec) { return SP.BASE[sec.kind].length; };
   SP.tierCap = function (sec, ti, type, size) { return Math.round(SP.BASE[sec.kind][ti] * SP.TYPES[type].f * (size == null ? 1 : size)); };

@@ -84,7 +84,7 @@
   function windowTex(kind) {
     // Fassaden: 8×8 Felder; map = Tagesfarbe, emissive = beleuchtete Fenster am Abend
     var cfg = {
-      office: { bg: '#24384d', frame: '#9aa9b8', pane: '#3f5f80', lit: 0.55, ww: 0.86, wh: 0.78 },
+      office: { bg: '#2c4258', frame: '#a9b6c4', pane: '#4f7396', lit: 0.28, ww: 0.9, wh: 0.74 },
       hotel: { bg: '#d9cdb8', frame: '#cfc3ad', pane: '#3a4654', lit: 0.62, ww: 0.5, wh: 0.62 },
       clinic: { bg: '#eef1f4', frame: '#e3e7ec', pane: '#4b6a86', lit: 0.5, ww: 0.9, wh: 0.42 },
       brick: { bg: '#8a5a44', frame: '#7a4c38', pane: '#2f3a44', lit: 0.45, ww: 0.42, wh: 0.58 },
@@ -154,6 +154,10 @@
     M.water = std({ color: '#2d5571', metalness: 0.7, roughness: 0.12 });
     M.trainingGrass = std({ color: '#ffffff', roughness: 0.95, map: tex('tgrass', 512, 352, function (g, W, H) { g.fillStyle = '#3f8a3d'; g.fillRect(0, 0, W, H); for (var i = 0; i < 12; i++) { g.fillStyle = i % 2 ? '#3a7f39' : '#449243'; g.fillRect(i * W / 12, 0, W / 12 + 1, H); } g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 2; g.strokeRect(10, 10, W - 20, H - 20); g.beginPath(); g.moveTo(W / 2, 10); g.lineTo(W / 2, H - 10); g.stroke(); g.beginPath(); g.arc(W / 2, H / 2, 40, 0, 7); g.stroke(); g.strokeRect(10, H / 2 - 70, 70, 140); g.strokeRect(W - 80, H / 2 - 70, 70, 140); }) });
     M.track = std({ color: '#a8432f', roughness: 0.9 });
+    M.turf = std({ color: '#86b8a0', roughness: 0.9, map: M.trainingGrass.map });
+    M.crossRed = std({ color: '#d31f2a', roughness: 0.5, emissive: '#b91c1c', emissiveIntensity: 0.35 });
+    M.lawnDark = std({ color: '#3d6b2f', roughness: 1 });
+    M.heli = std({ roughness: 0.8, map: tex('heli', 128, 128, function (g, W, H) { g.fillStyle = '#2b3036'; g.fillRect(0, 0, W, H); g.strokeStyle = '#facc15'; g.lineWidth = 6; g.beginPath(); g.arc(W / 2, H / 2, 50, 0, 7); g.stroke(); g.fillStyle = '#fff'; g.font = '900 64px Helvetica'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', W / 2, H / 2 + 3); }) });
     M.lawn = std({ color: '#ffffff', roughness: 1, map: simpleTex('lawn', '#47703a', function (g, W, H, r) { for (var i = 0; i < 3000; i++) { g.fillStyle = r() < 0.5 ? 'rgba(25,45,18,.2)' : 'rgba(140,170,80,.14)'; g.fillRect(r() * W, r() * H, 2, 2); } }) });
     M.white = std({ color: '#f8fafc', roughness: 0.5 });
     M.clubCol = std({ color: m.colors[0], roughness: 0.5 });
@@ -295,6 +299,15 @@
         var fx = p.x - p.rot * 0.45;
         B.quad(p.live ? 'screen' : 'board', [fx, p.z, p.y + p.w / 2 * p.rot], [fx, p.z, p.y - p.w / 2 * p.rot], [fx, p.z + p.hgt, p.y - p.w / 2 * p.rot], [fx, p.z + p.hgt, p.y + p.w / 2 * p.rot]);
         if (p.z > 3 && !(m.roof[p.area] && m.roofH)) { B.box('steelDark', p.x, p.y - p.w / 3, 0.5, 0.5, 0, p.z, 0, { top: false }); B.box('steelDark', p.x, p.y + p.w / 3, 0.5, 0.5, 0, p.z, 0, { top: false }); }
+      } else if (p.kind === 'retract') {
+        // Schiebedach: zwei Membranhälften auf Schienen über den Längsseiten; geschlossen über dem Spielfeld, offen über den Hintertor-Dächern
+        var hx = p.x, hy = p.y, hh = p.h;
+        [-1, 1].forEach(function (sy) { beam(B, 'steel', [-hx - 6, hh - 0.6, sy * (hy + 1)], [hx + 6, hh - 0.6, sy * (hy + 1)], 1.2); });
+        [-1, 1].forEach(function (sx) {
+          var x0 = p.closed ? sx * hx : sx * (hx - 2), x1 = p.closed ? 0 : sx * (hx - 16);
+          B.quad(p.closed ? 'roof' : 'roofClear', [x0, hh, -hy], [x1, hh + (p.closed ? 2.5 : 0.6), -hy], [x1, hh + (p.closed ? 2.5 : 0.6), hy], [x0, hh, hy], [[0, 0], [Math.abs(x1 - x0) / 16, 0], [Math.abs(x1 - x0) / 16, hy / 8], [0, hy / 8]]);
+          for (var k2 = 0; k2 <= 6; k2++) { var xx = x0 + (x1 - x0) * k2 / 6; beam(B, 'steel', [xx, hh + 0.2 + (p.closed ? 2.5 * k2 / 6 : 0), -hy], [xx, hh + 0.2 + (p.closed ? 2.5 * k2 / 6 : 0), hy], 0.5); }
+        });
       } else if (p.kind === 'boards') {
         var bx = p.x, by = p.y, k = p.led ? 'led' : 'ads';
         [[[-bx, -by], [bx, -by]], [[bx, by], [-bx, by]], [[-bx, by], [-bx, -by]], [[bx, -by], [bx, by]]].forEach(function (s) {
@@ -449,25 +462,61 @@
       for (var k = 0; k < 8; k++) treeAt(I, r, x - 92 + k * 24, z - 57, 1);
       return l >= 4 ? 12 : 6;
     },
+    // Nachwuchsleistungszentrum: wächst stufenweise auf demselben Gelände (Plätze im Norden, Gebäudezeile im Süden)
     jugend: function (B, b, I, r, M, m) {
-      var l = Math.max(1, b.level), x = b.x, z = b.y;
-      if (l === 1) { B.quad('gravel', [x - 30, 0.06, z - 20], [x + 30, 0.06, z - 20], [x + 30, 0.06, z + 20], [x - 30, 0.06, z + 20]); B.box('white', x - 29, z, 0.3, 5, 0, 2, 0, {}); B.box('white', x + 29, z, 0.3, 5, 0, 2, 0, {}); return 3; }
-      var spots = [[-38, -28], [36, -28], [-38, 30], [36, 30]];
-      for (var i = 0; i < Math.min(4, l - 1); i++) pitchAt(B, x + spots[i][0], z + spots[i][1], 64, 42, 0);
-      if (l >= 3) B.box('f_concrete', x + 2, z + 1, 36, 12, 0, l >= 4 ? 9 : 6, 0, { topKey: 'roofTop' });
-      if (l >= 4) { B.box('f_office', x + 2, z + 1, 24, 10, 9, 5, 0, { topKey: 'roofTop' }); sign(B, 'sgNLZ', 'NACHWUCHSLEISTUNGSZENTRUM', '#0b1424', '#ffffff', x + 2, z + 7.2, 6.5, 30, 1.9, 0); }
-      if (l >= 5) { B.box('f_hotel', x - 70, z - 2, 14, 30, 0, 18, 0, { topKey: 'roofTop' }); B.box('roof', x + 36, z - 56, 70, 4, 0, 5, 0, {}); }
-      return l >= 5 ? 20 : l >= 4 ? 15 : 7;
+      var l = Math.max(1, b.level), x = b.x, z = b.y, P = [[-40, -36], [26, -36], [-40, 10], [26, 10]];
+      function pitch(i, turf) { var p = P[i]; B.quad(turf ? 'turf' : 'trainingGrass', [x + p[0] - 29, 0.07, z + p[1] - 19], [x + p[0] + 29, 0.07, z + p[1] - 19], [x + p[0] + 29, 0.07, z + p[1] + 19], [x + p[0] - 29, 0.07, z + p[1] + 19]);
+        B.box('white', x + p[0] - 28, z + p[1], 0.25, 4.5, 0, 1.8, 0, {}); B.box('white', x + p[0] + 28, z + p[1], 0.25, 4.5, 0, 1.8, 0, {});
+        if (l >= 2) [[-30, -20], [30, -20], [-30, 20], [30, 20]].forEach(function (q) { B.box('steel', x + p[0] + q[0], z + p[1] + q[1], 0.35, 0.35, 0, 12, 0, { top: false }); B.box('lamp', x + p[0] + q[0], z + p[1] + q[1], 1.6, 0.4, 11.4, 0.9, 0, {}); }); }
+      function fence() { var w = b.w / 2 - 2, d = 30; B.box('steelDark', x, z - 58, b.w - 6, 0.12, 0, 2.6, 0, { top: false }); B.box('steelDark', x - w, z - 22, 0.12, 72, 0, 2.6, 0, { top: false }); B.box('steelDark', x + w, z - 22, 0.12, 72, 0, 2.6, 0, { top: false }); }
+      if (l === 1) {
+        B.quad('gravel', [x - 69, 0.06, z - 55], [x - 11, 0.06, z - 55], [x - 11, 0.06, z - 17], [x - 69, 0.06, z - 17]);
+        B.box('white', x - 68, z - 36, 0.25, 4.5, 0, 1.8, 0, {}); B.box('white', x - 12, z - 36, 0.25, 4.5, 0, 1.8, 0, {});
+        B.box('f_brick', x - 50, z + 44, 14, 9, 0, 3.2, 0, { top: false, tw: 16, th: 14 }); B.gable('roofTile', x - 50, z + 44, 15, 10, 3.2, 2.6, 0);
+        for (var t = 0; t < 6; t++) treeAt(I, r, x - 70 + t * 24, z + 58, 0.8);
+        return 6;
+      }
+      pitch(0, false); if (l >= 3) pitch(1, false); if (l >= 4) pitch(2, true); if (l >= 5) pitch(3, true);
+      fence();
+      // Akademiegebäude: Stufe 2 Flachbau, Stufe 3 Erweiterung, Stufe 4/5 mehrgeschossige Akademie mit Glasfront
+      if (l === 2) B.box('f_concrete', x - 40, z + 46, 34, 14, 0, 6, 0, { topKey: 'roofTop' });
+      if (l === 3) { B.box('f_concrete', x - 40, z + 46, 34, 14, 0, 6, 0, { topKey: 'roofTop' }); B.box('f_office', x - 8, z + 46, 28, 14, 0, 9, 0, { topKey: 'roofTop' }); B.box('roof', x - 40, z + 12, 36, 4, 2.6, 0.4, 0, {}); }
+      if (l >= 4) {
+        B.box('f_office', x - 28, z + 46, 54, 16, 0, 11, 0, { topKey: 'roofTop' });
+        B.box('glassWarm', x - 28, z + 37.6, 22, 1.4, 0, 4, 0, {});
+        B.box('band', x - 28, z + 46, 54.4, 16.4, 10.4, 0.6, 0, { top: false });
+        sign(B, 'sgNLZ2', 'NLZ', m.colors[0], '#ffffff', x - 46, z + 37.8, 6.2, 8, 3.2, 0);
+        B.box('f_hotel', x + 40, z + 46, 28, 14, 0, l >= 5 ? 24 : 14, 0, { topKey: 'roofTop', tw: 24, th: 20.4 });
+      }
+      if (l >= 5) {
+        var hg = new T.CylinderGeometry(15, 15, 34, 24, 1, false, 0, Math.PI); hg.rotateZ(Math.PI / 2); var hall = new T.Mesh(hg, M.roof); hall.position.set(x + 8, 0, z + 46); hall.scale.set(1, 0.7, 1); hall.castShadow = hq(); group_(hall);
+        B.box('glassWarm', x + 8, z + 37, 30, 1, 0, 6, 0, { top: false });
+        for (var s = 0; s < 6; s++) I.panels.push({ x: x - 50 + s * 9, z: z + 46, w: 8, d: 3.5, y: 11.6 });
+      }
+      for (var k = 0; k < 7; k++) treeAt(I, r, x - 72 + k * 24, z + 60, 0.85);
+      for (var pp = 0; pp < 14 + l * 6; pp++) I.people.push({ x: x - 60 + r() * 120, z: z - 50 + r() * 70, c: r() < 0.6 ? m.colors[0] : '#f8fafc' });
+      return l >= 5 ? 24 : l >= 4 ? 14 : l === 3 ? 9 : 6;
     },
+    // Medizinische Abteilung: vom Schamanenzelt bis zur Privatklinik, immer am selben Standort (Front Richtung Stadion)
     medizin: function (B, b, I, r, M, m) {
       var l = Math.max(1, b.level), x = b.x, z = b.y;
-      if (l === 1) { B.box('f_brick', x, z, 9, 7, 0, 3, 0, { top: false }); B.gable('roofTile', x, z, 10, 8, 3, 2.4, 0); return 6; }
-      var dims = [0, 0, [16, 12, 4.5], [30, 18, 9], [42, 24, 13], [52, 30, 17], [34, 26, 28]][l];
-      B.box('f_clinic', x, z, dims[0], dims[1], 0, dims[2], 0, { topKey: 'roofTop', tw: 24, th: 20 });
-      if (l >= 4) B.box('glassWarm', x, z + dims[1] / 2 + 3, dims[0] * 0.5, 6, 0, 4.5, 0, {});
-      if (l === 6) { B.box('f_clinic', x + 26, z + 8, 22, 18, 0, 10, 0, { topKey: 'roofTop', tw: 24, th: 20 }); MATS._dyn.heli = MATS._dyn.heli || new T.MeshStandardMaterial({ map: tex('heli', 128, 128, function (g, W, H) { g.fillStyle = '#2b3036'; g.fillRect(0, 0, W, H); g.strokeStyle = '#facc15'; g.lineWidth = 6; g.beginPath(); g.arc(W / 2, H / 2, 50, 0, 7); g.stroke(); g.fillStyle = '#fff'; g.font = '900 64px Helvetica'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', W / 2, H / 2 + 3); }) }); B.quad('heli', [x - 9, dims[2] + 0.1, z - 9], [x + 9, dims[2] + 0.1, z - 9], [x + 9, dims[2] + 0.1, z + 9], [x - 9, dims[2] + 0.1, z + 9]); }
-      sign(B, 'sgMED', l >= 5 ? 'SPORTKLINIK' : 'SPORTMEDIZIN', '#ffffff', '#b91c1c', x, z + dims[1] / 2 + 0.2, dims[2] - 2.6, Math.min(22, dims[0] * 0.7), 2.2, 0);
-      return dims[2] + 1;
+      function cross(cx, cz, y, s) { B.box('crossRed', cx, cz, s, 0.3, y - s * 0.17, s * 0.34, 0, {}); B.box('crossRed', cx, cz, s * 0.34, 0.3, y - s / 2, s, 0, {}); }
+      if (l === 1) {
+        B.gable('tent', x, z, 7, 6, 0, 3.4, 90); B.box('concreteDark', x + 7, z - 2, 1.2, 1.2, 0, 0.4, 0, {});
+        for (var g = 0; g < 4; g++) B.box('lawnDark', x - 10 + g * 3.2, z + 7, 2.4, 6, 0, 0.35, 0, {});
+        treeAt(I, r, x - 14, z - 6, 0.9); treeAt(I, r, x + 14, z + 8, 0.8);
+        return 4;
+      }
+      var main = [0, 0, [14, 10, 4.5], [28, 16, 8], [36, 20, 12], [36, 20, 12], [30, 22, 24]][l], fz = z - main[1] / 2 - 0.35;
+      B.box(l >= 4 ? 'f_clinic' : 'f_clinic', x, z, main[0], main[1], 0, main[2], 0, { topKey: 'roofTop', tw: 24, th: 20 });
+      if (l >= 3) B.box('glassWarm', x, fz + 0.2, main[0] * 0.9, 0.4, 0, 3.6, 0, { top: false });
+      if (l >= 4) { B.box('steel', x, fz - 3, 14, 6, 4.2, 0.4, 0, {}); B.box('glassWarm', x, fz - 0.6, 10, 1.6, 0, 4, 0, {}); I.cars.push({ x: x - 16, z: fz - 8, a: 0, c: '#f8fafc', l: 1.25 }); }
+      if (l >= 5) { B.box('f_clinic', x + 26, z + 4, 18, 28, 0, 12, 0, { topKey: 'roofTop', tw: 24, th: 20 }); B.box('lawn', x, z, main[0] * 0.8, main[1] * 0.7, main[2], 0.4, 0, {}); }
+      if (l === 6) { B.box('f_clinic', x - 26, z + 4, 18, 28, 0, 10, 0, { topKey: 'roofTop', tw: 24, th: 20 }); B.quad('heli', [x - 8, main[2] + 0.1, z - 8], [x + 8, main[2] + 0.1, z - 8], [x + 8, main[2] + 0.1, z + 8], [x - 8, main[2] + 0.1, z + 8]); I.cars.push({ x: x + 16, z: fz - 8, a: 0, c: '#f8fafc', l: 1.25 }); }
+      cross(x + main[0] / 2 - 3, fz - 0.05, main[2] - 0.6, l >= 4 ? 3.2 : 2.2);
+      sign(B, 'sgMED' + l, ['', '', 'VEREINSARZT', 'PHYSIOTHERAPIE', 'MEDIZINZENTRUM', 'SPORTMEDIZIN', 'PRIVATKLINIK'][l], '#ffffff', '#b91c1c', x - (l >= 4 ? 4 : 2), fz - 0.1, main[2] - (l >= 4 ? 2.8 : 2), Math.min(20, main[0] * 0.55), l >= 4 ? 2 : 1.4, 0);
+      for (var t2 = 0; t2 < 5; t2++) treeAt(I, r, x - 30 + t2 * 15, z + main[1] / 2 + 8, 0.8);
+      return main[2] + (l === 6 ? 2 : 1);
     },
     hotel: function (B, b, I, r, M, m) {
       var l = b.level, x = b.x, z = b.y; if (!l) return plot(B, b);
@@ -583,6 +632,39 @@
     },
     strasse: function () { return 1; }
   };
+  // Vereinsbank: Glasturm mit Sockelbau, Vordach, Vorplatz und Straße (gleiche Licht- und Materialwelt wie Stadion/Stadt)
+  function buildBank(group, m, M, I, r) {
+    var B = new Builder(); M._dyn = M._dyn || {}; _grp = group;
+    B.quad('ground', [-500, 0, -500], [500, 0, -500], [500, 0, 500], [-500, 0, 500], [[0, 0], [20, 0], [20, 20], [0, 20]]);
+    B.quad('paving', [-60, 0.02, -30], [60, 0.02, -30], [60, 0.02, 34], [-60, 0.02, 34], [[0, 0], [15, 0], [15, 8], [0, 8]]);
+    roadSeg(B, -500, 46, 500, 46, 16); roadSeg(B, 70, -500, 70, 38, 12);
+    carRow(I, r, -480, 42, 480, 42, 14, 0, 0.45); carRow(I, r, 480, 50, -480, 50, 14, Math.PI, 0.45);
+    // Turm
+    B.box('f_office', -6, -6, 30, 24, 10, 52, 0, { topKey: 'roofTop', tw: 20, th: 18 });
+    B.box('band', -6, -6, 30.4, 24.4, 61.5, 1.2, 0, {});
+    B.box('steelDark', -6, -6, 22, 16, 62, 4, 0, { topKey: 'roofTop' });
+    // Sockel mit Glasfront und Vordach
+    B.box('glassWarm', 0, 6, 64, 30, 0, 10, 0, { topKey: 'roofTop' });
+    B.box('steel', 0, 22.5, 36, 7, 7.2, 0.6, 0, {});
+    B.box('steelDark', -16, 25, 0.5, 0.5, 0, 7.2, 0, { top: false }); B.box('steelDark', 16, 25, 0.5, 0.5, 0, 7.2, 0, { top: false });
+    sign(B, 'sgBANK', 'VEREINSBANK', '#0b1424', '#e8eef8', 0, 21.15, 8.0, 20, 1.6, 0);
+    // Nachbargebäude
+    [[-78, -12, 30, 34, 26, 'f_concrete'], [78, -40, 28, 30, 34, 'f_brick'], [-90, -70, 40, 30, 44, 'f_office'], [40, -90, 36, 30, 60, 'f_office'], [-30, -110, 50, 30, 30, 'f_brick']].forEach(function (b) { B.box(b[5], b[0], b[1], b[2], b[3], 0, b[4], 0, { topKey: 'roofTop' }); });
+    for (var i = 0; i < 9; i++) { treeAt(I, r, -56 + i * 14, 32, 0.8); }
+    for (var k = 0; k < 70; k++) I.people.push({ x: -50 + r() * 100, z: 24 + r() * 8, c: ['#1f2937', '#e5e7eb', '#6b7280', m.colors[0], '#334155'][Math.floor(r() * 5)] });
+    B.flush(group, M, hq());
+    return { tower: 62, front: 21.2 };
+  }
+  // Einzelnes Gebäude auf seinem Bauplatz (für Stufen-Vorschaubilder): gleiche Bauregel wie in der Vereinsstadt
+  function buildFocus(group, m, M, I, r, f) {
+    var B = new Builder(), sl = SM.CITY_SLOTS[f.key], hts = {}; _grp = group; M._dyn = M._dyn || {};
+    B.quad('lawn', [sl.x - 260, 0, sl.y - 220], [sl.x + 260, 0, sl.y - 220], [sl.x + 260, 0, sl.y + 220], [sl.x - 260, 0, sl.y + 220], [[0, 0], [20, 0], [20, 17], [0, 17]]);
+    roadSeg(B, sl.x - 260, sl.y + sl.d / 2 + 16, sl.x + 260, sl.y + sl.d / 2 + 16, 10);
+    for (var t = -2; t <= 2; t++) { treeAt(I, r, sl.x + t * (sl.w / 4), sl.y - sl.d / 2 - 14, 1); treeAt(I, r, sl.x - sl.w / 2 - 14, sl.y + t * (sl.d / 5), 1); treeAt(I, r, sl.x + sl.w / 2 + 14, sl.y + t * (sl.d / 5), 1); }
+    hts[f.key] = BUILD[f.key](B, { key: f.key, x: sl.x, y: sl.y, w: sl.w, d: sl.d, level: f.level }, I, r, M, m) || 0;
+    B.flush(group, M, hq());
+    return hts;
+  }
   var _grp = null; function group_(o) { o.receiveShadow = hq(); _grp.add(o); }
   function plot(B, b) { // leerer Bauplatz mit Bauzaun
     B.quad('gravel', [b.x - b.w / 2, 0.04, b.y - b.d / 2], [b.x + b.w / 2, 0.04, b.y - b.d / 2], [b.x + b.w / 2, 0.04, b.y + b.d / 2], [b.x - b.w / 2, 0.04, b.y + b.d / 2], [[0, 0], [b.w / 30, 0], [b.w / 30, b.d / 30], [0, b.d / 30]]);
@@ -606,7 +688,10 @@
       sun.shadow.camera.left = -S; sun.shadow.camera.right = S; sun.shadow.camera.top = S; sun.shadow.camera.bottom = -S; sun.shadow.camera.near = 10; sun.shadow.camera.far = 1500; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.6;
     }
     var group = new T.Group(); scene.add(group); _grp = group;
-    var I = new Inst(), o = { highlight: cfg.highlight || [], lamps: [] }, info = buildStadium(group, m, M, o);
+    var I = new Inst();
+    if (cfg.kind === 'bank') { var hb = buildBank(group, m, M, I, r); flushInst(group, I, m, hq()); return { scene: scene, heights: hb }; }
+    if (cfg.kind === 'focus') { var hf = buildFocus(group, m, M, I, r, cfg.focus); flushInst(group, I, m, hq()); return { scene: scene, heights: hf }; }
+    var o = { highlight: cfg.highlight || [], lamps: [] }, info = buildStadium(group, m, M, o);
     buildPlaza(group, m, M, I, r, big);
     var heights = big ? buildCity(group, m, M, I, r, cfg.buildings || []) : {};
     flushInst(group, I, m, hq());
@@ -620,6 +705,8 @@
   function camDefaults(cfg) {
     var m = cfg.model, ex = m.extent, cam = cfg.cam;
     if (cam === 'stadt') return { az: -22, el: 34, dist: 760, tx: 0, ty: 0, tz: 25, fov: 34 };
+    if (cam === 'bank') return { az: -24, el: 14, dist: 150, tx: 0, ty: 22, tz: 4, fov: 36 };
+    if (cam === 'focus' && cfg.focus) { var sl = SM.CITY_SLOTS[cfg.focus.key]; var faz = { medizin: 152, museum: 160, eventhalle: 160 }[cfg.focus.key]; return { az: faz != null ? faz : -32, el: 28, dist: Math.max(sl.w, sl.d) * (cfg.kind === 'world' ? 1.05 : 0.72) + 22, tx: sl.x, ty: 4, tz: sl.y + (faz != null ? -4 : 4), fov: 34 }; }
     if (cam === 'innen') return { az: 0, el: 0, dist: 0, fov: 52, inside: true, yaw: 0, pitch: -8 };
     var d = Math.max(ex.x * 1.15, ex.y * 1.5) * (cfg.kind === 'world' ? 2.6 : 1.95) + (m.roofH || 8) * 0.9;
     return { az: -26, el: 27, dist: d, tx: cfg.kind === 'world' ? -16 : 0, ty: 4, tz: 4, fov: 34 };
@@ -653,10 +740,10 @@
   S3.reset = function () {
     Object.keys(CACHE).forEach(function (k) { disposeScene(CACHE[k].scene); }); CACHE = {}; ORDER = [];
     if (MATS) { Object.keys(MATS).forEach(function (k) { var x = MATS[k]; if (x && x.dispose) x.dispose(); }); MATS = null; }
-    Object.keys(TEX).forEach(function (k) { TEX[k].dispose(); }); TEX = {}; S3._env = null;
+    Object.keys(TEX).forEach(function (k) { TEX[k].dispose(); }); TEX = {}; S3._env = null; SNAPS = {};
     if (renderer) { renderer.dispose(); if (renderer.forceContextLoss) renderer.forceContextLoss(); renderer = null; }
   };
-  function hashOf(cfg) { var m = cfg.model; return cfg.kind + '|' + hq() + '|' + JSON.stringify(m.parts) + '|' + JSON.stringify(m.levels) + '|' + m.colors + '|' + Math.round(m.attendance * 4) + '|' + JSON.stringify((cfg.buildings || []).map(function (b) { return b.level; })) + '|' + (cfg.highlight || []).join(); }
+  function hashOf(cfg) { var m = cfg.model; return cfg.kind + '|' + hq() + '|' + JSON.stringify(m.parts) + '|' + JSON.stringify(m.levels) + '|' + m.colors + '|' + Math.round(m.attendance * 4) + '|' + JSON.stringify((cfg.buildings || []).map(function (b) { return b.level; })) + '|' + (cfg.highlight || []).join() + '|' + (cfg.kind === 'focus' && cfg.focus ? cfg.focus.key + cfg.focus.level : ''); }
   function getScene(cfg) {
     var h = hashOf(cfg), k = cfg.kind + ':' + h.length + ':' + hsh(h);
     if (!CACHE[k]) {
@@ -682,7 +769,30 @@
     keys.forEach(function (key) { var el = (root || document).querySelector('[data-s3d="' + key + '"]'); if (el) { live[key] = { el: el, cfg: pending[key] }; setup(key, el, pending[key]); } });
     pending = {};
     keys.forEach(function (key) { if (live[key]) draw(key); });
+    if (pendingSnaps.length) setTimeout(runSnaps, 30);
   };
+  // Standbild einer Ansicht (z. B. Ausbaustufen-Vergleich): einmal rendern, als Bild zwischenspeichern
+  var SNAPS = {}, pendingSnaps = [];
+  S3.snapHost = function (cfg, ratio) {
+    if (!S3.supported()) return cfg.fallback || '';
+    var k = hashOf(cfg) + '|' + cfg.cam, id = 'sn' + hsh(k);
+    if (SNAPS[k]) return '<img class="s3d-snap" style="aspect-ratio:' + (ratio || '16/10') + '" src="' + SNAPS[k] + '" alt="">';
+    pendingSnaps.push({ k: k, id: id, cfg: cfg });
+    return '<img class="s3d-snap loading" style="aspect-ratio:' + (ratio || '16/10') + '" data-snap="' + id + '" alt="">';
+  };
+  function runSnaps() {
+    var job = pendingSnaps.shift(); if (!job) return;
+    try {
+      if (!SNAPS[job.k]) {
+        var rd = getRenderer(), sc = sceneFor(job.cfg), cam = new T.PerspectiveCamera(34, 16 / 10, 1, 4000), w = 480, h = 300;
+        if (S3._env) sc.scene.environment = S3._env;
+        placeCamera(cam, camDefaults(job.cfg), job.cfg); rd.setPixelRatio(1); rd.setSize(w, h, false); rd.render(sc.scene, cam);
+        SNAPS[job.k] = rd.domElement.toDataURL('image/jpeg', 0.86); disposeScene(sc.scene);
+      }
+      document.querySelectorAll('img[data-snap="' + job.id + '"]').forEach(function (im) { im.src = SNAPS[job.k]; im.classList.remove('loading'); });
+    } catch (e) { console.warn(e); }
+    setTimeout(runSnaps, 0);
+  }
   S3.redrawAll = function () { Object.keys(live).forEach(function (k) { if (live[k].el.isConnected) draw(k); }); };
   function setup(key, el, cfg) {
     var v = VIEWS[key + ':' + cfg.cam]; if (!v || cfg.resetView) v = VIEWS[key + ':' + cfg.cam] = camDefaults(cfg);
@@ -729,7 +839,7 @@
   function labels(el, cfg, entry, w, h) {
     var box = el.querySelector('.s3d-labels'); if (!cfg.labels) { box.innerHTML = ''; return; }
     vtmp = vtmp || new T.Vector3();
-    if (box.childElementCount !== cfg.labels.length) box.innerHTML = cfg.labels.map(function (l) { return '<div class="s3d-lbl ' + (l.cls || '') + '"' + (l.act ? ' data-act="' + l.act + '"' + (l.k ? ' data-k="' + l.k + '"' : '') : '') + '>' + l.html + '</div>'; }).join('');
+    if (box.childElementCount !== cfg.labels.length) box.innerHTML = cfg.labels.map(function (l) { return '<div class="s3d-lbl ' + (l.cls || '') + '"' + (l.act ? ' data-act="' + l.act + '" tabindex="0" role="button"' + (l.k ? ' data-k="' + l.k + '"' : '') : '') + '>' + l.html + '</div>'; }).join('');
     cfg.labels.forEach(function (l, i) {
       var y = l.bld ? (entry.heights[l.bld] || 6) + 4 : l.z;
       vtmp.set(l.x, y, l.y).project(camera);

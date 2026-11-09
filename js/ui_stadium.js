@@ -5,16 +5,26 @@
   var U = R.ui, D = R.data, E = R.econ, SP = R.stadium, SM = R.stadiumModel, S3 = R.s3d, esc = R.esc, money = R.fmtMoney, num = R.fmtNum;
 
   function stufe(l, max) { var s = ''; for (var i = 0; i < max; i++) s += '<i class="' + (i < l ? 'on' : '') + '"></i>'; return '<span class="lvlbar">' + s + '</span>'; }
+  // Baustellensymbol hinter der Stufenanzeige: hier wird gerade gebaut
+  U.siteIcon = function (title) { return '<em class="site-ic" title="' + (title || 'Im Bau') + '">' + U.lc('construction', 12) + '</em>'; };
+  function markSites(L, isBuilding) {
+    L.forEach(function (l) {
+      var t = l.k && isBuilding(l.k); if (!t) return;
+      l.html = /<\/span>$/.test(l.html) && l.html.indexOf('lvlbar') >= 0 ? l.html.replace(/<\/span>$/, U.siteIcon(t) + '</span>') : l.html + '<span class="lvlbar">' + U.siteIcon(t) + '</span>';
+      l.cls = (l.cls || '') + ' building';
+    });
+    return L;
+  }
   function badge(title, sub, l, max) { return '<b>' + esc(title) + '</b><span>' + esc(sub) + '</span>' + (max ? stufe(l, max) : ''); }
 
   // Callouts im Stadion: Ankerpunkte aus dem Modell
   function stadiumCallouts(m, c) {
     var G = SM.GEO, L = [], A = m.areas;
-    function side(a, x, y) { var ar = A[a]; L.push({ x: x, y: y, z: ar.top + 4, html: badge(SM.AREA_NAMES[a], ar.tiers ? ar.tiers + (ar.tiers === 1 ? ' Rang' : ' Ränge') + ' · ' + num(ar.cap) : 'Bauplatz', ar.tiers, 3), act: 'planSelArea', k: a }); }
+    function side(a, x, y) { var ar = A[a]; L.push({ x: x, y: y, z: ar.top + 4, html: badge(SM.AREA_NAMES[a], ar.tiers ? ar.tiers + (ar.tiers === 1 ? ' Rang' : ' Ränge') + ' · ' + num(ar.cap) : 'Bauplatz', ar.tiers, 4), act: 'planSelArea', k: a }); }
     side('N', 0, -(G.Iy + A.N.depth * 0.5)); side('S', 0, G.Iy + A.S.depth * 0.5); side('W', -(G.Ix + A.W.depth * 0.5), 0); side('E', G.Ix + A.E.depth * 0.5, 0);
     var ne = m.sectors.NE; L.push({ x: ne.center[0], y: ne.center[1], z: (ne.top || 2) + 3, html: badge('Ecken', m.closedCorners === 4 ? 'geschlossen ✓' : m.closedCorners + '/4 geschlossen', m.closedCorners, 4), act: 'planSelArea', k: 'NE' });
-    if (m.roofH) { var rp = m.parts.filter(function (p) { return p.kind === 'roof'; })[0]; var rc = SM.centroid(rp.inner.concat(rp.outer)); L.push({ x: rc[0] * 0.92, y: rc[1] * 0.92, z: m.roofH + 3, html: badge('Dach', 'Stufe ' + m.levels.dach + '/3', m.levels.dach, 3), act: 'stadiumPart', k: 'dach' }); }
-    else L.push({ x: -20, y: -(G.Iy + A.N.depth + 2), z: Math.max(4, A.N.top) + 8, html: badge('Dach', 'nicht überdacht', 0, 3), act: 'stadiumPart', k: 'dach' });
+    if (m.roofH) { var rp = m.parts.filter(function (p) { return p.kind === 'roof'; })[0]; var rc = SM.centroid(rp.inner.concat(rp.outer)); L.push({ x: rc[0] * 0.92, y: rc[1] * 0.92, z: m.roofH + 3, html: badge(m.retract ? 'Schließbares Dach' : 'Dach', (m.retract ? (m.roofClosed ? 'geschlossen · ' : 'offen · ') : '') + 'Stufe ' + m.levels.dach + '/' + (D.facilities.dach.levels.length - 1), m.levels.dach, D.facilities.dach.levels.length - 1), act: 'stadiumPart', k: 'dach' }); }
+    else L.push({ x: -20, y: -(G.Iy + A.N.depth + 2), z: Math.max(4, A.N.top) + 8, html: badge('Dach', 'nicht überdacht', 0, D.facilities.dach.levels.length - 1), act: 'stadiumPart', k: 'dach' });
     var mast = m.parts.filter(function (p) { return p.kind === 'mast'; })[0];
     if (mast) L.push({ x: mast.x, y: mast.y, z: mast.h + 2, html: badge('Flutlicht', 'Stufe ' + m.levels.licht + '/3', m.levels.licht, 3), act: 'stadiumPart', k: 'licht' });
     else if (m.flood.kind === 'roof') L.push({ x: 30, y: -(G.Iy - 3), z: m.roofH + 1, html: badge('Flutlicht', 'LED im Dach', 3, 3), act: 'stadiumPart', k: 'licht' });
@@ -23,12 +33,16 @@
     var scr = m.parts.filter(function (p) { return p.kind === 'screen'; })[0];
     if (scr) L.push({ x: scr.x, y: scr.y + 18, z: scr.z + scr.hgt + 2, html: badge(scr.live ? 'Videowand' : 'Anzeigetafel', 'Stufe ' + m.levels.video + '/2', m.levels.video, 2), act: 'stadiumPart', k: 'video' });
     if (m.guest.area) L.push({ x: m.guest.center[0], y: m.guest.center[1], z: (m.sectors[m.guest.sector].top || 2) + 2, html: '<b>Gästeblock</b><span>' + m.guest.sector + ' · ' + num(m.guest.cap) + '</span>', cls: 'guest', act: 'planSelArea', k: m.guest.sector });
-    m.jobs.forEach(function (j) { var s = m.sectors[j.sec]; L.push({ x: s.center[0], y: s.center[1], z: 26, html: '<b>🚧 Baustelle ' + j.sec + '</b><span>noch ' + j.weeks + ' Wo.</span>', cls: 'site', act: 'planSelArea', k: j.sec }); });
+    markSites(L, function (k) {
+      var fj = c.construction.filter(function (b) { return b.key === k; })[0]; if (fj) return 'Im Bau: Stufe ' + fj.to + ' – noch ' + fj.weeks + ' Wo.';
+      var j = m.jobs.filter(function (x) { return x.sec === k || m.sectors[x.sec].area === k || (k === 'NE' && m.sectors[x.sec].side === 'C'); })[0]; return j ? 'Im Bau: ' + j.n + ' – noch ' + j.weeks + ' Wo.' : '';
+    });
+    m.jobs.forEach(function (j) { var s = m.sectors[j.sec]; L.push({ x: s.center[0], y: s.center[1], z: 26, html: '<b>' + U.lc('construction', 15) + ' Baustelle ' + j.sec + '</b><span>noch ' + j.weeks + ' Wo.</span>', cls: 'site', act: 'planSelArea', k: j.sec }); });
     return L;
   }
   function stagePanel(m, c, title) {
     var rows = SM.summary(m);
-    return '<div class="s3d-panel"><div class="s3d-panel-h"><span class="s3d-ic">🏟️</span><div><b>' + esc(title || c.stadiumName) + '</b><span>' + SM.STAGES[m.stage] + '</span></div></div>' +
+    return '<div class="s3d-panel"><div class="s3d-panel-h"><span class="s3d-ic">' + U.lc('stadium', 18) + '</span><div><b>' + esc(title || c.stadiumName) + '</b><span>' + SM.STAGES[m.stage] + '</span></div></div>' +
       '<div class="s3d-kv"><div><span>Kapazität</span><b>' + num(m.capacity) + '</b></div><div><span>Attraktivität</span><b>' + E.attractiveness(c) + '<small>/100</small></b></div></div>' +
       '<div class="s3d-sub">Aktuelle Ausbaustufe</div>' + rows.map(function (r) { return '<div class="s3d-row"><span>' + esc(r.n) + '</span><em>' + esc(r.txt) + '</em>' + stufe(r.l, r.max) + '</div>'; }).join('') + '</div>';
   }
@@ -45,6 +59,7 @@
     var cams = [['aussen', 'Außenansicht'], ['innen', 'Innenansicht'], ['vorschau', 'Ausbauvorschau']];
     var h = '<div class="stage3d"><div class="stage-bar"><div class="seg">' + cams.map(function (x) { return '<button class="sm ' + (cam === x[0] ? 'on' : '') + '" data-act="s3dCam" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       (note ? '<span class="stage-note">' + note + '</span>' : '<span class="stage-note muted">' + esc(c.stadiumName) + ' · ' + SM.STAGES[m.stage] + '</span>') +
+      (mNow.retract && !prev ? '<button class="sm ' + (mNow.roofClosed ? 'secondary' : 'ghost') + '" data-act="s3dRoof">' + U.lc(mNow.roofClosed ? 'sun' : 'shield', 15) + (mNow.roofClosed ? 'Dach öffnen' : 'Dach schließen') + '</button>' : '') +
       '<button class="sm ghost" data-act="gfxToggle" title="Grafikdetails umschalten">Grafik: ' + (S3.quality() === 'reduziert' ? 'reduziert' : 'hoch') + '</button></div>';
     h += S3.host('stadium', { kind: 'world', model: m, buildings: SM.city(c), cam: cam === 'vorschau' ? 'vorschau' : cam, labels: stadiumCallouts(m, c), interactive: true, ratio: '16/9',
       highlight: prev && U.p.sec ? [U.p.sec] : m.jobs.length ? [] : [], overlay: stagePanel(m, c),
@@ -52,6 +67,7 @@
     return h + '</div>';
   };
   U.acts.s3dCam = function (d) { U.p.cam = d.v; U.render(); };
+  U.acts.s3dRoof = function () { var p = SP.ensure(U.club()); p.roofClosed = !p.roofClosed; U.toast(p.roofClosed ? 'Das Dach schließt sich.' : 'Das Dach öffnet sich.'); U.render(); };
   U.acts.gfxToggle = function () { S3.setQuality(S3.quality() === 'reduziert' ? 'hoch' : 'reduziert'); U.toast('Grafikdetails: ' + S3.quality()); U.render(); };
   U.acts.planSelArea = function (d) {
     var k = d.k, sec = k.length === 1 ? (k === 'N' ? 'N2' : k === 'S' ? 'S2' : k + '1') : k;
@@ -69,14 +85,14 @@
     h += '<div class="splan-wrap">' + SM.planSVG(m, { sel: sel, highlight: imp ? [sel] : [] }) + '</div>';
     h += '<div class="splan-legend">' + Object.keys(SP.TYPES).map(function (k) { return '<span><i style="background:' + SM.TYPE_COL[k] + '"></i>' + SP.TYPES[k].n + '</span>'; }).join('') +
       '<span><i class="lg-roof"></i>Dach</span><span><i class="lg-guest"></i>Gästeblock</span><span><i class="lg-site"></i>Baustelle</span><span><i class="lg-mast"></i>Flutlicht</span></div>';
-    h += '<p class="muted small" style="margin:6px 0 0">Sektor antippen. Je Längsseite 3, je Hintertor 2 Sektoren, 4 Ecken. Bis zu 3 Ränge (Ecken 2). Eine Ecke mit Rang gilt als geschlossen.</p></div><div class="grid" style="align-content:start">';
+    h += '<p class="muted small" style="margin:6px 0 0">Sektor antippen. Je Längsseite 3, je Hintertor 2 Sektoren, 4 Ecken. Bis zu 4 Ränge (Ecken 3). Eine Ecke mit Rang gilt als geschlossen.</p></div><div class="grid" style="align-content:start">';
     // Sektorpanel
     var tiers = plan.sectors[sel].tiers, job = SP.jobOf(plan, sel), cap = SP.secCap(plan, sel), msec = m.sectors[sel];
     h += '<div class="panel sec-panel"><div class="panel-h"><h2>' + esc(sec.n) + ' <span class="muted small">' + sel + (msec.guest ? ' · <span class="neg">Gästeblock</span>' : '') + '</span></h2><b class="mono">' + num(cap.total) + ' Plätze</b></div>';
     h += '<div class="small muted" style="margin-bottom:6px">' + (sec.kind === 'corner' ? 'Ecke: <b>' + (m.corners[sel].state === 'closed' ? 'geschlossen' : 'offen') + '</b> · ' : '') + 'Dach: <b>' + (msec.roof ? 'ja' : 'nein') + '</b> · ' + tiers.length + '/' + SP.maxTiers(sec) + ' Ränge</div>';
     h += tiers.length ? '<table class="t small">' + tiers.map(function (t, ti) { return '<tr><td>' + SP.TIER_NAMES[ti] + '</td><td><i class="dot" style="background:' + SM.TYPE_COL[t.type] + '"></i>' + SP.TYPES[t.type].n + '</td><td class="num">' + Math.round(t.size * 100) + ' %</td><td class="num">' + num(SP.tierCap(sec, ti, t.type, t.size)) + '</td></tr>'; }).join('') + '</table>' : '<p class="muted small">Noch keine Tribüne – hier ist nur Rasen.</p>';
-    if (job) h += '<div class="help small" style="margin-top:8px">🚧 Im Bau: <b>' + esc(job.n) + '</b> – noch ' + job.weeks + ' von ' + job.total + ' Wochen.' + U.bar(job.total - job.weeks, job.total, '#f5b301') + '</div>';
-    if (plan.guest !== sel && tiers.length && can) h += '<button class="sm" style="margin-top:8px" data-act="planGuest" data-k="' + sel + '">🔴 Als Gästeblock festlegen</button>';
+    if (job) h += '<div class="help small" style="margin-top:8px">' + U.lc('construction', 15) + ' Im Bau: <b>' + esc(job.n) + '</b> – noch ' + job.weeks + ' von ' + job.total + ' Wochen.' + U.bar(job.total - job.weeks, job.total, '#f5b301') + '</div>';
+    if (plan.guest !== sel && tiers.length && can) h += '<button class="sm" style="margin-top:8px" data-act="planGuest" data-k="' + sel + '">' + U.lc('circle-dot', 14) + ' Als Gästeblock festlegen</button>';
     if (opts.length) {
       h += '<h3 style="margin-top:12px">Ausbauoptionen</h3><div class="opt-list">' + opts.map(function (o, i) {
         return '<button class="opt-card' + (i === oi ? ' on' : '') + '" data-act="planOpt" data-v="' + i + '"><b>' + esc(o.n) + '</b><span>' + (o.cap ? (o.cap > 0 ? '+' : '') + num(o.cap) + ' Plätze · ' : '') + o.weeks + ' Wo.</span><em>' + (o.cost ? money(o.cost) : 'kostenlos') + '</em></button>';
@@ -95,12 +111,12 @@
       if (o.action === 'convert' || o.action === 'grow') h += '<p class="small warn">Der Rang ist während des Umbaus gesperrt.</p>';
       var mp = SM.build(c, { plan: imp.plan });
       h += '<div class="imp-prev">' + S3.host('preview', { kind: 'lite', model: mp, cam: 'aussen', highlight: [sel], interactive: true, ratio: '16/10', resetView: false, fallback: '<div class="splan-wrap">' + SM.planSVG(mp, { highlight: [sel] }) + '</div>' }) + '<span class="imp-tag">Vorschau nach dem Ausbau</span></div>';
-      h += '<button class="primary big-build" data-act="planBuild" data-k="' + sel + '" data-v="' + oi + '"' + (afford ? '' : ' disabled title="Nicht genug Geld"') + '>🏗️ Ausbau beauftragen · ' + (o.cost ? money(o.cost) : 'kostenlos') + '</button></div>';
+      h += '<button class="primary big-build" data-act="planBuild" data-k="' + sel + '" data-v="' + oi + '"' + (afford ? '' : ' disabled title="Nicht genug Geld"') + '>' + U.lc('construction', 15) + ' Ausbau beauftragen · ' + (o.cost ? money(o.cost) : 'kostenlos') + '</button></div>';
     } else if (opts.length) h += '<p class="muted small" style="margin-top:8px">Option antippen: Vorschau, Kosten und Auswirkung erscheinen hier.</p>';
     h += '</div>';
     // Kapazität & Gästeblock
     h += '<div class="panel"><h2>Kapazität</h2><div class="grid g2">' + U.ikpi('fans', 'Stehplätze', num(parts.steh)) + U.ikpi('stadium', 'Sitzplätze', num(parts.sitz)) + U.ikpi('stocks', 'Business', num(parts.business)) + U.ikpi('star', 'Logenplätze', num(parts.loge)) + '</div>' +
-      (full.steh + full.sitz + full.vip > parts.steh + parts.sitz + parts.vip ? '<p class="small warn" style="margin-top:6px">🚧 Wegen Umbau gesperrt: ' + num(full.steh + full.sitz + full.vip - parts.steh - parts.sitz - parts.vip) + ' Plätze</p>' : '') +
+      (full.steh + full.sitz + full.vip > parts.steh + parts.sitz + parts.vip ? '<p class="small warn" style="margin-top:6px">' + U.lc('construction', 15) + ' Wegen Umbau gesperrt: ' + num(full.steh + full.sitz + full.vip - parts.steh - parts.sitz - parts.vip) + ' Plätze</p>' : '') +
       '<p class="small" style="margin-top:6px">Gästeblock: <b>' + esc(SP.sec(plan.guest).n) + '</b> · ' + num(SP.guestCap(c)) + ' Plätze' + (gs && gs.season === st.season ? ' · zuletzt ' + num(gs.last) + ' Gästefans' + (gs.short ? ' <span class="warn">(zu klein – Nachfrage ' + num(gs.demand) + ')</span>' : '') : '') + '</p>' +
       '<div class="row between small"><span>Abnutzung Gästeblock</span><b>' + Math.round(plan.wear || 0) + ' %</b></div>' + U.bar(plan.wear || 0, 100, (plan.wear || 0) > 60 ? '#ef4444' : (plan.wear || 0) > 30 ? '#f5b301' : '#22c55e') +
       (can && (plan.wear || 0) >= 5 ? '<button class="sm" style="margin-top:6px" data-act="planRepair">Gästeblock sanieren (' + money(SP.repairCost(c)) + ')</button>' : '') +
@@ -127,9 +143,12 @@
       return { x: b.x, y: b.y, bld: b.key, html: badge(b.name.replace(' & Merchandising', '').replace('Öffentlicher Nahverkehr', 'Nahverkehr'), b.level ? 'Stufe ' + b.level + '/' + b.max : 'Bauplatz', b.level, b.max), cls: b.level ? '' : 'empty', act: 'cityPlot', k: b.key };
     });
     labels.push({ x: 0, y: 0, z: Math.max(m.roofH, m.areas.N.top) + 10, html: badge(c.stadiumName, num(m.capacity) + ' Plätze', 0, 0), cls: 'main', act: 'nav-stadion' });
+    var stadBuild = m.jobs.length + c.construction.filter(function (b) { return E.isStadiumKey(b.key); }).length;
+    markSites(labels, function (k) { var b = c.construction.filter(function (x) { return x.key === k; })[0]; return b ? 'Im Bau: Stufe ' + b.to + ' – noch ' + b.weeks + ' Wo.' : ''; });
+    if (stadBuild) { var sl = labels[labels.length - 1]; sl.html += '<span class="lvlbar">' + U.siteIcon(stadBuild + ' Bauprojekt(e) im Stadion') + '</span>'; sl.cls += ' building'; }
     var lv = 0, n = 0; Object.keys(D.facilities).forEach(function (k) { var f = D.facilities[k], l = c.fac[k] != null ? c.fac[k] : (f.min || 0); lv += l / (f.levels.length - 1); n++; });
     var rev = 0, up = 0; keysRev.forEach(function (k) { rev += E.buildingRevenue(st, c, k); var l = E.level(c, k); up += l ? l.up : 0; });
-    var panel = '<div class="s3d-panel"><div class="s3d-panel-h"><span class="s3d-ic">🏙️</span><div><b>Vereinsstadt</b><span>' + esc(c.name) + '</span></div></div>' +
+    var panel = '<div class="s3d-panel"><div class="s3d-panel-h"><span class="s3d-ic">' + U.lc('building-2', 18) + '</span><div><b>Vereinsstadt</b><span>' + esc(c.name) + '</span></div></div>' +
       '<div class="s3d-row"><span>Stadion</span><em>' + num(m.capacity) + ' Plätze</em></div>' +
       '<div class="s3d-row"><span>Ausbau gesamt</span><em>' + Math.round(lv / n * 100) + ' %</em>' + stufe(Math.round(lv / n * 5), 5) + '</div>' +
       '<div class="s3d-row"><span>Attraktivität</span><em>' + E.attractiveness(c) + '/100</em></div>' +
@@ -138,8 +157,8 @@
       S3.host('city', { kind: 'world', model: m, buildings: blds, cam: 'stadt', labels: labels, interactive: true, ratio: '16/9', overlay: panel, fallback: U.gfx.cityView(c) }) + '</div>';
   };
 
-  U.stadiumThumb3d = function (c) {
+  U.stadiumThumb3d = function (c, ratio) {
     var m = SM.build(c);
-    return S3.host('thumb', { kind: 'lite', model: m, cam: 'aussen', ratio: '4/3', fallback: U.gfx.stadiumThumb(c) });
+    return S3.host('thumb', { kind: 'lite', model: m, cam: 'aussen', ratio: ratio || '4/3', fallback: U.gfx.stadiumThumb(c) });
   };
 })(RFM);

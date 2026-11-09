@@ -8,68 +8,74 @@
     var st = U.st, c = U.club(); if (!c) return U.screens.karriere();
     var mg = st.manager, pos = E.leaguePos(st, c), t = S.table(st, c.league), row = t.filter(function (r) { return r.id === c.id; })[0];
     var avgAtt = c.attendanceHist.length ? R.avg(c.attendanceHist) : 0, cap = E.capacity(c);
-    var trustF = Math.round(c.fanTrust != null ? c.fanTrust : 60), util = avgAtt ? Math.round(avgAtt / cap * 100) : 0;
+    var trustF = Math.round(c.fanTrust != null ? c.fanTrust : 60), util = avgAtt ? Math.round(avgAtt / cap * 100) : 0, trust = Math.round(mg.trust);
     var posHist = U.hist(c, 'pos', 34), cashHist = U.hist(c, 'cash', 34);
-    var h = '<h1>Zentrale</h1><div class="grid g4 kpi-row" style="margin-bottom:14px">' +
-      U.ikpi('trophy', 'Tabellenplatz', st.week ? pos + '. <span class="small muted">(' + row.pts + ' Pkt.)</span>' : '–', '', U.lineChart(posHist, { h: 44, color: '#f5c542', invert: true, min: 1, max: t.length, empty: 'Verlauf ab dem 2. Spieltag' })) +
-      U.ikpi('coins', 'Kontostand', money(c.cash), U.moneyCls(c.cash), '<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:flex-end">' + U.moneyArt(c.cash, 76, 44) + '<div style="flex:1;min-width:0">' + U.lineChart(cashHist, { h: 44, color: c.cash < 0 ? '#ef4444' : '#22c55e', empty: '–' }) + '</div></div>') +
-      U.ikpi('fans', 'Fanbasis', R.fmtNum(c.fans), '', '<div class="row between small muted"><span>Fanvertrauen</span><b class="mono" style="color:var(--text)">' + trustF + '</b></div>' + U.bar(trustF, 100, trustF < 35 ? '#ef4444' : trustF < 60 ? '#f5b301' : '#22c55e')) +
-      U.ikpi('stadium', 'Ø Zuschauer', avgAtt ? R.fmtNum(avgAtt) : '–', '', '<div class="row between small muted"><span>Auslastung</span><b class="mono" style="color:var(--text)">' + (avgAtt ? util + ' %' : '–') + '</b></div>' + U.fillBar(util, util > 90 ? '#22c55e' : util > 60 ? '#f5b301' : '#ef4444')) + '</div>';
-    if (R.dbimport && R.dbimport.careerOutdated(st) && !U.realDbLater) h += '<div class="help" style="margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span>🔄 <b>Neue Spielerdaten verfügbar</b> (Stand ' + esc(D.real.stamp.split('-').reverse().join('.')) + '): Wechsel, neue Spieler und aktuelle Stärken. Ihr eigener Kader bleibt unverändert.</span><span class="tb-spacer"></span><button class="primary sm" data-act="realDbCareer">Ansehen &amp; übernehmen</button><button class="sm" data-act="realDbLater">Später</button></div>';
-    h += '<div class="grid g21"><div class="grid">';
-    // Posteingang
+    var col = function (v, lo, hi) { return v < lo ? 'var(--bad)' : v < hi ? 'var(--warn)' : 'var(--ok)'; };
+    var h = '<div class="page-h"><div><h1>Zentrale</h1><div class="page-sub">' + esc(c.name) + ' · ' + D.leagueNames[c.league] + ' · Saison ' + st.season + '/' + String(st.season + 1).slice(2) + ' · ' + S.calText(st) + '</div></div></div>';
+    h += '<div class="grid g5 kpi-row" style="margin-bottom:16px">' +
+      U.ikpi('trophy', 'Tabellenplatz', st.week ? pos + '. <span class="small muted">' + row.pts + ' Pkt.</span>' : '–', '', U.lineChart(posHist, { h: 40, color: '#E9B44B', invert: true, min: 1, max: t.length, empty: 'Verlauf ab dem 2. Spieltag' })) +
+      U.ikpi('wallet', 'Kontostand', money(c.cash), U.moneyCls(c.cash), U.lineChart(cashHist, { h: 40, color: c.cash < 0 ? '#E35E63' : '#18B979', empty: 'Verlauf ab dem 2. Spieltag' })) +
+      U.ikpi('users', 'Fanbasis', R.fmtNum(c.fans), '', '<div class="row between small muted"><span>Fanvertrauen</span><b style="color:var(--text)">' + trustF + '</b></div>' + U.bar(trustF, 100, col(trustF, 35, 60))) +
+      U.ikpi('ticket', 'Ø Zuschauer', avgAtt ? R.fmtNum(avgAtt) : '–', '', '<div class="row between small muted"><span>Auslastung</span><b style="color:var(--text)">' + (avgAtt ? util + ' %' : '–') + '</b></div>' + U.bar(util, 100, util > 90 ? 'var(--ok)' : util > 60 ? 'var(--warn)' : 'var(--bad)')) +
+      U.ikpi('briefcase', 'Vorstand', mg.founder ? 'Gründer' : trust + ' %', '', '<div class="row between small muted"><span>Vertrauen</span><b style="color:var(--text)">' + (mg.founder ? '–' : trust + ' %') + '</b></div>' + U.bar(mg.founder ? 100 : trust, 100, col(trust, 30, 50))) + '</div>';
+    if (R.dbimport && R.dbimport.careerOutdated(st) && !U.realDbLater) h += '<div class="help" style="margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' + U.lc('refresh-cw', 18) + '<span><b>Neue Spielerdaten verfügbar</b> (Stand ' + esc(D.real.stamp.split('-').reverse().join('.')) + '): Wechsel, neue Spieler und aktuelle Stärken. Ihr eigener Kader bleibt unverändert.</span><span class="tb-spacer"></span><button class="primary sm" data-act="realDbCareer">Ansehen &amp; übernehmen</button><button class="sm" data-act="realDbLater">Später</button></div>';
+    h += '<div class="dash"><div class="grid" style="align-content:start">';
+    // Posteingang & wichtige Ereignisse
     var inbox = st.inbox.filter(function (o) { return o.type === 'offer' || o.type === 'sponsor'; });
-    if (st.deal && st.deal.club === c.id) h += '<div class="panel" style="border-color:var(--amber)"><div class="row between"><div><h2>📰 Eilmeldung: Großangebot</h2><div>' + esc(R.deals.type(st.deal.type).name) + ' – <b>' + money(st.deal.amount) + '</b> · Frist bis zum ' + st.deal.deadline + '. Spieltag</div></div><button class="primary" data-act="showDeal">Entscheiden</button></div></div>';
-    if (inbox.length) {
-      h += '<div class="panel"><h2>Posteingang (' + inbox.length + ')</h2>';
-      inbox.forEach(function (o) {
-        if (o.type === 'offer') {
-          var p = st.players[o.pid], b = st.clubs[o.from]; if (!p || !b) return;
-          h += '<div class="news-item row between"><div><div class="h">Angebot für ' + esc(W.playerName(p)) + ' (' + p.pos + ', ' + p.ovr + ')</div><div class="tx">' + esc(b.name) + ' bietet <b>' + money(o.amount) + '</b> (Marktwert ' + money(p.value) + ')</div></div>' +
-            (U.can('business') || U.can('sport') ? '<div class="row"><button class="sm primary" data-act="offerAccept" data-id="' + o.id + '">Annehmen</button><button class="sm" data-act="offerCounter" data-id="' + o.id + '">+15 % fordern</button><button class="sm danger" data-act="offerDecline" data-id="' + o.id + '">Ablehnen</button></div>' : '') + '</div>';
-        } else {
-          h += '<div class="news-item row between"><div><div class="h">Sponsorenangebote: ' + D.sponsorCategories[o.cat] + '</div><div class="tx">' + o.offers.length + ' Angebote liegen vor.</div></div><button class="sm primary" data-act="nav" data-s="verein">Ansehen</button></div>';
-        }
-      });
-      h += '</div>';
+    h += '<div class="panel"><div class="panel-h"><h2>' + U.lc('mail', 17) + ' Posteingang</h2>' + (inbox.length ? '<span class="pill act">' + inbox.length + ' neu</span>' : '') + '</div>';
+    if (st.deal && st.deal.club === c.id) h += '<div class="msg msg-warn"><div class="ic-tile warn">' + U.lc('newspaper', 20) + '</div><div class="msg-b"><b>Eilmeldung: Großangebot</b><span>' + esc(R.deals.type(st.deal.type).name) + ' – ' + money(st.deal.amount) + ' · Frist bis zum ' + st.deal.deadline + '. Spieltag</span></div><button class="primary sm" data-act="showDeal">Entscheiden</button></div>';
+    inbox.forEach(function (o) {
+      if (o.type === 'offer') {
+        var p = st.players[o.pid], b = st.clubs[o.from]; if (!p || !b) return;
+        h += '<div class="msg"><div class="ic-tile">' + U.lc('arrow-left-right', 20) + '</div><div class="msg-b"><b>Angebot für ' + esc(W.playerName(p)) + ' <span class="muted">(' + p.pos + ', ' + p.ovr + ')</span></b><span>' + esc(b.name) + ' bietet <b class="pos">' + money(o.amount) + '</b> · Marktwert ' + money(p.value) + '</span></div>' +
+          (U.can('business') || U.can('sport') ? '<div class="row" style="gap:6px"><button class="sm primary" data-act="offerAccept" data-id="' + o.id + '">Annehmen</button><button class="sm" data-act="offerCounter" data-id="' + o.id + '">+15 % fordern</button><button class="sm danger" data-act="offerDecline" data-id="' + o.id + '">Ablehnen</button></div>' : '') + '</div>';
+      } else h += '<div class="msg"><div class="ic-tile ok">' + U.lc('handshake', 20) + '</div><div class="msg-b"><b>Sponsorenangebote: ' + D.sponsorCategories[o.cat] + '</b><span>' + o.offers.length + ' Angebote liegen vor.</span></div><button class="sm primary" data-act="nav" data-s="verein">Ansehen</button></div>';
+    });
+    if (!inbox.length && !(st.deal && st.deal.club === c.id)) h += U.empty('mail', 'Keine neuen Nachrichten. Angebote für Spieler und Sponsoren erscheinen hier.');
+    if (c.construction.length || (c.stadium && c.stadium.jobs && c.stadium.jobs.length)) {
+      h += '<div class="sub-h">Laufende Bauprojekte</div>' + c.construction.map(function (b) { return '<div class="prog"><span>' + esc(D.facilities[b.key].levels[b.to].n) + '</span><em>noch ' + b.weeks + ' Wo.</em>' + U.bar(b.total - b.weeks, b.total, 'var(--warn)') + '</div>'; }).join('') +
+        ((c.stadium && c.stadium.jobs) || []).map(function (j) { return '<div class="prog"><span>Stadion ' + esc(j.sec) + ': ' + esc(j.n) + '</span><em>noch ' + j.weeks + ' Wo.</em>' + U.bar(j.total - j.weeks, j.total, 'var(--warn)') + '</div>'; }).join('');
     }
+    h += '</div>';
     // Nächstes Spiel
     var prep = S.prepareWeek(st), nx = prep.list.filter(function (x) { return x.user; });
-    h += '<div class="panel"><div class="panel-h"><h2>Nächstes Spiel</h2><button class="sm" data-act="nav" data-s="spieltag">Spieltagsvorbereitung</button></div>';
+    h += '<div class="panel"><div class="panel-h"><h2>' + U.lc('calendar-days', 17) + ' Nächstes Spiel</h2><button class="sm" data-act="nav" data-s="spieltag">Spieltagsvorbereitung</button></div>';
     if (nx.length) nx.forEach(function (fx) {
       var H = st.clubs[fx.h], A = st.clubs[fx.a];
-      h += '<div class="row" style="justify-content:center;gap:18px;padding:8px 0"><div class="row" style="flex-direction:column;gap:4px;width:180px">' + U.crest(H, 54) + '<b>' + esc(H.name) + '</b><span class="muted small">' + (H.league === c.league ? E.leaguePos(st, H) + '. Platz' : D.leagueNames[H.league]) + '</span></div><div class="mono" style="font-size:22px;font-weight:900">VS</div><div class="row" style="flex-direction:column;gap:4px;width:180px">' + U.crest(A, 54) + '<b>' + esc(A.name) + '</b><span class="muted small">' + (A.league === c.league ? E.leaguePos(st, A) + '. Platz' : D.leagueNames[A.league]) + '</span></div></div><p class="muted small" style="text-align:center">' + S.fxLabel(st, fx) + (H.rivals.indexOf(A.id) >= 0 ? ' · <span class="warn">DERBY!</span>' : '') + '</p>';
+      function side(x) { return '<div class="mc-team">' + U.crest(x, 56) + '<b>' + esc(x.name) + '</b><span>' + (x.league === c.league && st.week ? E.leaguePos(st, x) + '. Platz' : D.leagueNames[x.league]) + '</span>' + U.formDots(x.form) + '</div>'; }
+      h += '<div class="matchcard">' + side(H) + '<div class="mc-vs"><span>' + esc(S.fxLabel(st, fx)) + '</span><b>vs</b>' + (H.rivals.indexOf(A.id) >= 0 ? '<span class="pill warn">Derby</span>' : '') + '</div>' + side(A) + '</div>';
     });
-    else h += '<p class="muted">' + (st.phase === 'seasonEnd' ? 'Die Saison ist beendet.' : (S.isBreak(st) ? S.calText(st) + ' – diese Woche kein Spiel. ' + (U.can('business') ? '<a href="#" data-act="nav" data-s="training">Testspiel oder Trainingslager planen ›</a>' : '') : 'Diese Woche kein Spiel für Ihren Verein.')) + '</p>';
-    h += '</div>';
-    // Zeitung
-    h += '<div class="panel"><h2>Fußball-Zeitung</h2>' + st.news.slice(0, 12).map(function (n) {
-      return '<div class="news-item"><div class="h">' + esc(n.title) + '</div>' + (n.text ? '<div class="tx">' + esc(n.text) + '</div>' : '') + '<div class="muted small">Saison ' + n.season + ' · ' + (n.week ? n.week + '. Spieltag' : 'Vorbereitung') + '</div></div>';
-    }).join('') + '</div>';
-    h += '</div><div class="grid">';
-    // Stadion-Vorschau
-    h += '<div class="panel tight thumb-panel" data-act="nav" data-s="stadion" title="Zum Stadion">' + (U.stadiumThumb3d ? U.stadiumThumb3d(c) : U.gfx.stadiumThumb(c)) + '<div class="thumb-cap"><b>' + esc(c.stadiumName) + '</b><span>' + R.fmtNum(cap) + ' Plätze</span></div></div>';
-    // Vorstand
-    var trust = Math.round(mg.trust);
-    h += '<div class="panel"><h2>Vorstand</h2><p>Saisonziel: <b>' + esc(mg.boardTarget ? mg.boardTarget.text : '–') + '</b></p>' +
-      (mg.founder ? '<p class="muted small">Als Vereinsgründer können Sie nicht entlassen werden.</p>' : '<div class="row between small"><span>Vertrauen</span><span>' + trust + '%</span></div>' + U.bar(trust, 100, trust < 30 ? '#ef4444' : trust < 50 ? '#f5b301' : '#22c55e') + (mg.warnings ? '<p class="warn small">⚠️ Warnungen: ' + mg.warnings + '/2</p>' : '') + (!mg.canBeFired ? '<p class="muted small">Entlassungen sind deaktiviert.</p>' : '')) +
-      (st.manager.role === 'trainer' ? '<p class="small">Transferbudget: <b>' + money(mg.transferBudget || 0) + '</b></p>' : '') + '</div>';
-    // Tabelle
-    h += '<div class="panel"><div class="panel-h"><h2>' + D.leagueNames[c.league] + '</h2><button class="sm" data-act="nav" data-s="liga">Alle Tabellen</button></div>' + U.miniTable(st, c.league, c.id) + '</div>';
-    // Baustellen
-    if (c.construction.length) h += '<div class="panel"><h2>Baustellen</h2>' + c.construction.map(function (b) { return '<div class="small" style="margin-bottom:8px">' + esc(D.facilities[b.key].levels[b.to].n) + ' <span class="muted">(' + b.weeks + ' Wo.)</span>' + U.bar(b.total - b.weeks, b.total, '#f5b301') + '</div>'; }).join('') + '</div>';
-    // Letzte Ergebnisse
+    else h += U.empty('calendar', st.phase === 'seasonEnd' ? 'Die Saison ist beendet.' : S.isBreak(st) ? S.calText(st) + ': diese Woche kein Pflichtspiel. Das nächste Spiel wird nach Abschluss der Vorbereitung angesetzt.' + (U.can('business') ? ' <a href="#" data-act="nav" data-s="training">Testspiel oder Trainingslager planen</a>' : '') : 'Diese Woche kein Spiel für Ihren Verein.');
     if (st.lastResults) {
       var mine = st.lastResults.filter(function (r) { return r.user; });
-      if (mine.length) h += '<div class="panel"><h2>Letztes Spiel</h2>' + mine.map(function (r) { return '<div class="row between"><span>' + esc(st.clubs[r.h].short) + ' – ' + esc(st.clubs[r.a].short) + '</span><b class="mono">' + r.hg + ':' + r.ag + (r.pens ? ' i.E.' : '') + '</b></div>'; }).join('') + '<button class="sm" style="margin-top:8px" data-act="nav" data-s="bericht">Spielbericht</button></div>';
+      if (mine.length) h += '<div class="sub-h">Letztes Spiel</div>' + mine.map(function (r) { return '<div class="row between last-res"><span>' + U.crest(st.clubs[r.h], 18) + ' ' + esc(st.clubs[r.h].short) + ' – ' + esc(st.clubs[r.a].short) + ' ' + U.crest(st.clubs[r.a], 18) + '</span><b class="score">' + r.hg + ':' + r.ag + (r.pens ? ' i.E.' : '') + '</b><button class="sm ghost" data-act="nav" data-s="bericht">Spielbericht</button></div>'; }).join('');
     }
+    h += '</div>';
+    // Zeitung
+    h += '<div class="panel"><div class="panel-h"><h2>' + U.lc('newspaper', 17) + ' Fußball-Zeitung</h2></div>' + (st.news.length ? st.news.slice(0, 8).map(function (n) {
+      return '<div class="news-item"><div class="h">' + esc(n.title) + '</div>' + (n.text ? '<div class="tx">' + esc(n.text) + '</div>' : '') + '<div class="meta">Saison ' + n.season + ' · ' + (n.week ? n.week + '. Spieltag' : 'Vorbereitung') + '</div></div>';
+    }).join('') : U.empty('newspaper', 'Noch keine aktuellen Schlagzeilen.')) + '</div>';
+    h += '</div><div class="grid" style="align-content:start">';
+    // Stadion (gleiches Modell wie Stadionansicht und Vereinsstadt)
+    var att = E.attractiveness(c), sq = W.squad(st, c.id), strength = Math.round(M.squadStrength(st, c)), mood = Math.round(R.avg(sq, function (p) { return p.morale; })), fit = Math.round(R.avg(sq, function (p) { return p.fitness; }));
+    h += '<div class="panel tight dash-stadium"><div class="thumb-panel" data-act="nav" data-s="stadion" title="Zum Stadion">' + (U.stadiumThumb3d ? U.stadiumThumb3d(c, '16/10') : U.gfx.stadiumThumb(c)) + '<div class="thumb-cap"><b>' + esc(c.stadiumName) + '</b><span>' + R.fmtNum(cap) + ' Plätze</span></div></div>' +
+      '<div class="stat-strip"><div><span>Kapazität</span><b>' + R.fmtNum(cap) + '</b></div><div><span>Attraktivität</span><b>' + att + '<small>/100</small></b></div><div><span>Ø Auslastung</span><b>' + (avgAtt ? util + ' %' : '–') + '</b></div></div></div>';
+    // Mannschaftsform
+    h += '<div class="panel"><div class="panel-h"><h2>' + U.lc('activity', 17) + ' Mannschaftsform</h2>' + U.formDots(c.form) + '</div><div class="mini-kpis">' +
+      '<div><span>Stärke</span><b>' + strength + '</b></div><div><span>Moral</span><b>' + mood + '</b>' + U.bar(mood, 100, col(mood, 40, 60)) + '</div><div><span>Frische</span><b>' + fit + '</b>' + U.bar(fit, 100, col(fit, 70, 85)) + '</div><div><span>Teamchemie</span><b>' + Math.round(c.chemistry) + '</b>' + U.bar(c.chemistry, 100, 'var(--act)') + '</div></div></div>';
+    // Vorstand
+    h += '<div class="panel"><div class="panel-h"><h2>' + U.lc('briefcase', 17) + ' Vorstand</h2>' + (mg.warnings ? '<span class="pill bad">' + mg.warnings + '/2 Warnungen</span>' : '') + '</div><div class="row between"><span class="muted">Saisonziel</span><b>' + esc(mg.boardTarget ? mg.boardTarget.text : '–') + '</b></div>' +
+      (mg.founder ? '<p class="muted small" style="margin:8px 0 0">Als Vereinsgründer können Sie nicht entlassen werden.</p>' : '<div class="row between small" style="margin-top:8px"><span class="muted">Vertrauen</span><b>' + trust + ' %</b></div>' + U.bar(trust, 100, col(trust, 30, 50)) + (!mg.canBeFired ? '<p class="muted small" style="margin:6px 0 0">Entlassungen sind deaktiviert.</p>' : '')) +
+      (st.manager.role === 'trainer' ? '<div class="row between small" style="margin-top:8px"><span class="muted">Transferbudget</span><b>' + money(mg.transferBudget || 0) + '</b></div>' : '') + '</div>';
+    // Tabelle
+    h += '<div class="panel"><div class="panel-h"><h2>' + U.lc('chart-column', 17) + ' ' + D.leagueNames[c.league] + '</h2><button class="sm" data-act="nav" data-s="liga">Alle Tabellen</button></div>' + (st.week ? U.miniTable(st, c.league, c.id) : U.empty('trophy', 'Die Saison hat noch nicht begonnen.')) + '</div>';
     h += '</div></div>';
     return h;
   };
   U.miniTable = function (st, lvl, hl) {
     var t = S.table(st, lvl), idx = t.findIndex(function (r) { return r.id === hl; });
     var from = Math.max(0, Math.min(t.length - 8, idx - 3));
-    return '<table class="t">' + t.slice(from, from + 8).map(function (r, i) {
+    return '<table class="t mini"><thead><tr><th class="num">#</th><th>Verein</th><th class="num">Sp.</th><th class="num">Diff.</th><th class="num">Pkt.</th></tr></thead>' + t.slice(from, from + 8).map(function (r, i) {
       var c = st.clubs[r.id], n = from + i + 1;
       return '<tr class="' + (r.id === hl ? 'me' : '') + '"><td class="num">' + n + '</td><td>' + U.crest(c, 16) + ' ' + esc(c.short) + '</td><td class="num">' + r.p + '</td><td class="num">' + (r.gf - r.ga) + '</td><td class="num"><b>' + r.pts + '</b></td></tr>';
     }).join('') + '</table>';
@@ -108,7 +114,7 @@
     opts = opts || {};
     var st = U.st;
     var cols = [
-      { k: 'last', l: 'Name', v: function (p) { return p.last; }, f: function (p) { return (st.favs && st.favs[p.id] ? '★ ' : '') + esc(W.playerName(p)) + (p.homegrown ? ' <span title="Eigengewächs">🌱</span>' : '') + (p.loan ? ' <span class="tag">Leihe</span>' : '') + (p.trial ? ' <span class="tag" title="Nachwuchsspieler auf Probe">Probe</span>' : ''); } },
+      { k: 'last', l: 'Name', v: function (p) { return p.last; }, f: function (p) { return (st.favs && st.favs[p.id] ? U.lc('star', 13) + ' ' : '') + esc(W.playerName(p)) + (p.homegrown ? ' <span class="tag green" title="Eigengewächs">Eigengewächs</span>' : '') + (p.loan ? ' <span class="tag">Leihe</span>' : '') + (p.trial ? ' <span class="tag" title="Nachwuchsspieler auf Probe">Probe</span>' : ''); } },
       { k: 'pos', l: 'Pos', f: function (p) { return U.posTag(p.pos) + (p.alt.length ? ' <span class="muted small">' + p.alt.join('/') + '</span>' : ''); } },
       { k: 'age', l: 'Alter', num: true }, { k: 'ovr', l: 'Stärke', num: true, f: function (p) { return U.ovrBadge(p.ovr); } },
       { k: 'pot', l: 'Pot.', num: true, f: function (p) { return U.potText(p); } }
@@ -128,7 +134,7 @@
   };
   U.statusTags = function (p) {
     var t = '';
-    if (p.inj) t += '<span class="tag red" title="' + esc(p.inj.type) + '">✚ ' + p.inj.weeks + ' Wo.</span> ';
+    if (p.inj) t += '<span class="tag red" title="' + esc(p.inj.type) + '">Verletzt ' + p.inj.weeks + ' Wo.</span> ';
     if (p.susp > 0) t += '<span class="tag red">Gesperrt ' + p.susp + '</span> ';
     if (p.listed) t += '<span class="tag amber">Transferliste</span> ';
     if (p.yellow >= 4) t += '<span class="tag amber">4 Gelbe</span>';
@@ -143,23 +149,26 @@
     var styleHelp = ['Kompakt stehen, wenig Risiko – weniger Tore auf beiden Seiten.', 'Ausgewogenes Spiel zwischen Angriff und Abwehr.', 'Mehr Druck nach vorne, etwas anfälliger hinten.', 'Alles nach vorne! Viele Chancen – aber hinten offen wie ein Scheunentor.'];
     var h = '<div class="panel" style="margin-bottom:14px"><div class="grid g2"><div><h2>Formation</h2><div class="seg" style="flex-wrap:wrap">' + Object.keys(D.formations).map(function (f) { return '<button class="' + (f === c.tactic.formation ? 'on' : '') + '" data-act="setFormation" data-v="' + f + '"' + (can ? '' : ' disabled') + '>' + f + '</button>'; }).join('') + '</div></div>' +
       '<div><h2>Spielstil</h2><div class="seg" style="flex-wrap:wrap">' + M.STYLE.map(function (l, i) { return '<button class="' + (c.tactic.style === i ? 'on' : '') + '" data-act="clubTactic" data-k="style" data-v="' + i + '"' + (can ? '' : ' disabled') + '>' + l + '</button>'; }).join('') + '</div><p class="muted small" style="margin:6px 0 0">' + styleHelp[c.tactic.style] + '</p></div></div></div>';
-    h += '<div class="grid g12"><div class="panel"><div class="panel-h"><h2>Aufstellung ' + c.tactic.formation + '</h2><span class="muted small">' + M.STYLE[c.tactic.style] + '</span></div>';
+    var selName = sel.slot != null ? (st.players[c.lineup[sel.slot]] ? W.playerName(st.players[c.lineup[sel.slot]]) : 'Position ' + slots[sel.slot][0]) : sel.pid && st.players[sel.pid] ? W.playerName(st.players[sel.pid]) : '';
+    h += '<div class="lineup-grid"><div class="panel"><div class="panel-h"><h2>Aufstellung ' + c.tactic.formation + '</h2><span class="muted small">' + M.STYLE[c.tactic.style] + ' · Stärke ' + Math.round(M.squadStrength(st, c)) + '</span></div>';
+    if (U.lsel) h += '<div class="swap-banner">' + U.lc('arrow-left-right', 16) + '<span>Tauschmodus: <b>' + esc(selName) + '</b> ausgewählt. Jetzt den Tauschpartner antippen.</span><button class="sm ghost" data-act="lineCancel">Abbrechen</button></div>';
     h += '<div class="pitch" id="pitchArea"><div class="line" style="left:0;right:0;top:50%;height:0"></div><div class="line" style="left:35%;width:30%;top:0;height:14%;border-top:0"></div><div class="line" style="left:35%;width:30%;bottom:0;height:14%;border-bottom:0"></div><div class="line" style="left:40%;width:20%;top:42%;height:16%;border-radius:50%"></div>';
     slots.forEach(function (s, i) {
       var p = st.players[c.lineup[i]];
       var x = 6 + s[1] * 0.88, y = 94 - s[2] * 0.86;
       var rr = p ? Math.round(W.roleRating(p, s[0])) : 0;
       var warn = p && p.pos !== s[0] && p.alt.indexOf(s[0]) < 0;
-      h += '<div class="token ' + (p ? '' : 'empty ') + (sel.slot === i ? 'sel ' : '') + (warn ? 'warn' : '') + '" style="left:' + x + '%;top:' + y + '%" data-act="lineSlot" data-i="' + i + '" data-drag="slot:' + i + '" data-drop="slot:' + i + '"><div class="dot" style="background:' + c.colors[0] + ';color:' + c.colors[1] + '">' + (p ? rr : s[0]) + '</div><div class="nm">' + (p ? esc(p.last) + (c.captain === p.id ? ' (C)' : '') : s[0]) + '</div></div>';
+      var flag = p && (p.inj || p.susp > 0) ? '<span class="tk-flag bad" title="' + (p.inj ? 'Verletzt' : 'Gesperrt') + '">' + U.lc(p.inj ? 'heart-pulse' : 'square', 11) + '</span>' : warn ? '<span class="tk-flag warn" title="Positionsfremd: ' + esc(p.pos) + ' auf ' + s[0] + '">!</span>' : '';
+      h += '<div class="token ' + (p ? '' : 'empty ') + (sel.slot === i ? 'sel ' : '') + (warn ? 'warn' : '') + '" style="left:' + x + '%;top:' + y + '%" data-act="lineSlot" data-i="' + i + '" data-drag="slot:' + i + '" data-drop="slot:' + i + '" title="' + (p ? esc(W.playerName(p)) + ' · ' + p.pos + ' · Stärke ' + p.ovr + ' · Fitness ' + Math.round(p.fitness) : 'Freie Position ' + s[0]) + '"><div class="dot" style="background:' + c.colors[0] + ';color:' + c.colors[1] + '">' + (p ? rr : s[0]) + flag + '</div><div class="nm">' + (p ? esc(p.last) + (c.captain === p.id ? ' <span class="cap">C</span>' : '') : 'frei') + '</div>' + (p ? '<div class="tk-meta"><span>' + s[0] + '</span><i style="--f:' + Math.round(p.fitness) + '%;--fc:' + (p.fitness < 70 ? 'var(--bad)' : p.fitness < 85 ? 'var(--warn)' : 'var(--ok)') + '"></i></div>' : '') + '</div>';
     });
-    h += '</div><div class="row" style="margin-top:10px">' + (can ? '<button class="primary" data-act="autoLineup">⚡ Automatische beste Elf</button>' : '') + '<label class="row small"><input type="checkbox" data-chg="manualToggle"' + (c.manualLineup ? '' : ' checked') + (can ? '' : ' disabled') + '> Aufstellung vor jedem Spiel automatisch</label></div><p class="muted small">Klicken Sie zwei Spieler nacheinander an (oder ziehen Sie sie), um sie zu tauschen. Rote Umrandung = Spieler auf fremder Position.</p></div>';
+    h += '</div><div class="row" style="margin-top:10px">' + (can ? '<button class="primary" data-act="autoLineup">' + U.lc('sparkles', 16) + 'Automatische beste Elf</button>' : '') + '<label class="row small"><input type="checkbox" data-chg="manualToggle"' + (c.manualLineup ? '' : ' checked') + (can ? '' : ' disabled') + '> Aufstellung vor jedem Spiel automatisch</label></div><p class="muted small">Zwei Spieler nacheinander antippen oder ziehen, um sie zu tauschen. Gelbes Ausrufezeichen = fremde Position, roter Punkt = verletzt oder gesperrt. Der Balken unter dem Namen zeigt die Fitness.</p></div>';
     // Bank & Reserve
     var squad = W.squad(st, c.id), inXI = {}, onBench = {};
     c.lineup.forEach(function (id) { inXI[id] = 1; }); c.bench.forEach(function (id) { onBench[id] = 1; });
     function prow(p, zone) {
       return '<tr class="click ' + (sel.pid === p.id ? 'sel' : '') + '" data-act="linePid" data-id="' + p.id + '" data-drag="pid:' + p.id + '" data-drop="pid:' + p.id + '"><td>' + U.posTag(p.pos) + '</td><td>' + esc(W.playerName(p)) + (p.trial ? ' <span class="tag" title="Nachwuchsspieler auf Probe">Probe</span>' : '') + '</td><td class="num">' + U.ovrBadge(p.ovr) + '</td><td>' + U.bar(p.fitness, 100, p.fitness < 70 ? '#f5b301' : null) + '</td><td>' + U.statusTags(p) + '</td></tr>';
     }
-    h += '<div class="grid"><div class="panel"><h2>Ersatzbank</h2><table class="t">' + c.bench.map(function (id) { return st.players[id] ? prow(st.players[id]) : ''; }).join('') + '</table></div>';
+    h += '<div class="grid" style="align-content:start"><div class="panel"><h2>Ersatzbank <span class="muted small">(' + c.bench.length + '/9)</span></h2><table class="t">' + c.bench.map(function (id) { return st.players[id] ? prow(st.players[id]) : ''; }).join('') + '</table></div>';
     h += '<div class="panel"><h2>Nicht im Kader</h2><table class="t">' + squad.filter(function (p) { return !inXI[p.id] && !onBench[p.id]; }).sort(function (a, b) { return b.ovr - a.ovr; }).map(function (p) { return prow(p); }).join('') + '</table></div>';
     var xi = c.lineup.map(function (id) { return st.players[id]; }).filter(Boolean);
     function sp(key, label) { return U.field(label, '<select data-chg="setPiece" data-k="' + key + '"' + (can ? '' : ' disabled') + '>' + xi.map(function (p) { return '<option value="' + p.id + '"' + (c[key] === p.id ? ' selected' : '') + '>' + esc(W.playerName(p)) + '</option>'; }).join('') + '</select>'); }
@@ -190,6 +199,7 @@
     c.manualLineup = true;
     M.autoSetPieces(U.st, c);
   };
+  U.acts.lineCancel = function () { U.lsel = null; U.render(); };
   U.acts.lineSlot = function (d) { U.lineClick({ slot: +d.i }); };
   U.acts.linePid = function (d) { U.lineClick({ pid: d.id }); };
   U.lineClick = function (x) {
@@ -222,29 +232,29 @@
   U.showPlayer = function (id) {
     var st = U.st, p = st.players[id]; if (!p) return;
     var c = U.club(), own = c && p.clubId === c.id, club = p.clubId ? st.clubs[p.clubId] : null;
-    var h = '<div class="grid g2"><div><div class="row" style="gap:12px;flex-wrap:nowrap">' + (p.photo ? '<img src="' + p.photo + '" style="width:72px;height:72px;object-fit:cover;border-radius:8px">' : '<div style="width:72px;height:72px;border-radius:8px;background:#22345a;display:flex;align-items:center;justify-content:center;font-size:30px">👤</div>') +
-      '<div><div style="font-size:18px;font-weight:800">' + esc(W.playerName(p)) + '</div><div class="muted">' + U.posTag(p.pos) + ' ' + p.alt.join('/') + ' · ' + p.age + ' Jahre · ' + (club ? esc(club.name) : 'vereinslos') + '</div>' + (p.extId ? '<div class="muted small">' + [p.posDetail ? { TW: 'Torwart', IV: 'Innenverteidiger', AV: 'Außenverteidiger', DM: 'Defensives Mittelfeld', ZM: 'Zentrales Mittelfeld', OM: 'Offensives Mittelfeld', FL: 'Flügel', ST: 'Stürmer' }[p.posDetail] || p.posDetail : '', p.nat ? esc(p.nat) : '', p.foot ? (p.foot === 'L' ? 'Linksfuß' : 'Rechtsfuß') : ''].filter(Boolean).join(' · ') + '</div>' : '') + '<div style="margin-top:6px">Stärke ' + U.ovrBadge(p.ovr) + ' Potenzial ' + U.potText(p) + '</div></div></div>';
-    h += '<table class="t" style="margin-top:12px">' + D.attrKeys.map(function (k) { var v = p.attr[k]; return (k === 'gk' && p.pos !== 'TW') ? '' : '<tr><td>' + D.attrNames[k] + '</td><td class="num" style="width:40px">' + Math.round(v) + '</td><td style="width:50%">' + U.bar(v, 99) + '</td></tr>'; }).join('') + '</table></div><div>';
-    h += '<table class="t"><tr><td>Marktwert</td><td class="num">' + money(p.value) + '</td></tr><tr><td>Gehalt</td><td class="num">' + money(p.wage) + '/Jahr</td></tr><tr><td>Vertrag</td><td class="num">' + p.contract + ' Jahr(e)</td></tr><tr><td>Form / Fitness / Moral</td><td class="num">' + p.form.toFixed(1) + ' / ' + Math.round(p.fitness) + ' / ' + Math.round(p.morale) + '</td></tr>' +
-      '<tr><td>Saison: Spiele / Tore / Vorlagen</td><td class="num">' + p.stats.apps + ' / ' + p.stats.goals + ' / ' + p.stats.assists + '</td></tr><tr><td>Ø Note</td><td class="num">' + (p.stats.apps ? (p.stats.rsum / p.stats.apps).toFixed(2) : '–') + '</td></tr><tr><td>Karriere: Spiele / Tore</td><td class="num">' + p.career.apps + ' / ' + p.career.goals + '</td></tr>' +
-      (p.inj ? '<tr><td>Verletzung</td><td class="num neg">' + esc(p.inj.type) + ', ' + p.inj.weeks + ' Wo.</td></tr>' : '') + (p.susp ? '<tr><td>Sperre</td><td class="num neg">' + p.susp + ' Spiel(e)</td></tr>' : '') + '</table>';
+    var POSD = { TW: 'Torwart', IV: 'Innenverteidiger', AV: 'Außenverteidiger', DM: 'Defensives Mittelfeld', ZM: 'Zentrales Mittelfeld', OM: 'Offensives Mittelfeld', FL: 'Flügel', ST: 'Stürmer' };
+    var status = p.inj ? '<span class="pill bad">Verletzt · ' + esc(p.inj.type) + ', ' + p.inj.weeks + ' Wo.</span>' : p.susp ? '<span class="pill bad">Gesperrt · ' + p.susp + ' Spiel(e)</span>' : p.listed ? '<span class="pill warn">Transferliste</span>' : !p.clubId ? '<span class="pill ok">Vertragslos</span>' : p.loan ? '<span class="pill act">Leihe</span>' : '<span class="pill">' + (own ? 'Im Kader' : 'Unter Vertrag') + '</span>';
+    var h = '<div class="pp-head">' + (p.photo ? '<img src="' + p.photo + '" alt="">' : '<div class="pp-ph">' + U.lc('user-round', 34) + '</div>') +
+      '<div><div class="pp-name">' + esc(W.playerName(p)) + '</div><div class="pp-sub">' + (club ? U.crest(club, 16) + ' ' + esc(club.name) : 'vereinslos') + '</div><div class="pp-sub">' + U.posTag(p.pos) + (p.alt.length ? ' <span class="muted">' + p.alt.join('/') + '</span>' : '') + ' · ' + p.age + ' Jahre' + (p.extId ? [p.posDetail ? POSD[p.posDetail] || p.posDetail : '', p.nat ? esc(p.nat) : '', p.foot ? (p.foot === 'L' ? 'Linksfuß' : 'Rechtsfuß') : ''].filter(Boolean).map(function (x) { return ' · ' + x; }).join('') : '') + '</div><div style="margin-top:6px">' + status + '</div></div></div>';
+    h += '<div class="pp-kpis"><div><span>Stärke</span><b>' + U.ovrBadge(p.ovr) + '</b></div><div><span>Potenzial</span><b>' + U.potText(p) + '</b></div><div><span>Marktwert</span><b>' + money(p.value) + '</b></div><div><span>Gehalt</span><b>' + money(p.wage) + '<small>/J.</small></b></div><div><span>Vertrag</span><b>' + p.contract + ' J.</b></div><div><span>Form</span><b>' + p.form.toFixed(1) + '</b></div></div>';
+    h += '<div class="sub-h">Attribute</div><div class="pp-attrs">' + D.attrKeys.map(function (k) { var v = Math.round(p.attr[k]); return (k === 'gk' && p.pos !== 'TW') ? '' : '<div><span>' + D.attrNames[k] + '</span><b>' + v + '</b>' + U.bar(v, 99, v >= 75 ? 'var(--ok)' : v >= 55 ? 'var(--act)' : 'var(--warn)') + '</div>'; }).join('') + '</div>';
+    h += '<div class="sub-h">Zustand &amp; Statistik</div><table class="t small"><tr><td>Fitness / Moral</td><td class="num">' + Math.round(p.fitness) + ' / ' + Math.round(p.morale) + '</td></tr><tr><td>Saison: Spiele / Tore / Vorlagen</td><td class="num">' + p.stats.apps + ' / ' + p.stats.goals + ' / ' + p.stats.assists + '</td></tr><tr><td>Ø Note</td><td class="num">' + (p.stats.apps ? (p.stats.rsum / p.stats.apps).toFixed(2).replace('.', ',') : '–') + '</td></tr><tr><td>Karriere: Spiele / Tore</td><td class="num">' + p.career.apps + ' / ' + p.career.goals + '</td></tr></table>';
     if (c && !own && p.clubId) {
       var mine = W.squad(st, c.id).filter(function (x) { return x.pos === p.pos; }).sort(function (a, b) { return b.ovr - a.ovr; })[0];
-      if (mine) h += '<div class="help" style="margin-top:10px">Kadervergleich: Ihr bester ' + D.posNames[p.pos] + ' ist ' + esc(W.playerName(mine)) + ' (' + mine.ovr + ').</div>';
+      if (mine) h += '<div class="help" style="margin-top:12px">Kadervergleich: Ihr bester ' + D.posNames[p.pos] + ' ist ' + esc(W.playerName(mine)) + ' (' + mine.ovr + ').</div>';
     }
-    if (p.hist && p.hist.length) h += '<div class="small muted" style="margin-top:8px">Historie: ' + p.hist.slice(-6).map(function (x) { return x.s + ' ' + esc(x.c) + ' ' + x.a + '/' + x.g; }).join(' · ') + '</div>';
-    h += '</div></div>';
+    if (p.hist && p.hist.length) h += '<div class="small muted" style="margin-top:10px">Historie: ' + p.hist.slice(-6).map(function (x) { return x.s + ' ' + esc(x.c) + ' ' + x.a + '/' + x.g; }).join(' · ') + '</div>';
     var f = '';
     if (own) {
       if (U.canYouth()) f += p.youth ? '<button class="primary" data-act="promoteYouth" data-id="' + p.id + '">In die 1. Mannschaft …</button>' : p.trial ? '<button class="primary" data-act="promoteYouth" data-id="' + p.id + '">Profivertrag …</button><button data-act="youthBack" data-id="' + p.id + '">Zurück in die Jugend</button>' : '';
       f += '<button data-act="toggleList" data-id="' + p.id + '">' + (p.listed ? 'Von Transferliste nehmen' : 'Auf Transferliste') + '</button><button data-act="renew" data-id="' + p.id + '">Vertrag verlängern</button><button data-act="loanOut" data-id="' + p.id + '">Ausleihen</button><button class="danger" data-act="releasePlayer" data-id="' + p.id + '">Entlassen</button>';
     } else if (c) {
       st.favs = st.favs || {};
-      f += '<button data-act="fav" data-id="' + p.id + '">' + (st.favs[p.id] ? '★ Favorit' : '☆ Favorit') + '</button>';
+      f += '<button data-act="fav" data-id="' + p.id + '">' + U.lc('star', 15) + (st.favs[p.id] ? 'Favorit' : 'Merken') + '</button>';
       if (!p.clubId) f += '<button class="primary" data-act="buyStart" data-id="' + p.id + '">Vertrag anbieten</button>';
       else if (!st.clubs[p.clubId].userControlled) f += '<button data-act="loanIn" data-id="' + p.id + '">Ausleihen</button><button class="primary" data-act="buyStart" data-id="' + p.id + '">Angebot abgeben</button>';
     }
-    U.modal('Spieler', h, f + '<button data-act="closeModal">Schließen</button>', true);
+    U.drawer('Spielerprofil', h, f + '<button class="ghost" data-act="closeModal">Schließen</button>');
   };
   U.acts.fav = function (d) { var st = U.st; st.favs = st.favs || {}; if (st.favs[d.id]) delete st.favs[d.id]; else st.favs[d.id] = 1; U.showPlayer(d.id); };
   // Nachwuchs → 1. Mannschaft: zur Probe oder mit Profivertrag (jederzeit, auch außerhalb des Transferfensters)
@@ -253,8 +263,8 @@
     var st = U.st, p = st.players[d.id], T_ = R.transfers, wage = T_.youthProWage(p);
     var h = '<p><b>' + esc(W.playerName(p)) + '</b> (' + p.pos + ', ' + p.age + ' J., Stärke ' + p.ovr + ', Potenzial ' + p.pot + ')</p>' +
       '<div class="grid g2">' +
-      (p.youth ? '<div class="panel"><h3>🧪 Zur Probe</h3><p class="small">Trainiert und spielt ' + T_.TRIAL_WEEKS + ' Wochen bei den Profis mit, behält sein Jugendgehalt (' + money(p.wage) + '/Jahr). Danach entscheiden Sie: Profivertrag – sonst kehrt er automatisch in die Jugend zurück.</p><button class="primary" data-act="youthTrial" data-id="' + p.id + '">Zur Probe hochziehen</button></div>' : '<div class="panel"><h3>🧪 Auf Probe</h3><p class="small">Noch ' + Math.max(0, p.trial.until - (st.tick || 0)) + ' Woche(n) Probezeit. Danach geht er zurück in die Jugend, wenn er keinen Vertrag bekommt.</p></div>') +
-      '<div class="panel"><h3>✍️ Profivertrag</h3>' + U.field('Jahresgehalt (€)', '<input type="number" id="ypW" value="' + wage + '" step="5000" data-money>') + U.field('Laufzeit (Jahre)', '<select id="ypY">' + [1, 2, 3, 4, 5].map(function (y) { return '<option' + (y === 3 ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>') +
+      (p.youth ? '<div class="panel"><h3>' + U.lc('flask-conical', 15) + ' Zur Probe</h3><p class="small">Trainiert und spielt ' + T_.TRIAL_WEEKS + ' Wochen bei den Profis mit, behält sein Jugendgehalt (' + money(p.wage) + '/Jahr). Danach entscheiden Sie: Profivertrag – sonst kehrt er automatisch in die Jugend zurück.</p><button class="primary" data-act="youthTrial" data-id="' + p.id + '">Zur Probe hochziehen</button></div>' : '<div class="panel"><h3>' + U.lc('flask-conical', 15) + ' Auf Probe</h3><p class="small">Noch ' + Math.max(0, p.trial.until - (st.tick || 0)) + ' Woche(n) Probezeit. Danach geht er zurück in die Jugend, wenn er keinen Vertrag bekommt.</p></div>') +
+      '<div class="panel"><h3>' + U.lc('pen-line', 15) + ' Profivertrag</h3>' + U.field('Jahresgehalt (€)', '<input type="number" id="ypW" value="' + wage + '" step="5000" data-money>') + U.field('Laufzeit (Jahre)', '<select id="ypY">' + [1, 2, 3, 4, 5].map(function (y) { return '<option' + (y === 3 ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select>') +
       '<p class="muted small">Vorschlag: ' + money(wage) + '/Jahr (60 % eines marktüblichen Gehalts). Eigengewächse unterschreiben ohne Verhandlung.</p><button class="primary" data-act="youthPro" data-id="' + p.id + '">Profivertrag unterschreiben</button></div></div>' +
       '<p class="muted small">Beides ist jederzeit möglich – auch außerhalb des Transferfensters.</p>';
     U.modal('In die 1. Mannschaft', h, '<button data-act="closeModal">Abbrechen</button>', true);
@@ -312,7 +322,7 @@
     var st = U.st, n = U.nego, p = st.players[n.pid], c = U.club(), h = '', f = '';
     var budgetInfo = st.manager.role === 'trainer' ? '<p class="small">Ihr Transferbudget: <b>' + money(st.manager.transferBudget || 0) + '</b></p>' : '<p class="small">Kontostand: <b>' + money(c.cash) + '</b></p>';
     h += '<p><b>' + esc(W.playerName(p)) + '</b> (' + p.pos + ', ' + p.age + ' J., Stärke ' + p.ovr + ') · Marktwert ' + money(p.value) + '</p>' + budgetInfo;
-    if (n.future) h += '<div class="help" style="margin-bottom:8px">🗓 Das Transferfenster ist geschlossen. Sie verhandeln einen <b>Wechsel zur neuen Saison</b>: Der Spieler kommt zum Start der Saisonvorbereitung, Ablöse und Handgeld werden erst dann fällig.</div>';
+    if (n.future) h += '<div class="help" style="margin-bottom:8px">' + U.lc('calendar', 15) + ' Das Transferfenster ist geschlossen. Sie verhandeln einen <b>Wechsel zur neuen Saison</b>: Der Spieler kommt zum Start der Saisonvorbereitung, Ablöse und Handgeld werden erst dann fällig.</div>';
     if (n.stage === 'fee') {
       h += '<h3>Schritt 1: Ablöse mit ' + esc(st.clubs[p.clubId].name) + '</h3>' + U.field('Ihr Angebot (€)', '<input type="number" id="feeIn" value="' + n.fee + '" step="50000">');
       f = '<button data-act="closeModal">Abbrechen</button><button class="primary" data-act="negoFee">Angebot abgeben</button>';
@@ -325,7 +335,7 @@
       h += '<h3>Medizincheck</h3><div class="help">' + esc(n.medical.text) + ' <span class="muted">(Zuverlässigkeit ca. ' + n.medical.reliability + ' %)</span></div>';
       f = '<button class="danger" data-act="negoAbort">Transfer abbrechen</button>' + (n.medical.found ? '<button data-act="negoRenegotiate">Ablöse neu verhandeln (−20 %)</button>' : '') + '<button class="primary" data-act="negoFinish">Transfer durchführen</button>';
     } else if (n.stage === 'done') {
-      h += '<div class="help">✅ ' + esc(n.msg) + '</div>'; f = '<button class="primary" data-act="closeModal">Super!</button>';
+      h += '<div class="help">' + U.lc('circle-check', 15) + ' ' + esc(n.msg) + '</div>'; f = '<button class="primary" data-act="closeModal">Super!</button>';
     }
     if (n.msg && n.stage !== 'done') h += '<div class="help" style="margin-top:10px">' + esc(n.msg) + '</div>';
     U.modal(n.renew ? 'Vertragsverhandlung' : 'Transferverhandlung', h, f);
@@ -380,19 +390,22 @@
   U.screens.transfer = function () {
     var st = U.st, f = U.mf, c = U.club();
     var ws = T.windowStatus(st);
-    var h = '<h1>Transfermarkt</h1><div class="row" style="margin-bottom:10px"><span class="tag ' + (ws.open ? 'green' : 'red') + '" title="' + esc(T.WINDOW_TEXT) + '">' + esc(ws.text) + '</span>' + (st.manager.role === 'trainer' ? '<span class="muted">Transferbudget: <b>' + money(st.manager.transferBudget || 0) + '</b></span>' : '<span class="muted">Kontostand: <b>' + money(c.cash) + '</b></span>') + '<span class="muted small">Kader: ' + W.squad(st, c.id).length + ' Spieler</span></div>';
-    h += '<div class="panel" style="margin-bottom:12px"><div class="row">' +
-      '<input type="text" placeholder="🔎 Name suchen" data-inp="mf" data-k="q" value="' + esc(f.q) + '" style="width:180px">' +
+    var h = '<div class="page-h"><div><h1>Transfermarkt</h1><div class="page-sub">Scouting-Datenbank aller Spieler · Kader: ' + W.squad(st, c.id).length + ' Spieler</div></div><div class="row"><span class="pill ' + (ws.open ? 'ok' : 'bad') + '" title="' + esc(T.WINDOW_TEXT) + '">' + U.lc(ws.open ? 'check' : 'lock', 13) + esc(ws.text) + '</span><span class="pill">' + U.lc('wallet', 13) + (st.manager.role === 'trainer' ? 'Budget ' + money(st.manager.transferBudget || 0) : money(c.cash)) + '</span></div></div>';
+    var adv = ['ageMin', 'ageMax', 'ovrMin', 'potMin', 'valueMax', 'wageMax', 'contractMax'], advN = adv.filter(function (k) { return String(f[k]) !== String({ ageMin: 16, ageMax: 40, ovrMin: 0, potMin: 0, valueMax: 0, wageMax: 0, contractMax: 9 }[k]); }).length;
+    h += '<div class="panel filter-panel"><div class="flt-main">' +
+      '<label class="flt-search">' + U.lc('search', 16) + '<input type="search" placeholder="Name suchen" data-inp="mf" data-k="q" value="' + esc(f.q) + '"></label>' +
       U.sel('pos', [['', 'Alle Positionen']].concat(D.positions.map(function (p) { return [p, D.posNames[p]]; }))) +
       U.sel('league', [['', 'Alle Ligen'], ['1', '1. Liga'], ['2', '2. Liga'], ['3', '3. Liga']]) +
       U.sel('club', [['', 'Alle Vereine']].concat(Object.keys(st.clubs).map(function (k) { return [k, st.clubs[k].name]; }).sort(function (a, b) { return a[1].localeCompare(b[1]); }))) +
       U.sel('status', [['all', 'Alle Spieler'], ['listed', 'Transferliste'], ['free', 'Vertragslos'], ['loan', 'Leihkandidaten'], ['expiring', 'Auslaufende Verträge'], ['young', 'Talente (≤ 21)'], ['fav', 'Favoriten']]) +
-      '</div><div class="row" style="margin-top:8px">' +
-      U.num('ageMin', 'Alter ab') + U.num('ageMax', 'bis') + U.num('ovrMin', 'Stärke ab') + U.num('potMin', 'Potenzial ab') + U.num('valueMax', 'Marktwert bis (Mio.)') + U.num('wageMax', 'Gehalt bis (Tsd.)') + U.num('contractMax', 'Vertrag bis (J.)') +
-      '<label class="row small" style="gap:6px"><input type="checkbox" data-chg="mfReach"' + (f.reach ? ' checked' : '') + '> Nur erreichbare Spieler</label>' +
-      '<button data-act="mfReset">Filter zurücksetzen</button></div></div>';
+      '<label class="row small" style="gap:6px"><input type="checkbox" data-chg="mfReach"' + (f.reach ? ' checked' : '') + '> Nur erreichbare</label>' +
+      '<button class="sm ' + (U.mfOpen ? 'secondary' : 'ghost') + '" data-act="mfToggle">' + U.lc('sliders-horizontal', 15) + 'Erweiterte Filter' + (advN ? ' <span class="pill act">' + advN + '</span>' : '') + '</button>' +
+      '<button class="sm ghost" data-act="mfReset">Zurücksetzen</button></div>';
+    if (U.mfOpen) h += '<div class="flt-groups"><div class="flt-g"><div class="flt-h">' + U.lc('user-round', 14) + 'Spieler</div><div class="flt-f">' + U.num('ageMin', 'Alter ab') + U.num('ageMax', 'Alter bis') + U.num('ovrMin', 'Stärke ab') + U.num('potMin', 'Potenzial ab') + '</div></div>' +
+      '<div class="flt-g"><div class="flt-h">' + U.lc('euro', 14) + 'Finanzen</div><div class="flt-f">' + U.num('valueMax', 'Marktwert bis (Mio. €)') + U.num('wageMax', 'Gehalt bis (Tsd. €)') + U.num('contractMax', 'Vertrag bis (Jahre)') + '</div></div></div>';
+    h += '</div>';
     var pend = (st.pendingTransfers || []).filter(function (x) { return x.to === c.id; });
-    if (pend.length) h += '<div class="panel" style="margin-bottom:12px"><h2>📝 Vereinbart zur neuen Saison</h2>' + pend.map(function (x) { var p = st.players[x.pid]; return p ? '<div class="news-item row between"><div><div class="h">' + esc(W.playerName(p)) + ' (' + p.pos + ', ' + p.ovr + ')</div><div class="tx">' + (x.from && st.clubs[x.from] ? esc(st.clubs[x.from].name) + ' · ' : '') + 'Ablöse ' + money(x.fee) + ' · ' + money(x.wage) + '/Jahr · ' + x.years + ' J.</div></div><button class="sm danger" data-act="pendCancel" data-id="' + p.id + '">Zurückziehen</button></div>' : ''; }).join('') + '</div>';
+    if (pend.length) h += '<div class="panel" style="margin-bottom:12px"><h2>' + U.lc('handshake', 17) + ' Vereinbart zur neuen Saison</h2>' + pend.map(function (x) { var p = st.players[x.pid]; return p ? '<div class="news-item row between"><div><div class="h">' + esc(W.playerName(p)) + ' (' + p.pos + ', ' + p.ovr + ')</div><div class="tx">' + (x.from && st.clubs[x.from] ? esc(st.clubs[x.from].name) + ' · ' : '') + 'Ablöse ' + money(x.fee) + ' · ' + money(x.wage) + '/Jahr · ' + x.years + ' J.</div></div><button class="sm danger" data-act="pendCancel" data-id="' + p.id + '">Zurückziehen</button></div>' : ''; }).join('') + '</div>';
     var list = [];
     st.favs = st.favs || {};
     for (var id in st.players) {
@@ -418,11 +431,12 @@
     var total = list.length;
     var ss = U.sortState.market;
     if (!ss) list.sort(function (a, b) { return b.ovr - a.ovr; });
-    h += '<div class="panel tight"><div class="scroll" style="max-height:62vh">' + U.squadTable(list.slice(0, ss ? 2000 : 250), 'market', { market: true, club: true }) + '</div></div><p class="muted small">' + total + ' Spieler gefunden' + (total > 250 && !ss ? ' (die besten 250 werden angezeigt – Filter oder Sortierung nutzen)' : '') + '. Klick auf einen Spieler öffnet Details, Angebot und Kadervergleich.</p>';
+    h += '<div class="panel tight"><div class="scroll market-scroll">' + U.squadTable(list.slice(0, ss ? 2000 : 250), 'market', { market: true, club: true }) + '</div></div><p class="muted small" style="margin-top:8px">' + total + ' Spieler gefunden' + (total > 250 && !ss ? ' (die besten 250 werden angezeigt – Filter oder Sortierung nutzen)' : '') + '. Klick auf einen Spieler öffnet Details, Angebot und Kadervergleich.</p>';
     return h;
   };
   U.sel = function (k, opts) { return '<select data-chg="mfSel" data-k="' + k + '">' + opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(U.mf[k]) === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>'; };
-  U.num = function (k, l) { return '<label class="f" style="width:96px">' + l + '<input type="number" data-chg="mfNum" data-k="' + k + '" value="' + U.mf[k] + '"></label>'; };
+  U.num = function (k, l) { return '<label class="f">' + l + '<input type="number" data-chg="mfNum" data-k="' + k + '" value="' + U.mf[k] + '"></label>'; };
+  U.acts.mfToggle = function () { U.mfOpen = !U.mfOpen; U.render(); };
   U.acts.mfSel = function (d, el) { U.mf[d.k] = el.value; U.render(); };
   U.acts.mfReach = function (d, el) { U.mf.reach = el.checked; U.render(); };
   U.acts.pendCancel = function (d) { T.cancelPending(U.st, d.id); U.toast('Vereinbarung zurückgezogen.'); U.render(); };
@@ -431,25 +445,50 @@
   U.acts.mfReset = function () { U.mf = { q: '', pos: '', league: '', club: '', ageMin: 16, ageMax: 40, ovrMin: 0, potMin: 0, valueMax: 0, wageMax: 0, contractMax: 9, status: 'all' }; U.sortState.market = null; U.render(); };
 
   // ---------- Training ----------
+  var TR_IC = { fitness: 'activity', taktik: 'brain', angriff: 'target', defensive: 'shield', technik: 'sparkles', regeneration: 'refresh-cw' };
+  var FX_N = { mor: 'Moral', fit: 'Fitness', fresh: 'Frische', inj: 'Verletzungsgefahr', dev: 'Entwicklung' };
+  // Kleine Landschaftsillustration je Trainingslager (Vektor, keine Bilddateien)
+  function campArt(id) {
+    var sky = { harz: ['#6f8fb3', '#b9c9d6'], tirol: ['#4a7fc0', '#bcd6ee'], mallorca: ['#3d8fd1', '#f3d39b'], dubai: ['#e08a4b', '#f5d08c'] }[id] || ['#4a7fc0', '#bcd6ee'];
+    var g = '<svg viewBox="0 0 200 84" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="cs' + id + '" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="' + sky[0] + '"/><stop offset="1" stop-color="' + sky[1] + '"/></linearGradient></defs><rect width="200" height="84" fill="url(#cs' + id + ')"/>';
+    if (id === 'harz') g += '<path d="M0 60 Q40 34 80 52 T160 44 T200 50 V84 H0Z" fill="#3f6b45"/><path d="M0 70 Q50 52 100 66 T200 62 V84 H0Z" fill="#2c5233"/>' + [20, 34, 48, 140, 156, 172].map(function (x, i) { return '<path d="M' + x + ' ' + (62 - i % 2 * 4) + ' l6 -16 l6 16z" fill="#1f3d27"/>'; }).join('') + '<rect y="0" width="200" height="84" fill="rgba(200,210,220,.18)"/>';
+    if (id === 'tirol') g += '<path d="M0 66 L40 24 L62 44 L96 10 L132 50 L160 30 L200 60 V84 H0Z" fill="#7d8a9c"/><path d="M84 22 L96 10 L108 22 L100 20 L94 25Z M32 32 L40 24 L48 32 L42 31Z" fill="#f4f7fb"/><path d="M0 72 Q60 58 120 70 T200 66 V84 H0Z" fill="#5f8f4e"/>';
+    if (id === 'mallorca') g += '<circle cx="160" cy="22" r="10" fill="#fff3c4"/><rect y="52" width="200" height="14" fill="#2b88c7"/><path d="M0 66 H200 V84 H0Z" fill="#ecd3a0"/><path d="M30 66 Q34 46 30 36 M30 36 q-10 0 -16 6 M30 36 q10 -2 16 4 M30 36 q-4 -8 -12 -8 M30 36 q6 -8 14 -6" stroke="#2f5d36" stroke-width="2.4" fill="none"/>';
+    if (id === 'dubai') g += '<circle cx="40" cy="26" r="11" fill="#fff1c9"/>' + [[70, 30, 8], [84, 40, 7], [100, 8, 6], [112, 34, 8], [128, 26, 7], [142, 44, 9]].map(function (b) { return '<rect x="' + b[0] + '" y="' + b[1] + '" width="' + b[2] + '" height="' + (70 - b[1]) + '" fill="#6b5a6e"/>'; }).join('') + '<path d="M102 8 l1 -8 l1 8z" fill="#6b5a6e"/><path d="M0 66 Q60 58 120 68 T200 64 V84 H0Z" fill="#e6c48a"/>';
+    return g + '</svg>';
+  }
   U.screens.training = function () {
     var st = U.st, c = U.club(), gf = st.manager.role === 'gf', can = U.can('sport') || gf;
-    var h = '<h1>Training</h1>';
-    if (gf) h += '<div class="help" style="margin-bottom:12px">🤝 <b>Mitspracherecht des Geschäftsführers:</b> ' + (c.trainingByUser ? 'Sie geben den Trainingsschwerpunkt vor – ' + esc(U.coachName(c)) + ' und sein Stab setzen ihn um.' : esc(U.coachName(c)) + ' wählt den Schwerpunkt selbst. Tippen Sie auf eine Kachel, um ihn vorzugeben.') +
+    var h = '<div class="page-h"><div><h1>Training</h1><div class="page-sub">Trainingszentrum: ' + esc(E.level(c, 'training').n) + ' · Trainingsorganisation: ' + D.budgetLevels[c.budgets.trainorg] + ' · Trainer: ' + esc(U.coachName(c)) + (E.staffLvl(c, 'co') ? ' · Co-Trainer ' + U.stars(E.staffLvl(c, 'co'), 3) : '') + (E.staffLvl(c, 'fitness') ? ' · Fitnesstrainer ' + U.stars(E.staffLvl(c, 'fitness'), 3) : '') + '</div></div></div>';
+    if (gf) h += '<div class="help" style="margin-bottom:12px">' + U.lc('handshake', 16) + ' <b>Mitspracherecht des Geschäftsführers:</b> ' + (c.trainingByUser ? 'Sie geben den Trainingsschwerpunkt vor – ' + esc(U.coachName(c)) + ' und sein Stab setzen ihn um.' : esc(U.coachName(c)) + ' wählt den Schwerpunkt selbst. Tippen Sie auf eine Karte, um ihn vorzugeben.') +
       (c.trainingByUser ? ' <button class="sm" data-act="trainingToCoach">Wieder dem Trainer überlassen</button>' : '') + '</div>';
-    h += U.planPanel(st, c) + '<div class="sec-h">🏋️ Trainingsschwerpunkt <span class="ts" style="margin-left:auto">gilt jede Woche, bis Sie ihn ändern</span></div><div class="tiles big">';
-    var arrows = function (v) { return v === 0 ? '<span class="arr nu">●</span>' : '<span class="arr ' + (v > 0 ? 'up' : 'dn') + '">' + (v > 0 ? '▲' : '▼').repeat(Math.abs(v)) + '</span>'; };
+    var sq = W.squad(st, c.id), avgFit = Math.round(R.avg(sq, function (p) { return p.fitness; })), avgMor = Math.round(R.avg(sq, function (p) { return p.morale; })), injN = sq.filter(function (p) { return p.inj; }).length, suspN = sq.filter(function (p) { return p.susp > 0; }).length;
+    var col = function (v, lo, hi) { return v < lo ? 'var(--bad)' : v < hi ? 'var(--warn)' : 'var(--ok)'; };
+    h += '<div class="grid g4" style="margin-bottom:16px">' + U.ikpi('zap', 'Ø Frische', avgFit, '', U.bar(avgFit, 100, col(avgFit, 70, 85))) + U.ikpi('heart-pulse', 'Ø Moral', avgMor, '', U.bar(avgMor, 100, col(avgMor, 40, 60))) + U.ikpi('users', 'Teamchemie', Math.round(c.chemistry), '', U.bar(c.chemistry, 100, 'var(--act)')) +
+      U.ikpi('stethoscope', 'Ausfälle', injN + suspN, injN + suspN > 3 ? 'neg' : '', '<div class="small muted">' + injN + ' verletzt · ' + suspN + ' gesperrt</div>') + '</div>';
+    h += U.planPanel(st, c);
+    h += '<div class="sec-h">Trainingsschwerpunkt <span style="margin-left:auto">gilt jede Woche, bis Sie ihn ändern</span></div><div class="tr-cards">';
     Object.keys(D.training).forEach(function (k) {
-      var t = D.training[k];
-      h += '<div class="tile ' + (c.training === k ? 'on' : '') + (can ? '' : ' ro') + '" ' + (can ? 'data-act="setTraining" data-k="' + k + '"' : '') + '><div class="row-ic"><span class="ti" style="font-size:40px">' + t.ic + '</span><div><div class="tt" style="font-size:16px">' + t.n + '</div><div class="ts">' + (c.training === k ? '✔ aktiv' : 'Fördert: ' + t.attrs) + '</div></div></div>' +
-        '<div class="ts">' + t.d + '</div><div class="fx-row">' + Object.keys(D.trainingFx).map(function (f) { return '<div class="fx' + (f === 'inj' ? ' inv' : '') + '" title="' + D.trainingFx[f][1] + '"><b>' + D.trainingFx[f][0] + '</b>' + arrows(t.fx[f]) + ({ mor: 'Moral', fit: 'Fitness', fresh: 'Frische', inj: 'Verletz.', dev: 'Entwickl.' })[f] + '</div>'; }).join('') + '</div></div>';
+      var t = D.training[k], on = c.training === k, plus = [], minus = [];
+      Object.keys(FX_N).forEach(function (f) { var v = t.fx[f]; if (!v) return; var good = f === 'inj' ? v < 0 : v > 0; (good ? plus : minus).push('<span class="fx-chip ' + (good ? 'ok' : 'bad') + '">' + U.lc(v > 0 ? 'trending-up' : 'trending-down', 13) + FX_N[f] + (Math.abs(v) > 1 ? ' ++' : '') + '</span>'); });
+      h += '<div class="tr-card' + (on ? ' on' : '') + (can ? '' : ' ro') + '" ' + (can ? 'data-act="setTraining" data-k="' + k + '" tabindex="0" role="button"' : '') + '><div class="tr-top"><div class="ic-tile' + (on ? ' ok' : '') + '">' + U.lc(TR_IC[k], 22) + '</div><div><b>' + t.n + '</b><span>' + (t.attrs !== '–' ? 'Fördert: ' + t.attrs : 'Erholung statt Entwicklung') + '</span></div>' + (on ? '<span class="pill ok">' + U.lc('check', 13) + 'Aktiv</span>' : '') + '</div><p>' + t.d + '</p>' +
+        '<div class="fx-list">' + plus.join('') + minus.join('') + '</div></div>';
     });
-    var sq = W.squad(st, c.id);
-    h += '</div><p class="muted small" style="margin-top:8px">▲ steigt · ▼ sinkt · ● neutral. Bei der Verletzungsgefahr ist ▼ gut (grün). Trainingszentrum: <b>' + esc(E.level(c, 'training').n) + '</b> · Trainingsorganisation: <b>' + D.budgetLevels[c.budgets.trainorg] + '</b> · Trainer: <b>' + esc(U.coachName(c)) + '</b>' + (E.staffLvl(c, 'co') ? ' · Co-Trainer ' + U.stars(E.staffLvl(c, 'co'), 3) : '') + (E.staffLvl(c, 'fitness') ? ' · Fitnesstrainer ' + U.stars(E.staffLvl(c, 'fitness'), 3) : '') + '</p>';
-    var avgFit = Math.round(R.avg(sq, function (p) { return p.fitness; })), avgMor = Math.round(R.avg(sq, function (p) { return p.morale; })), injN = sq.filter(function (p) { return p.inj; }).length;
-    h += '<div class="grid g2" style="margin-top:14px"><div class="panel"><h2>Zustand der Mannschaft</h2><div class="grid g2">' + U.ikpi('energy', 'Ø Frische', avgFit, '', U.bar(avgFit, 100, avgFit < 70 ? '#ef4444' : avgFit < 85 ? '#f5b301' : '#22c55e')) + U.ikpi('heart', 'Ø Moral', avgMor, '', U.bar(avgMor, 100, '#a78bfa')) + U.ikpi('fans', 'Teamchemie', Math.round(c.chemistry), '', U.bar(c.chemistry)) + U.ikpi('heart', 'Verletzte', injN, injN > 3 ? 'neg' : '') + '</div></div>';
-    h += '<div class="panel"><h2>Trainingslager-Ziele</h2>' + D.camps.map(function (cp) { return '<div class="news-item"><div class="h">' + cp.name + ' – ' + money(cp.cost) + '</div><div class="tx">' + cp.desc + '</div></div>'; }).join('') + '<p class="muted small">Gebucht wird im Vorbereitungs- bzw. Winterpausenplan oben (je ein Trainingslager pro Pause, dauert eine Woche).</p></div></div>';
+    h += '</div>';
+    h += '<div class="sec-h">Trainingslager <span style="margin-left:auto">je Pause ein Lager, dauert eine Woche</span></div><div class="camp-cards">';
+    var weeks = S.planWeeks(st), canPlan = S.planOwnerIsUser(st) && U.can('business') || st.manager.role === 'manager', plan = st.plan || {};
+    var free = weeks.filter(function (w) { return !w.past && !w.cup && !plan[w.k]; })[0];
+    var booked = weeks.some(function (w) { return plan[w.k] && plan[w.k].type === 'camp'; });
+    D.camps.forEach(function (cp) {
+      var isBooked = weeks.some(function (w) { return plan[w.k] && plan[w.k].type === 'camp' && plan[w.k].camp === cp.id; });
+      var fx = [['Fitness', cp.fit], ['Moral', cp.mor], ['Teamchemie', cp.chem], ['Öffentlichkeit', cp.pr]].filter(function (x) { return x[1] > 0; });
+      h += '<div class="camp' + (isBooked ? ' on' : '') + '"><div class="camp-art">' + campArt(cp.id) + '<span class="camp-cost">' + money(cp.cost) + '</span></div><div class="camp-b"><b>' + cp.name + '</b><p>' + cp.desc + '</p><div class="camp-fx">' + fx.map(function (x) { return '<div><span>' + x[0] + '</span>' + U.bar(x[1] * 10, 100, 'var(--ok)') + '</div>'; }).join('') + '</div>' +
+        (isBooked ? '<span class="pill ok">' + U.lc('check', 13) + 'Eingeplant</span>' : canPlan && free && !booked ? '<button class="sm secondary" data-act="campPlan" data-k="' + cp.id + '" data-w="' + free.k + '">Einplanen (' + esc(free.n) + ')</button>' : '<span class="muted small">' + (weeks.length ? (booked ? 'Lager für diese Pause bereits gebucht' : 'Planung durch die Vereinsführung') : 'Buchbar in Vorbereitung und Winterpause') + '</span>') + '</div></div>';
+    });
+    h += '</div>';
     return h;
   };
+  U.acts.campPlan = function (d) { var r = S.setPlan(U.st, d.w, { type: 'camp', camp: d.k }); U.toast(r.ok ? 'Trainingslager eingeplant.' : r.why); U.render(); };
   U.acts.setTraining = function (d) { var c = U.club(); c.training = d.k; if (U.st.manager.role === 'gf') c.trainingByUser = true; U.render(); U.toast('Trainingsschwerpunkt: ' + D.training[d.k].n); };
   U.acts.trainingToCoach = function () { U.club().trainingByUser = false; S.aiCoachDuties(U.st, U.club()); U.render(); U.toast('Der Trainer entscheidet wieder selbst.'); };
   // Vorbereitungs-/Winterpausenplan: je Woche Training, Testspiel oder Trainingslager
@@ -458,20 +497,20 @@
     var can = S.planOwnerIsUser(st) && U.can('business') || st.manager.role === 'manager';
     var cur = S.isBreak(st) ? S.breakKey(st) : null, opps = S.friendlyOpponents(st, c), plan = st.plan || {};
     var title = weeks[0].k.charAt(0) === 'p' ? 'Saisonvorbereitung planen' : 'Winterpause planen';
-    var h = '<div class="panel" style="margin-bottom:14px"><div class="panel-h"><h2>🗓 ' + title + '</h2><span class="muted small">' + (can ? 'Planung: Sie (' + S.roleName(st.manager.role) + ')' : 'Planung: Vereinsführung') + '</span></div><table class="t plan-t"><tr><th>Woche</th><th>Programm</th><th></th></tr>';
+    var h = '<div class="panel" style="margin-bottom:16px"><div class="panel-h"><h2>' + U.lc('calendar', 17) + ' ' + title + '</h2><span class="muted small">' + (can ? 'Planung: Sie (' + S.roleName(st.manager.role) + ')' : 'Planung: Vereinsführung') + '</span></div><table class="t plan-t"><tr><th>Woche</th><th>Programm</th><th></th></tr>';
     weeks.forEach(function (w) {
       var it = plan[w.k], past = w.past || (it && it.done), now = cur === w.k;
-      var desc = w.cup ? '🏆 1. Pokalrunde' + (it && it.type === 'camp' ? ' + ' : '') : '';
-      if (it && it.type === 'test') { var o = st.clubs[it.opp]; desc += '⚽ Testspiel ' + (it.home ? 'gegen ' : 'bei ') + (o ? esc(o.name) : '?') + (o ? ' <span class="muted small">(' + D.leagueNames[o.league] + ')</span>' : ''); }
-      else if (it && it.type === 'camp') { var cp = D.camps.filter(function (x) { return x.id === it.camp; })[0]; desc += '🏕 Trainingslager ' + (cp ? cp.name + ' (' + money(cp.cost) + ')' : ''); }
-      else if (!w.cup) desc = '<span class="muted">🏋️ Nur Training</span>';
+      var desc = w.cup ? '<span class="plan-ev cup">' + U.lc('trophy', 14) + '1. Pokalrunde</span>' + (it && it.type === 'camp' ? ' ' : '') : '';
+      if (it && it.type === 'test') { var o = st.clubs[it.opp]; desc += '<span class="plan-ev test">' + U.lc('flag', 14) + 'Testspiel</span> ' + (it.home ? 'gegen ' : 'bei ') + (o ? esc(o.name) : '?') + (o ? ' <span class="muted small">(' + D.leagueNames[o.league] + ')</span>' : ''); }
+      else if (it && it.type === 'camp') { var cp = D.camps.filter(function (x) { return x.id === it.camp; })[0]; desc += '<span class="plan-ev camp">' + U.lc('tent', 14) + 'Trainingslager</span> ' + (cp ? cp.name + ' (' + money(cp.cost) + ')' : ''); }
+      else if (!w.cup) desc = '<span class="plan-ev">' + U.lc('dumbbell', 14) + 'Training</span>';
       var ctrl = '';
       if (can && !past) {
         ctrl = '<select data-chg="planSet" data-k="' + w.k + '"><option value="">Nur Training</option>' +
           (w.cup ? '' : '<optgroup label="Testspiel (Heim)">' + opps.map(function (o) { return '<option value="test:' + o.id + ':1"' + (it && it.type === 'test' && it.opp === o.id && it.home ? ' selected' : '') + '>' + esc(o.short) + ' · ' + D.leagueNames[o.league] + '</option>'; }).join('') + '</optgroup><optgroup label="Testspiel (Auswärts)">' + opps.map(function (o) { return '<option value="test:' + o.id + ':0"' + (it && it.type === 'test' && it.opp === o.id && !it.home ? ' selected' : '') + '>bei ' + esc(o.short) + '</option>'; }).join('') + '</optgroup>') +
           '<optgroup label="Trainingslager">' + D.camps.map(function (cp) { return '<option value="camp:' + cp.id + '"' + (it && it.type === 'camp' && it.camp === cp.id ? ' selected' : '') + '>' + cp.name + ' · ' + money(cp.cost) + '</option>'; }).join('') + '</optgroup></select>';
       }
-      h += '<tr class="' + (now ? 'plan-now' : past ? 'muted' : '') + '"><td>' + (now ? '▶ ' : past ? '✓ ' : '') + esc(w.n) + '</td><td>' + desc + '</td><td class="num">' + ctrl + '</td></tr>';
+      h += '<tr class="' + (now ? 'plan-now' : past ? 'muted' : '') + '"><td>' + (now ? '<span class="pill act">Jetzt</span> ' : past ? U.lc('check', 14) + ' ' : '') + esc(w.n) + '</td><td>' + desc + '</td><td class="num">' + ctrl + '</td></tr>';
     });
     h += '</table><p class="muted small" style="margin-top:6px">Testspiele bringen Spielpraxis und Teamchemie (keine Tabellen, keine Sperren, kleine Einnahme bei Heimspielen). Trainingslager stärken Fitness, Moral und Teamchemie. Ungeplante Wochen sind reine Trainingswochen.</p></div>';
     return h;
@@ -490,16 +529,16 @@
     opts = opts || {};
     var st = U.st, c = U.club(), f = D.facilities[key], lvl = c.fac[key] != null ? c.fac[key] : (f.min || 0), cur = f.levels[lvl], max = f.levels.length - 1;
     var pv = E.buildPreview(st, c, key), can = E.canBuild(st, c, key), b = c.construction.filter(function (x) { return x.key === key; })[0];
-    var h = '<div class="panel"><div class="panel-h"><h3>' + f.name + '</h3><span class="tag">Stufe ' + lvl + '/' + max + '</span></div><div><b>' + esc(cur ? cur.n : '—') + '</b>' + (cur && cur.up ? ' <span class="muted small">· Unterhalt ' + money(cur.up) + '/Saison</span>' : '') + '</div>';
+    var h = '<div class="panel"><div class="panel-h"><h3>' + f.name + '</h3><span class="tag">Stufe ' + lvl + '/' + max + (b && U.siteIcon ? ' ' + U.siteIcon('Im Bau') : '') + '</span></div><div><b>' + esc(cur ? cur.n : '—') + '</b>' + (cur && cur.up ? ' <span class="muted small">· Unterhalt ' + money(cur.up) + '/Saison</span>' : '') + '</div>';
     if (opts.extra) h += opts.extra;
-    if (b) h += '<div class="small warn" style="margin-top:8px">🏗️ Im Bau: ' + esc(f.levels[b.to].n) + ' – noch ' + b.weeks + ' Wochen</div>' + U.bar(b.total - b.weeks, b.total, '#f5b301');
+    if (b) h += '<div class="small warn" style="margin-top:8px">' + U.lc('construction', 15) + ' Im Bau: ' + esc(f.levels[b.to].n) + ' – noch ' + b.weeks + ' Wochen</div>' + U.bar(b.total - b.weeks, b.total, '#f5b301');
     else if (pv) {
       h += '<div class="small" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">Nächste Stufe: <b>' + esc(pv.name) + '</b><table class="t small"><tr><td>Investition</td><td class="num">' + money(pv.cost) + (pv.subsidy ? ' <span class="pos">(Zuschuss ' + money(pv.subsidy) + ')</span>' : '') + '</td></tr><tr><td>Bauzeit</td><td class="num">' + pv.weeks + ' Wochen</td></tr>' +
         (pv.addRev ? '<tr><td>Zus. Einnahmen</td><td class="num pos">+' + money(pv.addRev) + '/J.</td></tr>' : '') + '<tr><td>Zus. Kosten</td><td class="num neg">−' + money(pv.addCost) + '/J.</td></tr>' +
         (pv.addRev ? '<tr><td>Überschuss</td><td class="num ' + (pv.surplus >= 0 ? 'pos' : 'neg') + '">' + money(pv.surplus) + '/J.</td></tr><tr><td>Amortisation</td><td class="num">' + (pv.payback ? 'ca. ' + pv.payback.toFixed(1).replace('.', ',') + ' Jahre' : 'nicht rentabel') + '</td></tr>' : '') + '</table>' +
         (opts.effect ? '<div class="muted small">' + opts.effect + '</div>' : '') +
         (U.can('business') ? '<button class="primary sm" style="margin-top:6px" data-act="build" data-k="' + key + '"' + (can.ok ? '' : ' disabled title="' + esc(can.why) + '"') + '>Ausbauen</button>' + (!can.ok ? ' <span class="muted small">' + esc(can.why) + '</span>' : '') : '') + '</div>';
-    } else h += '<div class="pos small" style="margin-top:8px">✔ Höchste Ausbaustufe erreicht</div>';
+    } else h += '<div class="pos small" style="margin-top:8px">' + U.lc('check', 14) + ' Höchste Ausbaustufe erreicht</div>';
     return h + '</div>';
   };
   U.acts.build = function (d) {
@@ -510,19 +549,67 @@
     });
   };
 
+  // ---------- Gebäudeansichten (NLZ, Medizin): 3D aus dem Campusmodell, Stufenvergleich, Ausbaupanel ----------
+  // Werte je Stufe aus der Spiellogik (season.js / world.js / transfers.js) – keine neuen Boni
+  U.youthFx = function (l, c) { var q = l - 1; return [
+    ['users', 'Talente pro Jahrgang', 2 + (q >= 2 ? 1 : 0) + (q >= 4 ? 1 : 0) + (c && c.budgets.scouting === 2 ? 1 : 0)],
+    ['trending-up', 'Entwicklungstempo', '+' + Math.round(q * 0.12 / 0.75 * 100) + ' %'],
+    ['star', 'Talentqualität (Startstärke)', '+' + q * 4],
+    ['sparkles', 'Chance auf Ausnahmetalent', 4 + q * 2 + ' %']]; };
+  U.medFx = function (l) { var q = l - 1; return [
+    ['shield', 'Verletzungsprävention', q ? '−' + q * 6 + ' %' : '±0 %'],
+    ['timer', 'Kürzere Ausfallzeiten', q ? '−' + q * 6 + ' %' : '±0 %'],
+    ['refresh-cw', 'Regeneration pro Woche', '+' + (q * 1.5).toFixed(1).replace('.', ',')],
+    ['scan-search', 'Medizincheck', q >= 1 ? Math.round((0.35 + q * 0.13) * 100) + ' % zuverlässig' : 'nicht verfügbar']]; };
+  U.buildingStage = function (key, o) {
+    var st = U.st, c = U.club(), f = D.facilities[key], lvl = c.fac[key] != null ? c.fac[key] : (f.min || 0), max = f.levels.length - 1, cur = f.levels[lvl];
+    var pv = E.buildPreview(st, c, key), can = E.canBuild(st, c, key), b = c.construction.filter(function (x) { return x.key === key; })[0];
+    var S3 = R.s3d, SM = R.stadiumModel, m = SM.build(c), blds = SM.city(c), seg = '';
+    for (var i = 1; i <= max; i++) seg += '<i class="' + (i <= lvl ? 'on' : '') + '"></i>';
+    var h = '<div class="page-h"><div><h1 class="row" style="gap:10px"><span class="ic-tile ok">' + U.lc(o.icon, 20) + '</span>' + o.title + '</h1><div class="page-sub">' + o.sub + '</div></div><div class="lvl-pill"><span>Aktuelle Stufe ' + lvl + '/' + max + '</span><span class="lvlbar big">' + seg + (b ? U.siteIcon('Im Bau: Stufe ' + b.to + ' - noch ' + b.weeks + ' Wo.') : '') + '</span></div></div>';
+    // Großansicht: dieselbe Szene wie die Vereinsstadt, Kamera am Bauplatz
+    var view = S3 ? S3.host('bld-' + key, { kind: 'world', model: m, buildings: blds, cam: 'focus', focus: { key: key }, interactive: true, ratio: '16/9', labels: [{ x: SM.CITY_SLOTS[key].x, y: SM.CITY_SLOTS[key].y, bld: key, html: '<b>' + esc(f.name) + '</b><span>Stufe ' + lvl + '/' + max + ' · ' + esc(cur.n) + '</span>' }], fallback: '' }) : '';
+    h += '<div class="bld-top"><div class="panel tight bld-view">' + view + '</div><div class="panel bld-side">';
+    if (b) {
+      h += '<h2>' + U.lc('construction', 17) + ' Im Bau: Stufe ' + b.to + '</h2><p><b>' + esc(f.levels[b.to].n) + '</b></p><div class="row between small"><span class="muted">Fertig in</span><b>' + b.weeks + ' Wochen</b></div>' + U.bar(b.total - b.weeks, b.total, 'var(--warn)') +
+        '<div class="sub-h">Wirkung nach Fertigstellung</div>' + fxList(o.fx(b.to, c), o.fx(lvl, c));
+    } else if (pv) {
+      var nl = lvl + 1;
+      h += '<h2>' + U.lc('arrow-up-right', 17) + ' Ausbau auf Stufe ' + nl + '</h2><p class="bld-next">' + esc(f.levels[nl].n) + '</p>' + fxList(o.fx(nl, c), o.fx(lvl, c)) +
+        '<div class="bld-cost"><div><span>Investition</span><b>' + money(pv.cost) + '</b>' + (pv.subsidy ? '<small class="pos">Zuschuss ' + money(pv.subsidy) + '</small>' : '') + '</div><div><span>Bauzeit</span><b>' + pv.weeks + ' Wochen</b></div><div><span>Laufende Kosten</span><b>' + money(f.levels[nl].up) + '<small>/Saison</small></b><small class="neg">+' + money(pv.addCost) + '</small></div></div>' +
+        '<div class="bld-prev">' + (S3 ? S3.snapHost({ kind: 'focus', model: m, cam: 'focus', focus: { key: key, level: nl } }) : '') + '<span class="imp-tag">Vorschau Stufe ' + nl + '</span></div>' +
+        (U.can('business') ? '<button class="primary big-build" data-act="build" data-k="' + key + '"' + (can.ok ? '' : ' disabled title="' + esc(can.why) + '"') + '>' + U.lc('hammer', 17) + 'Ausbauen · ' + money(pv.cost) + '</button>' + (!can.ok ? '<div class="muted small" style="margin-top:6px">' + esc(can.why) + '</div>' : '') : '<p class="muted small">Ausbauten entscheidet die Geschäftsführung.</p>');
+    } else h += '<h2>' + U.lc('trophy', 17) + ' Höchste Ausbaustufe</h2><p class="bld-next">' + esc(cur.n) + '</p>' + fxList(o.fx(lvl, c)) + '<p class="muted small">Weiter geht es nicht – das ist die Spitze.</p>';
+    h += '</div></div>';
+    // Stufenvergleich: jede Stufe aus demselben Gebäudemodell gerendert
+    h += '<div class="sec-h">' + U.lc('layers', 17) + ' Ausbaustufen <span style="margin-left:auto">' + max + ' Stufen · laufende Kosten aktuell ' + money(cur.up) + '/Saison</span></div><div class="lvl-cards" style="--n:' + max + '">';
+    for (var l = 1; l <= max; l++) {
+      var Lv = f.levels[l], st8 = l === lvl ? 'cur' : l < lvl ? 'done' : l === lvl + 1 ? 'next' : '';
+      h += '<div class="lvl-card ' + st8 + '">' + (S3 ? S3.snapHost({ kind: 'focus', model: m, cam: 'focus', focus: { key: key, level: l } }) : '') + '<span class="lvl-no">Stufe ' + l + '</span>' + (l === lvl ? '<span class="lvl-tag">Aktuell</span>' : l === lvl + 1 ? '<span class="lvl-tag next">Nächste Stufe</span>' : '') +
+        '<div class="lvl-b"><b>' + esc(Lv.n) + '</b><span>' + esc(o.cardStat(l, c)) + '</span><small>' + (Lv.cost ? 'Bau ' + money(Lv.cost) + ' · ' : 'Grundausstattung · ') + money(Lv.up) + '/Saison</small></div></div>';
+    }
+    h += '</div>';
+    return h;
+    function fxList(now, before) {
+      return '<div class="fx-rows">' + now.map(function (r, i) { var changed = before && String(before[i][2]) !== String(r[2]); return '<div class="fx-r">' + U.lc(r[0], 15) + '<span>' + r[1] + '</span><b class="' + (changed ? 'pos' : '') + '">' + r[2] + (changed ? ' <small class="muted">(bisher ' + before[i][2] + ')</small>' : '') + '</b></div>'; }).join('') + '</div>';
+    }
+  };
+
   // ---------- Nachwuchs ----------
   U.screens.nachwuchs = function () {
     var st = U.st, c = U.club(), youth = W.youthOf(st, c.id);
-    var h = '<h1>Nachwuchsleistungszentrum</h1><div class="grid g12"><div class="grid">' + U.facilityCard('jugend', { effect: 'Höhere Stufen: bessere Talente, schnellere Entwicklung, mehr Talente pro Jahrgang.' }) +
-      '<div class="panel"><h2>Info</h2><p class="small">Jedes Jahr zum Saisonwechsel kommen neue Talente (16–18 Jahre). Mit 21 müssen sie in den Profikader übernommen werden oder gehen. Scouting-Budget „Premium“ bringt ein zusätzliches Talent.</p><p class="small">Selbst ausgebildete Spieler sind mit 🌱 markiert.</p></div></div>';
-    h += '<div class="panel tight"><div style="padding:12px 14px 0"><h2>Jugendspieler (' + youth.length + ')</h2></div>' + U.table('youth', [
-      { k: 'last', l: 'Name', f: function (p) { return esc(W.playerName(p)); } }, { k: 'pos', l: 'Pos', f: function (p) { return U.posTag(p.pos); } }, { k: 'age', l: 'Alter', num: true },
-      { k: 'ovr', l: 'Stärke', num: true, f: function (p) { return U.ovrBadge(p.ovr); } }, { k: 'pot', l: 'Potenzial', num: true, f: function (p) { return U.ovrBadge(p.pot); } },
-      { k: 'x', l: '', nosort: true, f: function (p) { return U.canYouth() ? '<button class="sm primary" data-act="promoteYouth" data-id="' + p.id + '">In die 1. Mannschaft …</button>' : ''; } }
-    ], youth, { click: 'playerInfo', sort: { k: 'pot', d: -1 } }) + '</div>';
+    var h = U.buildingStage('jugend', { icon: 'graduation-cap', title: 'Nachwuchsleistungszentrum', sub: 'Talentförderung · Ausbildung · Profis von morgen', fx: U.youthFx, cardStat: function (l, cc) { return U.youthFx(l, cc)[0][2] + ' Talente/Jahr · Tempo ' + U.youthFx(l, cc)[1][2]; } });
+    var avgPot = youth.length ? Math.round(R.avg(youth, function (p) { return p.pot; })) : 0, best = youth.slice().sort(function (a, b) { return b.pot - a.pot; })[0];
+    h += '<div class="grid g4" style="margin:4px 0 16px">' + U.ikpi('users', 'Nachwuchsspieler', youth.length) + U.ikpi('trending-up', 'Ø Potenzial', youth.length ? avgPot : '–', '', best ? '<div class="small muted">Top: ' + esc(W.playerName(best)) + ' (' + best.pot + ')</div>' : '') +
+      U.ikpi('scan-search', 'Scouting', D.budgetLevels[c.budgets.scouting], '', '<div class="small muted">' + (c.budgets.scouting === 2 ? '+1 Talent je Jahrgang' : 'Premium: +1 Talent je Jahrgang') + '</div>') + U.ikpi('coins', 'Laufende Kosten', money(E.level(c, 'jugend').up) + '<small class="muted">/Saison</small>') + '</div>';
+    h += '<div class="panel tight"><div class="panel-h" style="padding:14px 16px 0"><h2>' + U.lc('users', 17) + ' Jugendspieler (' + youth.length + ')</h2><span class="muted small">Neue Talente zum Saisonwechsel · mit 21 Übernahme oder Abschied</span></div>' + (youth.length ? U.table('youth', [
+      { k: 'last', l: 'Name', f: function (p) { return '<b>' + esc(W.playerName(p)) + '</b>'; } }, { k: 'pos', l: 'Pos', f: function (p) { return U.posTag(p.pos); } }, { k: 'age', l: 'Alter', num: true },
+      { k: 'ovr', l: 'Stärke', num: true, f: function (p) { return U.ovrBadge(p.ovr); } },
+      { k: 'pot', l: 'Potenzial', v: function (p) { return p.pot; }, f: function (p) { return '<div class="pot-cell"><span>' + p.pot + '</span><div class="pot-bar"><i style="width:' + p.ovr + '%"></i><em style="left:' + p.ovr + '%;width:' + Math.max(0, p.pot - p.ovr) + '%"></em></div></div>'; } },
+      { k: 'x', l: '', nosort: true, f: function (p) { return U.canYouth() ? '<button class="sm secondary" data-act="promoteYouth" data-id="' + p.id + '">' + U.lc('arrow-up-right', 14) + 'In den Profikader</button>' : ''; } }
+    ], youth, { click: 'playerInfo', sort: { k: 'pot', d: -1 } }) : '<div style="padding:16px">' + U.empty('graduation-cap', 'Aktuell keine Jugendspieler. Der nächste Jahrgang kommt zum Saisonwechsel.') + '</div>') + '</div>';
     var trial = W.squad(st, c.id).filter(function (p) { return p.trial; });
-    if (trial.length) h += '<div class="panel" style="margin-top:14px"><h2>🧪 Zur Probe bei den Profis (' + trial.length + ')</h2>' + trial.map(function (p) { var left = Math.max(0, p.trial.until - (st.tick || 0)); return '<div class="news-item row between"><div><div class="h">' + esc(W.playerName(p)) + ' (' + p.pos + ', ' + p.age + ' J., ' + p.ovr + '/' + p.pot + ')</div><div class="tx">noch ' + left + ' Woche' + (left === 1 ? '' : 'n') + ' Probezeit</div></div>' + (U.canYouth() ? '<div class="row"><button class="sm primary" data-act="promoteYouth" data-id="' + p.id + '">Profivertrag …</button><button class="sm" data-act="youthBack" data-id="' + p.id + '">Zurück</button></div>' : '') + '</div>'; }).join('') + '</div>';
-    h += '</div>';
+    if (trial.length) h += '<div class="panel" style="margin-top:14px"><h2>' + U.lc('timer', 17) + ' Zur Probe bei den Profis (' + trial.length + ')</h2>' + trial.map(function (p) { var left = Math.max(0, p.trial.until - (st.tick || 0)); return '<div class="msg"><div class="msg-b"><b>' + esc(W.playerName(p)) + ' <span class="muted">(' + p.pos + ', ' + p.age + ' J., ' + p.ovr + '/' + p.pot + ')</span></b><span>noch ' + left + ' Woche(n) Probezeit</span></div>' + (U.canYouth() ? '<button class="sm primary" data-act="promoteYouth" data-id="' + p.id + '">Profivertrag …</button><button class="sm" data-act="youthBack" data-id="' + p.id + '">Zurück in die Jugend</button>' : '') + '</div>'; }).join('') + '</div>';
     return h;
   };
 
@@ -530,15 +617,18 @@
   U.screens.medizin = function () {
     var st = U.st, c = U.club(), lvl = c.fac.medizin || 1;
     var inj = W.squad(st, c.id).filter(function (p) { return p.inj; }).concat(W.youthOf(st, c.id).filter(function (p) { return p.inj; }));
-    var q = E.level(c, 'medizin').q;
-    var h = '<h1>Medizinische Abteilung</h1>' + (U.gfx.medView ? '<div style="margin-bottom:14px">' + U.gfx.medView(c) + '</div>' : '') + '<div class="grid g12"><div class="grid">' + U.facilityCard('medizin', { extra: D.medicalQuotes[lvl] ? '<p class="muted" style="font-style:italic">' + D.medicalQuotes[lvl] + '</p>' : '', effect: 'Bessere Prävention, schnellere Heilung und zuverlässigere Medizinchecks bei Transfers (ab Stufe 2).' }) +
-      '<div class="panel"><h2>Wirkung</h2><table class="t small"><tr><td>Verletzungsprävention</td><td class="num">−' + Math.round(q * 6) + ' %</td></tr><tr><td>Kürzere Ausfallzeiten</td><td class="num">−' + Math.round(q * 6) + ' %</td></tr><tr><td>Regeneration pro Woche</td><td class="num">+' + (q * 1.5).toFixed(1) + '</td></tr><tr><td>Medizincheck</td><td class="num">' + (q >= 1 ? Math.round((0.35 + q * 0.13) * 100) + ' % zuverlässig' : 'nicht verfügbar') + '</td></tr></table><p class="muted small">Der Begriff „Schamane“ ist humorvoll gemeint – die Berechnungen bleiben realistisch. Schwere Verletzungen heilen nie sofort.</p></div></div>';
-    h += '<div class="panel tight"><div style="padding:12px 14px 0"><h2>Verletzte Spieler (' + inj.length + ')</h2></div>' + U.table('inj', [
-      { k: 'last', l: 'Spieler', f: function (p) { return esc(W.playerName(p)); } }, { k: 'pos', l: 'Pos', f: function (p) { return U.posTag(p.pos); } },
+    var h = U.buildingStage('medizin', { icon: 'stethoscope', title: 'Medizinische Abteilung', sub: 'Prävention · Behandlung · Regeneration' + (D.medicalQuotes[lvl] ? ' — <i>' + D.medicalQuotes[lvl] + '</i>' : ''), fx: U.medFx, cardStat: function (l) { var fx = U.medFx(l); return 'Ausfallzeit ' + fx[1][2] + ' · Check ' + (l > 1 ? fx[3][2].replace(' zuverlässig', '') : '–'); } });
+    var fx = U.medFx(lvl), heavy = inj.filter(function (p) { return p.inj.weeks >= 6; }).length;
+    h += '<div class="grid g4" style="margin:4px 0 16px">' + fx.map(function (r, i) { return U.ikpi(r[0], r[1], r[2], i < 2 && lvl > 1 ? 'pos' : ''); }).join('') + '</div>';
+    h += '<div class="grid g21"><div class="panel tight"><div class="panel-h" style="padding:14px 16px 0"><h2>' + U.lc('heart-pulse', 17) + ' Verletzte Spieler (' + inj.length + ')</h2>' + (heavy ? '<span class="pill bad">' + heavy + ' längerfristig</span>' : '') + '</div>' + (inj.length ? U.table('inj', [
+      { k: 'last', l: 'Spieler', f: function (p) { return '<b>' + esc(W.playerName(p)) + '</b>'; } }, { k: 'pos', l: 'Pos', f: function (p) { return U.posTag(p.pos); } },
       { k: 'type', l: 'Diagnose', v: function (p) { return p.inj.type; }, f: function (p) { return esc(p.inj.type); } },
-      { k: 'w', l: 'Ausfall', num: true, v: function (p) { return p.inj.weeks; }, f: function (p) { return p.inj.weeks + ' Wo.'; } },
-      { k: 'pr', l: 'Heilung', v: function (p) { return 1 - p.inj.weeks / p.inj.total; }, f: function (p) { return U.bar(p.inj.total - p.inj.weeks, p.inj.total); } }
-    ], inj, { click: 'playerInfo' }) + '</div></div>';
+      { k: 'w', l: 'Ausfall', num: true, v: function (p) { return p.inj.weeks; }, f: function (p) { return '<span class="' + (p.inj.weeks >= 6 ? 'neg' : '') + '">' + p.inj.weeks + ' Wo.</span>'; } },
+      { k: 'pr', l: 'Heilungsverlauf', v: function (p) { return 1 - p.inj.weeks / p.inj.total; }, f: function (p) { var pc = Math.round((p.inj.total - p.inj.weeks) / p.inj.total * 100); return '<div class="pot-cell"><span>' + pc + ' %</span>' + U.bar(pc, 100, 'var(--ok)') + '</div>'; } }
+    ], inj, { click: 'playerInfo' }) : '<div style="padding:16px">' + U.empty('heart-pulse', 'Keine verletzten Spieler – der Kader ist komplett fit.') + '</div>') + '</div>';
+    h += '<div class="panel"><h2>' + U.lc('scan-search', 17) + ' Medizincheck bei Transfers</h2><p class="small">' + (lvl >= 2 ? 'Vor jedem Wechsel untersucht Ihr Team den Spieler. Zuverlässigkeit derzeit <b>' + fx[3][2].replace(' zuverlässig', '') + '</b>: Vorerkrankungen und Verletzungsrisiken werden so mit hoher Wahrscheinlichkeit erkannt.' : 'Ab Stufe 2 (Vereinsarzt) können Spieler vor einem Transfer untersucht werden. Der Vereinsschamane schaut nur tief in die Augen.') + '</p>' +
+      '<div class="sub-h">Medizinische Leistungsfähigkeit</div>' + U.bar(lvl, 6, 'var(--ok)') + '<div class="row between small" style="margin-top:4px"><span class="muted">' + esc(E.level(c, 'medizin').n) + '</span><b>Stufe ' + lvl + '/6</b></div>' +
+      '<p class="muted small" style="margin-top:10px">Der Begriff „Schamane“ ist humorvoll gemeint – die Berechnungen bleiben realistisch. Schwere Verletzungen heilen nie sofort.</p></div></div>';
     return h;
   };
 })(RFM);

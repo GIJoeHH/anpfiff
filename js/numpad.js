@@ -8,9 +8,11 @@
 
   function fmt(v) { return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
   function isMoney(el) { return el.hasAttribute('data-money') || (+el.getAttribute('step') || 0) >= 1000 || /Amt$|^feeIn$|^wIn$|^sIn$|^bIn$/.test(el.id || ''); }
+  function isUnits(el) { return el.hasAttribute('data-units'); } // große Stückzahlen (z. B. Aktien): Tsd./Mio. ohne €
   function hintText(el) {
     var v = +el.value || 0;
     if (!v) return '';
+    if (isUnits(el)) return '= ' + fmt(v) + ' Stück' + (Math.abs(v) >= 1000000 ? ' · ' + (v / 1e6).toFixed(2).replace('.', ',') + ' Mio.' : '');
     return '= ' + fmt(v) + ' €' + (Math.abs(v) >= 10000 ? ' · ' + R.fmtMoney(v) : '');
   }
   function updHint(el) { var h = el._hint; if (h) h.textContent = hintText(el); }
@@ -19,7 +21,7 @@
     for (var i = 0; i < list.length; i++) {
       var el = list[i];
       if (el._np) continue; el._np = true;
-      if (isMoney(el)) {
+      if (isMoney(el) || isUnits(el)) {
         var h = document.createElement('span'); h.className = 'num-hint';
         el.insertAdjacentElement('afterend', h); el._hint = h; updHint(el);
         el.addEventListener('input', function () { updHint(this); });
@@ -43,15 +45,16 @@
   function render() {
     var money = target && isMoney(target), v = value();
     pad.querySelector('.np-v').textContent = buf === '' ? '0' : fmt(v);
-    pad.querySelector('.np-u').textContent = money ? (Math.abs(v) >= 10000 ? R.fmtMoney(v) : '€') : '';
+    pad.querySelector('.np-u').textContent = money ? (Math.abs(v) >= 10000 ? R.fmtMoney(v) : '€') : target && isUnits(target) ? 'Stück' : '';
     pad.querySelector('[data-np=tsd]').classList.toggle('on', mult === 1000);
     pad.querySelector('[data-np=mio]').classList.toggle('on', mult === 1000000);
   }
   function open(el) {
     target = el; mult = 1;
     var v = +el.value || 0;
-    if (isMoney(el) && v && v % 1000000 === 0) { mult = 1000000; buf = String(v / 1000000); }
-    else if (isMoney(el) && v && v % 1000 === 0) { mult = 1000; buf = String(v / 1000); }
+    var big = isMoney(el) || isUnits(el);
+    if (big && v && v % 1000000 === 0) { mult = 1000000; buf = String(v / 1000000); }
+    else if (big && v && v % 1000 === 0) { mult = 1000; buf = String(v / 1000); }
     else buf = v ? String(v) : '';
     if (!pad) {
       pad = document.createElement('div'); pad.id = 'numpad';
@@ -76,9 +79,9 @@
         render();
       });
     }
-    var money = isMoney(el);
-    pad.querySelector('.np-mul').style.display = money ? '' : 'none';
-    pad.querySelector('[data-np=","]').style.visibility = money ? '' : 'hidden';
+    var money = isMoney(el), big = money || isUnits(el);
+    pad.querySelector('.np-mul').style.display = big ? '' : 'none';
+    pad.querySelector('[data-np=","]').style.visibility = big ? '' : 'hidden';
     pad.querySelector('.np-t').textContent = label(el);
     pad.style.display = 'flex';
     render();

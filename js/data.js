@@ -120,7 +120,7 @@
       L('Holzbänke', 0, 0, 5000, { cap: 500 }), L('Kleine Sitztribüne', 400000, 5, 25000, { cap: 2500 }), L('Haupttribüne', 1500000, 9, 70000, { cap: 6000 }),
       L('Zwei Sitztribünen', 4500000, 14, 160000, { cap: 12000 }), L('Rundum-Sitzplätze', 10000000, 22, 320000, { cap: 20000 }), L('Großarena', 20000000, 32, 560000, { cap: 32000 }), L('Weltklasse-Arena', 35000000, 44, 900000, { cap: 45000 })] },
     dach: { name: 'Überdachung', group: 'stadion', levels: [
-      L('Keine Überdachung', 0, 0, 0, { att: 0 }), L('Haupttribüne überdacht', 500000, 6, 20000, { att: 5 }), L('Drei Seiten überdacht', 2000000, 12, 60000, { att: 10 }), L('Komplett überdacht', 6000000, 20, 140000, { att: 15 })] },
+      L('Keine Überdachung', 0, 0, 0, { att: 0 }), L('Haupttribüne überdacht', 500000, 6, 20000, { att: 5 }), L('Drei Seiten überdacht', 2000000, 12, 60000, { att: 10 }), L('Komplett überdacht', 6000000, 20, 140000, { att: 15 }), L('Schließbares Dach', 25000000, 30, 260000, { att: 17 })] },
     vip: { name: 'VIP-Logen', group: 'stadion', levels: [
       L('Keine Logen', 0, 0, 0, { vip: 0 }), L('4 Logen', 300000, 4, 20000, { vip: 48 }), L('10 Logen', 1000000, 8, 50000, { vip: 120 }), L('24 Logen', 3000000, 12, 120000, { vip: 300 }), L('48 Logen', 7000000, 18, 250000, { vip: 600 }), L('80 Logen + Business-Club', 14000000, 26, 450000, { vip: 1000 })] },
     licht: { name: 'Flutlicht', group: 'stadion', levels: [

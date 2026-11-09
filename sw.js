@@ -1,8 +1,9 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = '84af96e717';
+const VERSION = '71bb024843';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
+  './design.css',
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -14,6 +15,7 @@ const CORE = [
   './js/deals.js',
   './js/economy.js',
   './js/editor.js',
+  './js/icons.js',
   './js/match.js',
   './js/numpad.js',
   './js/save.js',
@@ -39,6 +41,9 @@ const CORE = [
   './js/world.js',
   './manifest.webmanifest',
   './style.css',
+  './vendor/LICENSE-lucide.txt',
+  './vendor/fonts/LICENSE-Inter.txt',
+  './vendor/fonts/inter-latin-var.woff2',
   './vendor/three.min.js',
 ];
 self.addEventListener('install', e => {

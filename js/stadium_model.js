@@ -15,13 +15,13 @@
     pitchL: 105, pitchW: 68,
     Lx: 54, Iy: 40,   // Längsseiten: halbe Länge, Abstand Vorderkante zur Mittellinie
     Ly: 36, Ix: 60,   // Hintertor: halbe Breite, Abstand Vorderkante
-    TD: [12, 11, 11], // Tiefe je Rang
+    TD: [12, 11, 11, 13], // Tiefe je Rang
     rake: 0.48, band: 3.2, base: 1.0, // Neigung, Logen-/Umlaufband zwischen Rängen, Höhe Vorderkante
     arcSeg: 10, roofOver: 4, roofGap: 5
   };
-  G.CD = [0, G.TD[0], G.TD[0] + G.TD[1], G.TD[0] + G.TD[1] + G.TD[2]];
+  G.CD = [0]; for (var c0 = 0; c0 < G.TD.length; c0++) G.CD.push(G.CD[c0] + G.TD[c0]);
   G.HIN = [G.base];
-  for (var i = 1; i < 3; i++) G.HIN[i] = G.HIN[i - 1] + G.TD[i - 1] * G.rake + G.band;
+  for (var i = 1; i < G.TD.length; i++) G.HIN[i] = G.HIN[i - 1] + G.TD[i - 1] * G.rake + G.band;
   SM.AREAS = ['N', 'S', 'W', 'E', 'NW', 'NE', 'SW', 'SE'];
   SM.CORNERS = ['NW', 'NE', 'SW', 'SE'];
   SM.AREA_NAMES = { N: 'Nordtribüne', S: 'Südtribüne', W: 'Westtribüne', E: 'Osttribüne', NW: 'Ecke Nordwest', NE: 'Ecke Nordost', SW: 'Ecke Südwest', SE: 'Ecke Südost' };
@@ -110,6 +110,9 @@
     SP.SECTORS.forEach(function (s) { var x = m.sectors[s.id]; x.roof = !!(m.roof[x.area] && x.tiers.length); });
     var roofTop = 0; SP.SECTORS.forEach(function (s) { var x = m.sectors[s.id]; if (x.roof) roofTop = Math.max(roofTop, x.top); });
     m.roofH = roofTop ? r1(roofTop + G.roofGap) : 0;
+    // Schließbares Dach (Ausbaustufe 4): nur bei umlaufendem Dach; Zustand offen/geschlossen ist rein optisch und wird im Plan gespeichert
+    m.retract = !!(dl >= 4 && m.roofH && SM.AREAS.every(function (a) { return m.roof[a] || !m.areas[a].built; }));
+    m.roofClosed = !!(m.retract && plan.roofClosed);
     // Gästeblock
     var gs = m.sectors[plan.guest] || null;
     m.guest = { sector: plan.guest, area: gs ? gs.area : null, center: gs ? gs.center : [0, 0], cap: gs ? gs.cap : 0 };
@@ -172,6 +175,7 @@
       P.push({ kind: 'screen', area: a, x: sx * (G.Ix + (onRoof ? Math.max(4, d * 0.35) : d + 2)), y: 0, z: onRoof ? r1(m.roofH - 6.5) : r1(top + 1.5), w: m.video.screens ? 14 : 7, hgt: m.video.screens ? 6 : 3, rot: sx, live: m.video.screens > 0 });
     });
     // Banden
+    if (m.retract) P.push({ kind: 'retract', x: G.Ix - G.roofOver, y: G.Iy - G.roofOver, h: r1(m.roofH + 2.2), closed: m.roofClosed });
     P.push({ kind: 'boards', x: G.pitchL / 2 + 4.5, y: G.pitchW / 2 + 3.2, h: 0.9, led: m.led });
     P.push({ kind: 'pitch', l: G.pitchL, w: G.pitchW, quality: m.levels.rasen });
     return P;
@@ -199,9 +203,10 @@
   SM.facLevel = function (club, k) { var f = D.facilities[k]; return { l: lvOf(club, k), max: f.levels.length - 1, n: f.levels[lvOf(club, k)] ? f.levels[lvOf(club, k)].n : '' }; };
   SM.summary = function (m) {
     var rows = [];
-    ['N', 'S', 'E', 'W'].forEach(function (a) { var A = m.areas[a]; rows.push({ id: a, n: SM.AREA_NAMES[a], l: A.tiers, max: 3, txt: A.tiers ? A.tiers + (A.tiers === 1 ? ' Rang' : ' Ränge') + ' · ' + R.fmtNum(A.cap) : 'nicht gebaut' }); });
+    ['N', 'S', 'E', 'W'].forEach(function (a) { var A = m.areas[a]; rows.push({ id: a, n: SM.AREA_NAMES[a], l: A.tiers, max: 4, txt: A.tiers ? A.tiers + (A.tiers === 1 ? ' Rang' : ' Ränge') + ' · ' + R.fmtNum(A.cap) : 'nicht gebaut' }); });
     rows.push({ id: 'C', n: 'Ecken', l: m.closedCorners, max: 4, txt: m.closedCorners === 4 ? 'geschlossen' : m.closedCorners + '/4 geschlossen' });
-    rows.push({ id: 'dach', n: 'Dach', l: m.levels.dach, max: 3, txt: 'Stufe ' + m.levels.dach + '/3' });
+    var dmax = D.facilities.dach.levels.length - 1;
+    rows.push({ id: 'dach', n: m.retract ? 'Dach (schließbar)' : 'Dach', l: m.levels.dach, max: dmax, txt: (m.retract ? (m.roofClosed ? 'geschlossen · ' : 'offen · ') : '') + 'Stufe ' + m.levels.dach + '/' + dmax });
     rows.push({ id: 'licht', n: 'Flutlicht', l: m.levels.licht, max: 3, txt: 'Stufe ' + m.levels.licht + '/3' });
     rows.push({ id: 'vip', n: 'VIP & Hospitality', l: Math.min(3, m.levels.hosp + (m.vip ? 0 : 0)), max: 3, txt: R.fmtNum(m.vip) + ' VIP · Stufe ' + m.levels.hosp + '/3' });
     rows.push({ id: 'video', n: 'Videowand', l: m.levels.video, max: 2, txt: 'Stufe ' + m.levels.video + '/2' });
@@ -284,6 +289,7 @@
       // Beschriftung
       var c = x.center, lab = x.id + (x.guest ? ' · GÄSTE' : x.cap ? ' · ' + fmtN(x.cap) : '');
       var fs = x.side === 'C' ? 3.1 : 3.6, wpx = lab.length * fs * 0.56 + 3;
+      if (site) { var ix = r1(c[0] + wpx / 2 + 1.2), iy = r1(c[1] - fs * 0.85), q = fs * 1.55; g += '<g class="site-mark" pointer-events="none"><rect x="' + ix + '" y="' + iy + '" width="' + r1(q) + '" height="' + r1(q) + '" rx="' + r1(fs * 0.35) + '" fill="#E9B44B"/><path d="M' + r1(ix + q * 0.18) + ' ' + r1(iy + q * 0.8) + ' l' + r1(q * 0.32) + ' ' + r1(-q * 0.6) + ' M' + r1(ix + q * 0.5) + ' ' + r1(iy + q * 0.8) + ' l' + r1(q * 0.32) + ' ' + r1(-q * 0.6) + '" stroke="#1b1300" stroke-width="' + r1(fs * 0.22) + '" stroke-linecap="round"/><title>Im Bau</title></g>'; } // Baustellensymbol
       g += '<g class="lbl" pointer-events="none"><rect x="' + r1(c[0] - wpx / 2) + '" y="' + r1(c[1] - fs * 0.85) + '" width="' + r1(wpx) + '" height="' + r1(fs * 1.55) + '" rx="' + r1(fs * 0.5) + '" fill="' + (x.guest ? 'rgba(127,29,29,.88)' : 'rgba(11,20,36,.78)') + '"/>' +
         '<text x="' + c[0] + '" y="' + r1(c[1] + fs * 0.36) + '" text-anchor="middle" font-size="' + fs + '" font-weight="800" fill="' + (x.guest ? '#fecaca' : '#fff') + '">' + lab + '</text></g>';
       s += g + '</g>';
