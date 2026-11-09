@@ -48,7 +48,7 @@
     }).join('') + '</div>';
     h += '</div><div class="grid">';
     // Stadion-Vorschau
-    h += '<div class="panel tight thumb-panel" data-act="nav" data-s="stadion" title="Zum Stadion">' + U.gfx.stadiumThumb(c) + '<div class="thumb-cap"><b>' + esc(c.stadiumName) + '</b><span>' + R.fmtNum(cap) + ' Plätze</span></div></div>';
+    h += '<div class="panel tight thumb-panel" data-act="nav" data-s="stadion" title="Zum Stadion">' + (U.stadiumThumb3d ? U.stadiumThumb3d(c) : U.gfx.stadiumThumb(c)) + '<div class="thumb-cap"><b>' + esc(c.stadiumName) + '</b><span>' + R.fmtNum(cap) + ' Plätze</span></div></div>';
     // Vorstand
     var trust = Math.round(mg.trust);
     h += '<div class="panel"><h2>Vorstand</h2><p>Saisonziel: <b>' + esc(mg.boardTarget ? mg.boardTarget.text : '–') + '</b></p>' +

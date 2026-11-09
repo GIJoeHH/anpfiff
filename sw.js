@@ -1,5 +1,5 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = 'b94c5d7002';
+const VERSION = '84af96e717';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
@@ -19,6 +19,8 @@ const CORE = [
   './js/save.js',
   './js/season.js',
   './js/stadium.js',
+  './js/stadium3d.js',
+  './js/stadium_model.js',
   './js/touch.js',
   './js/transfers.js',
   './js/ui_art.js',
@@ -28,6 +30,7 @@ const CORE = [
   './js/ui_gfx.js',
   './js/ui_match.js',
   './js/ui_misc.js',
+  './js/ui_stadium.js',
   './js/ui_team.js',
   './js/ui_widgets.js',
   './js/util.js',
@@ -36,6 +39,7 @@ const CORE = [
   './js/world.js',
   './manifest.webmanifest',
   './style.css',
+  './vendor/three.min.js',
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));

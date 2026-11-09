@@ -30,7 +30,7 @@
 
   // ---------- Aus alten Kapazitäten übernehmen ----------
   SP.fromCaps = function (steh, sitz, vip) {
-    var plan = { v: 1, sectors: {}, guest: 'E2', jobs: [], wear: 0 };
+    var plan = { v: 2, sectors: {}, guest: 'E2', jobs: [], wear: 0 };
     SP.SECTORS.forEach(function (s) { plan.sectors[s.id] = { tiers: [] }; });
     function fill(type, amount, order) {
       for (var i = 0; i < order.length && amount > 0; i++) {
@@ -53,12 +53,38 @@
     return plan;
   };
   SP.ensure = function (club) {
-    if (club.stadium && club.stadium.v) return club.stadium;
+    if (club.stadium && club.stadium.v) return club.stadium.v < SP.VERSION ? SP.migrate(club) : club.stadium;
     var f = D.facilities, lvl = function (k) { return f[k].levels[club.fac[k] != null ? club.fac[k] : (f[k].min || 0)]; };
     club.stadium = SP.fromCaps(lvl('steh').cap, lvl('sitz').cap, lvl('vip').vip);
     return club.stadium;
   };
   SP.has = function (club) { return !!(club && club.stadium && club.stadium.v); };
+  // Baumaßnahme auf einen Plan anwenden (Fertigstellung und Ausbauvorschau nutzen dieselbe Regel)
+  SP.applyJob = function (plan, j) {
+    var t = plan.sectors[j.sec].tiers;
+    if (j.action === 'new') t.push({ type: j.type, size: 1 });
+    else if (j.action === 'grow') t[j.tier].size = 1;
+    else if (j.action === 'convert') t[j.tier].type = j.type;
+    else if (j.action === 'remove') t.splice(j.tier, 1);
+  };
+  // Spielstände aus älteren Versionen bereinigen (v1 → v2): fehlende Felder, ungültige Ränge, Gästeblock ohne Plätze
+  SP.VERSION = 2;
+  SP.migrate = function (club) {
+    var p = club && club.stadium; if (!p || !p.v) return p;
+    p.sectors = p.sectors || {}; p.jobs = Array.isArray(p.jobs) ? p.jobs : []; p.wear = +p.wear || 0;
+    SP.SECTORS.forEach(function (s) {
+      var x = p.sectors[s.id] = p.sectors[s.id] || { tiers: [] };
+      x.tiers = (x.tiers || []).filter(function (t) { return t && SP.TYPES[t.type]; }).slice(0, SP.maxTiers(s));
+      x.tiers.forEach(function (t) { t.size = Math.max(0.05, Math.min(1, +t.size || 1)); });
+    });
+    p.jobs = p.jobs.filter(function (j) { return j && p.sectors[j.sec]; });
+    if (!p.guest || !p.sectors[p.guest] || !p.sectors[p.guest].tiers.length) {
+      var g = ['E2', 'E1', 'W2', 'W1', 'SE', 'S3', 'N3'].concat(SP.SECTORS.map(function (s) { return s.id; })).filter(function (id) { return p.sectors[id].tiers.length; })[0];
+      p.guest = g || 'E2';
+    }
+    p.v = SP.VERSION;
+    return p;
+  };
 
   // ---------- Kennzahlen ----------
   function busy(plan, id, ti) { return plan.jobs.some(function (j) { return j.sec === id && j.tier === ti && j.action !== 'new'; }); }
@@ -143,11 +169,7 @@
     var plan = club.stadium, done = [];
     plan.jobs.forEach(function (j) { j.weeks--; if (j.weeks <= 0) done.push(j); });
     done.forEach(function (j) {
-      var t = plan.sectors[j.sec].tiers;
-      if (j.action === 'new') t.push({ type: j.type, size: 1 });
-      else if (j.action === 'grow') t[j.tier].size = 1;
-      else if (j.action === 'convert') t[j.tier].type = j.type;
-      else if (j.action === 'remove') t.splice(j.tier, 1);
+      SP.applyJob(plan, j);
       plan.jobs.splice(plan.jobs.indexOf(j), 1);
       if (club.userControlled) R.season.news(st, 'Stadionausbau fertig: ' + SP.sec(j.sec).n, j.n + '. Neue Kapazität: ' + R.fmtNum(E.capacity(club)) + ' Plätze.', 'bau');
     });

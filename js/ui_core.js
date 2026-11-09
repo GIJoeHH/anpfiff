@@ -28,6 +28,7 @@
     var html;
     try { html = fn(); } catch (e) { console.error(e); html = '<div class="panel"><h2>Fehler</h2><pre class="small">' + esc(e.stack || e) + '</pre></div>'; }
     document.getElementById('main').innerHTML = html;
+    if (R.s3d) { try { R.s3d.mountAll(document.getElementById('main')); } catch (e) { console.error(e); } }
     if (U.after) { var a = U.after; U.after = null; a(); }
     if (U.st && U.st.toast) { U.toast(U.st.toast.text); U.st.toast = null; }
   };
