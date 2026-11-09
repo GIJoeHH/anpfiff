@@ -1,5 +1,5 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = 'f2e26ae457';
+const VERSION = '7d0feb37ad';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
