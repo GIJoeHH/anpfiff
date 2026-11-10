@@ -240,6 +240,7 @@
     if (isLeagueWeek) st.week++;
     st.tick = (st.tick || 0) + 1; // fortlaufende Kalenderwoche (auch Vorbereitung/Winterpause)
     if (ucPlan && ucPlan.stadium && R.stadium.weeklyWear) R.stadium.weeklyWear(ucPlan); // Stadionzustand altert wöchentlich
+    if (E.seasonSales) E.seasonSales(st); // alte Spielstände: Dauerkarten/Logen nachträglich (anteilig)
     if (R.realty) R.realty.tick(st); // Immobilien: Monatsbuchungen am Monatsende (idempotent je Kalenderwoche)
 
     prep.list.forEach(function (fx) {
@@ -297,6 +298,7 @@
         if ((st.prep || 1) >= S.PREP_WEEKS) {
           S.advanceCup(st);
           st.phase = 'season'; st.week = 0;
+          E.seasonSales(st); // Dauerkarten & Logen für die neue Saison
           S.news(st, 'Die Saison beginnt!', 'Die Vorbereitung ist abgeschlossen – am Wochenende steigt der 1. Spieltag. Das Transferfenster ist noch bis einschließlich 3. Spieltag offen.', 'liga');
         } else st.prep = (st.prep || 1) + 1;
       } else {
