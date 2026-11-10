@@ -1,6 +1,6 @@
 // ANPFIFF! – Stadionplan: Grundriss mit Sektoren und Rängen, Gästeblock, Abnutzung
 // 14 Sektoren: je 2 hinter den Toren (West/Ost), je 3 an den Längsseiten (Haupttribüne/Gegengerade), 4 Ecken.
-// Jeder Sektor hat bis zu 4 Ränge (Ecken 3). Ein Rang ist Stehplatz, Sitzplatz, Business oder Logen und kann
+// Jeder Sektor hat bis zu 4 Ränge (auch die Ecken). Ein Rang ist Stehplatz, Sitzplatz, Business oder Logen und kann
 // teilweise ausgebaut sein (Größe 5 … 100 %). Überdachung, Technik, Flutlicht usw. laufen weiter über die
 // bisherigen Ausbaustufen. Ältere Spielstände werden aus den alten Kapazitäten übernommen.
 (function (R) {
@@ -15,7 +15,7 @@
     { id: 'NW', side: 'C', kind: 'corner', n: 'Ecke Nordwest' }, { id: 'NE', side: 'C', kind: 'corner', n: 'Ecke Nordost' },
     { id: 'SW', side: 'C', kind: 'corner', n: 'Ecke Südwest' }, { id: 'SE', side: 'C', kind: 'corner', n: 'Ecke Südost' }
   ];
-  SP.BASE = { long: [2000, 2600, 3000, 7200], goal: [2400, 3000, 3400, 6600], corner: [900, 1300, 3600] }; // Stehplatz-Äquivalent je Rang (4. Rang = großer Oberring, Vollausbau ≈ 95.000 Sitzplätze)
+  SP.BASE = { long: [2000, 2600, 3000, 7200], goal: [2400, 3000, 3400, 6600], corner: [900, 1300, 3600, 4200] }; // Stehplatz-Äquivalent je Rang (4. Rang = großer Oberring, Vollausbau ≈ 95.000 Sitzplätze)
   SP.TYPES = {
     steh: { n: 'Stehplatz', f: 1, cost: 110, up: 5, col: '#8d8676', ic: '🧍' },
     sitz: { n: 'Sitzplatz', f: 0.55, cost: 260, up: 9, col: '#2f5fb3', ic: '💺' },
@@ -173,7 +173,10 @@
     var plan = club.stadium, done = [];
     plan.jobs.forEach(function (j) { j.weeks--; if (j.weeks <= 0) done.push(j); });
     done.forEach(function (j) {
+      var capBefore = SP.parts(club, { live: false }), cb = capBefore.steh + capBefore.sitz + capBefore.vip;
       SP.applyJob(plan, j);
+      var capAfter = SP.parts(club, { live: false }), ca = capAfter.steh + capAfter.sitz + capAfter.vip;
+      if (ca > cb && ca > 0) plan.cond = R.clamp((SP.cond(club) * cb + 100 * (ca - cb)) / ca, 0, 100); else if (j.action === 'convert') plan.cond = Math.min(100, SP.cond(club) + 2);
       plan.jobs.splice(plan.jobs.indexOf(j), 1);
       if (club.userControlled) R.season.news(st, 'Stadionausbau fertig: ' + SP.sec(j.sec).n, j.n + '. Neue Kapazität: ' + R.fmtNum(E.capacity(club)) + ' Plätze.', 'bau');
     });
@@ -181,6 +184,32 @@
   };
   SP.removeGuest = function (club, id) { var p = SP.ensure(club), g = SP.guestIds(p); if (g.length <= 1 || g.indexOf(id) < 0) return false; p.guests = g.filter(function (x) { return x !== id; }); p.guest = p.guests[0]; return true; };
   SP.addGuest = function (club, id) { var p = SP.ensure(club); if (!p.sectors[id] || !p.sectors[id].tiers.length) return false; var g = SP.guestIds(p); if (g.indexOf(id) < 0) g.push(id); p.guests = g; p.guest = g[0]; return true; };
+  // ---------- Gesamtzustand des Stadions (0–100) und Sanierung ----------
+  // Der Zustand sinkt jede Woche etwas (Alterung, Witterung) und an Heimspieltagen je nach Auslastung.
+  // Unter 70 leidet die Attraktivität, unter 60 steigen die Unterhaltskosten (Sanierungsstau).
+  SP.COND_WEEK = 0.09; SP.COND_MATCH = 0.3;
+  SP.cond = function (club) { var p = club && club.stadium; return p ? (p.cond != null ? p.cond : 82) : 100; };
+  SP.weeklyWear = function (club) { var p = club.stadium; if (!p) return; p.cond = R.clamp(SP.cond(club) - SP.COND_WEEK, 0, 100); };
+  SP.matchWear = function (club, att) { var p = club.stadium; if (!p) return; var util = att && att.capacity ? R.clamp(att.total / att.capacity, 0, 1.1) : 0.6; p.cond = R.clamp(SP.cond(club) - SP.COND_MATCH * (0.5 + util), 0, 100); };
+  SP.condLabel = function (c) { return c >= 85 ? 'Sehr gut' : c >= 70 ? 'Gut' : c >= 55 ? 'Befriedigend' : c >= 40 ? 'Sanierungsbedürftig' : 'Marode'; };
+  SP.condAttr = function (club) { var c = SP.cond(club); return c < 70 ? -Math.round((70 - c) / 3) : 0; };     // Attraktivitäts-Abzug
+  SP.condUpkeepF = function (club) { var c = SP.cond(club); return 1 + Math.max(0, 60 - c) / 100; };           // Unterhalts-Aufschlag
+  // Sanierungskosten: je Zustandspunkt 1,2 % des Tribünenwerts (mind. 15.000 € je Punkt) + Baustelleneinrichtung
+  SP.renoCost = function (club, target) {
+    var c = SP.cond(club), pts = Math.max(0, Math.min(100, target) - c); if (pts < 0.5) return 0;
+    var perPt = Math.max(15000, SP.value(club) * 0.012), worse = c < 40 ? 1.25 : 1; // marode Substanz wird teurer
+    return Math.round((25000 + pts * perPt * worse) / 5000) * 5000;
+  };
+  SP.RENO = [{ k: 'klein', n: 'Instandsetzung', add: 12, ic: 'wrench' }, { k: 'mittel', n: 'Teilsanierung', add: 30, ic: 'hammer' }, { k: 'voll', n: 'Komplettsanierung', add: 100, ic: 'construction' }];
+  SP.renoOptions = function (club) { var c = SP.cond(club); return SP.RENO.map(function (o) { var t = Math.min(100, c + o.add); return { k: o.k, n: o.n, ic: o.ic, to: Math.round(t), cost: SP.renoCost(club, t) }; }).filter(function (o) { return o.cost > 0; }); };
+  SP.renovate = function (club, k) {
+    var o = SP.renoOptions(club).filter(function (x) { return x.k === k; })[0];
+    if (!o) return { ok: false, why: 'Keine Sanierung nötig.' };
+    if (club.cash < o.cost) return { ok: false, why: 'Nicht genug Geld (' + R.fmtMoney(o.cost) + ').' };
+    club.cash -= o.cost; E.book(club, 'Stadionsanierung', -o.cost); club.stadium.cond = o.to;
+    return { ok: true, cost: o.cost, to: o.to, n: o.n };
+  };
+
   SP.setGuest = function (club, id) { var p = SP.ensure(club); if (!p.sectors[id] || !p.sectors[id].tiers.length) return false; p.guest = id; p.guests = [id]; p.wear = Math.min(p.wear || 0, 40); return true; };
   // Gästeblock sanieren (Abnutzung durch Gästefans)
   SP.repairCost = function (club) { var p = club.stadium; return Math.round(((p && p.wear) || 0) * (800 + SP.guestCap(club) * 2.5) / 1000) * 1000; };

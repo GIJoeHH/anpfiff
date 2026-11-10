@@ -239,6 +239,7 @@
     var isLeagueWeek = st.phase === 'season';
     if (isLeagueWeek) st.week++;
     st.tick = (st.tick || 0) + 1; // fortlaufende Kalenderwoche (auch Vorbereitung/Winterpause)
+    if (ucPlan && ucPlan.stadium && R.stadium.weeklyWear) R.stadium.weeklyWear(ucPlan); // Stadionzustand altert wöchentlich
     if (R.realty) R.realty.tick(st); // Immobilien: Monatsbuchungen am Monatsende (idempotent je Kalenderwoche)
 
     prep.list.forEach(function (fx) {
@@ -258,6 +259,7 @@
       } else {
         att = E.attendance(st, home, away, fx.comp);
         E.matchdayIncome(st, home, att);
+        if (home.userControlled && R.stadium && home.stadium) R.stadium.matchWear(home, att);
         if (home.userControlled) S.guestAftermath(st, home, away, att, fx);
         home.attendanceHist.push(att.total);
         home.congestion = (home.congestion || 0) * 0.8 + att.congestion * 0.2;

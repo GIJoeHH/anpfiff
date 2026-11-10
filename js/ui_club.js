@@ -155,6 +155,7 @@
     h += U.stadiumStage(st, c);
     // Ticketpreise & Zuschauerprognose (js/ui_tickets.js)
     h += '<div style="margin-top:14px">' + U.ticketPanel(st, c) + '</div><div class="grid g2" style="margin-top:14px">';
+    h += U.stadiumCondPanel ? U.stadiumCondPanel(st, c) : '';
     h += '<div class="panel"><h2>Zuschauerverlauf</h2>' + (c.attendanceHist.length > 1 ? U.sparkline(c.attendanceHist, 300, 90, '#3b82f6') : '<p class="muted small">Noch keine Heimspiele.</p>') + '<p class="muted small">Rekord: ' + R.fmtNum(c.records.attendance) + '</p></div></div>';
     h += '<div class="seg" style="margin:16px 0 12px">' + [['plan', 'Stadionplan (Tribünen)'], ['stadion', 'Ausstattung'], ['infra', 'Verkehrsinfrastruktur']].map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="tab" data-s="stadion" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
     var effects = { steh: 'Mehr günstige Plätze – mehr Stimmung.', sitz: 'Mehr Sitzplätze: höhere Erlöse, mehr Komfort.', dach: 'Komfort und Attraktivität.', vip: 'Hohe Erlöse pro Platz, Hospitality.', licht: 'Abendspiele und Attraktivität.', video: 'Attraktivität.', rasen: 'Attraktivität und Spielqualität.', sanitaer: 'Zufriedenheit der Zuschauer.', hosp: 'Höherer Umsatz pro Zuschauer.', technik: 'Moderner Komfort.', oepnv: 'Transportiert viele Fans – ersetzt Parkplatzbedarf. Große Projekte mit städtischem Zuschuss.', strasse: 'Begrenzt, wie viele Autos ankommen können.', parken: 'Parkplätze bringen Parkgebühren, benötigen aber eine gute Straße.' };
@@ -162,6 +163,23 @@
     else h += '<div class="grid g3">' + D.facilityOrder[tab === 'infra' ? 'infra' : 'stadion'].filter(function (k) { return !(R.stadium && R.stadium.has(c) && E.PLAN_KEYS.indexOf(k) >= 0); }).map(function (k) { return U.facilityCard(k, { effect: effects[k] }); }).join('') + '</div>';
     if (tab === 'infra') h += '<div class="help" style="margin-top:12px">Verkehrskapazität = ÖPNV (' + R.fmtNum(E.level(c, 'oepnv').fans) + ') + min(Parkplätze × 2,6 = ' + R.fmtNum(E.level(c, 'parken').cars * 2.6) + ', Straße = ' + R.fmtNum(E.level(c, 'strasse').fans) + '). Sie müssen nicht alle drei Zweige ausbauen – eine starke S-Bahn ersetzt viele Parkplätze.</div>';
     return h;
+  };
+  // ---------- Stadionzustand & Sanierung ----------
+  U.stadiumCondPanel = function (st, c) {
+    var SP = R.stadium; if (!SP || !c.stadium) return '';
+    var cond = SP.cond(c), col = cond >= 70 ? '#22c55e' : cond >= 55 ? '#84cc16' : cond >= 40 ? '#f5b301' : '#ef4444', opts = SP.renoOptions(c), can = U.can('business');
+    var attr = SP.condAttr(c), upF = SP.condUpkeepF(c);
+    var h = '<div class="panel cond-panel"><div class="panel-h"><h2>' + U.lc('wrench', 17) + ' Stadionzustand</h2><span class="pill ' + (cond >= 70 ? 'ok' : cond >= 40 ? 'warn' : 'bad') + '">' + SP.condLabel(cond) + '</span></div>' +
+      '<div class="cond-big"><b style="color:' + col + '">' + Math.round(cond) + '</b><span>/ 100</span></div>' + U.bar(cond, 100, col) +
+      '<div class="cond-fx"><div><small>Attraktivität</small><b class="' + (attr < 0 ? 'neg' : 'pos') + '">' + (attr < 0 ? attr : '±0') + '</b></div><div><small>Unterhalt</small><b class="' + (upF > 1 ? 'neg' : '') + '">' + (upF > 1 ? '+' + Math.round((upF - 1) * 100) + ' %' : 'normal') + '</b></div><div><small>Tribünenwert</small><b>' + money(SP.value(c)) + '</b></div></div>' +
+      '<p class="muted small">Der Zustand sinkt mit der Zeit und an jedem Heimspiel, bei voller Hütte stärker. Unter 70 leidet die Attraktivität, unter 60 steigen die Unterhaltskosten. Neue Ränge sind neuwertig und heben den Gesamtzustand.</p>';
+    if (opts.length) h += '<div class="opt-list">' + opts.map(function (o) { return '<button class="opt-card" data-act="stadiumReno" data-k="' + o.k + '"' + (can ? '' : ' disabled') + '><b>' + U.lc(o.ic, 13) + ' ' + o.n + '</b><span>Zustand ' + Math.round(cond) + ' → ' + o.to + '</span><em>' + money(o.cost) + '</em></button>'; }).join('') + '</div>';
+    else h += '<div class="pos small">' + U.lc('check', 14) + ' Neuwertig – keine Sanierung nötig.</div>';
+    return h + '</div>';
+  };
+  U.acts.stadiumReno = function (d) {
+    var c = U.club(), o = R.stadium.renoOptions(c).filter(function (x) { return x.k === d.k; })[0]; if (!o) return;
+    U.confirm(o.n, '<p>Stadion sanieren: Zustand ' + Math.round(R.stadium.cond(c)) + ' → <b>' + o.to + '</b> für <b>' + money(o.cost) + '</b>?</p>', function () { var r = R.stadium.renovate(c, d.k); U.closeModal(); U.toast(r.ok ? r.n + ' abgeschlossen – Zustand ' + r.to + '/100.' : r.why); U.render(); });
   };
   U.acts.ticket = function (d, el) { if (!U.can('business')) return; U.club().tickets[d.k] = R.clamp(Math.round(+el.value || 1), 1, 2000); U.render(); };
   U.acts.stadiumPart = function (d) {

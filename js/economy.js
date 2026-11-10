@@ -26,6 +26,7 @@
     a += cap ? 5 * (parts.sitz + parts.vip) / cap : 0;
     a += Math.min(12, (club.fac.fanshop || 0) * 0.8 + (club.fac.restaurant || 0) * 0.8 + (club.fac.cafe || 0) * 0.5 + (club.fac.museum || 0) * 0.6 + (club.fac.erlebnis || 0) * 0.8);
     a -= Math.min(10, (club.congestion || 0) * 10);
+    if (plan(club) && R.stadium.condAttr) a += R.stadium.condAttr(club); // Stadionzustand
     a += club.attBonus || 0;
     if (club.pitch != null && club.pitch < 100) a -= (100 - club.pitch) / 8; // Rasenzustand nach Großereignissen
     return R.clamp(Math.round(a), 0, 100);
@@ -206,7 +207,7 @@
     var sum = 0;
     var pl = plan(club);
     Object.keys(D.facilities).forEach(function (k) { if (pl && E.PLAN_KEYS.indexOf(k) >= 0) return; var l = lv(club, k); if (l) sum += l.up; });
-    if (pl) sum += R.stadium.upkeep(club);
+    if (pl) sum += R.stadium.upkeep(club) * (R.stadium.condUpkeepF ? R.stadium.condUpkeepF(club) : 1);
     return sum * (1 - E.energySave(club));
   };
   E.budgetCost = function (club, area) {

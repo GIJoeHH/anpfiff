@@ -85,7 +85,7 @@
     h += '<div class="splan-wrap">' + SM.planSVG(m, { sel: sel, highlight: imp ? [sel] : [] }) + '</div>';
     h += '<div class="splan-legend">' + Object.keys(SP.TYPES).map(function (k) { return '<span><i style="background:' + SM.TYPE_COL[k] + '"></i>' + SP.TYPES[k].n + '</span>'; }).join('') +
       '<span><i class="lg-roof"></i>Dach</span><span><i class="lg-guest"></i>Gästeblock</span><span><i class="lg-site"></i>Baustelle</span><span><i class="lg-mast"></i>Flutlicht</span></div>';
-    h += '<p class="muted small" style="margin:6px 0 0">Sektor antippen. Je Längsseite 3, je Hintertor 2 Sektoren, 4 Ecken. Bis zu 4 Ränge (Ecken 3). Eine Ecke mit Rang gilt als geschlossen.</p></div><div class="grid" style="align-content:start">';
+    h += '<p class="muted small" style="margin:6px 0 0">Sektor antippen. Je Längsseite 3, je Hintertor 2 Sektoren, 4 Ecken. Bis zu 4 Ränge, auch in den Ecken. Eine Ecke mit Rang gilt als geschlossen.</p></div><div class="grid" style="align-content:start">';
     // Sektorpanel
     var tiers = plan.sectors[sel].tiers, job = SP.jobOf(plan, sel), cap = SP.secCap(plan, sel), msec = m.sectors[sel];
     h += '<div class="panel sec-panel"><div class="panel-h"><h2>' + esc(sec.n) + ' <span class="muted small">' + sel + (msec.guest ? ' · <span class="neg">Gästeblock</span>' : '') + '</span></h2><b class="mono">' + num(cap.total) + ' Plätze</b></div>';
