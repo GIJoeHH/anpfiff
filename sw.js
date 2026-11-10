@@ -1,5 +1,5 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = '4a191bd28e';
+const VERSION = 'e7e2cc4e30';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
@@ -16,8 +16,10 @@ const CORE = [
   './js/economy.js',
   './js/editor.js',
   './js/icons.js',
+  './js/logos.js',
   './js/match.js',
   './js/numpad.js',
+  './js/realty.js',
   './js/save.js',
   './js/season.js',
   './js/stadium.js',
@@ -32,8 +34,10 @@ const CORE = [
   './js/ui_gfx.js',
   './js/ui_match.js',
   './js/ui_misc.js',
+  './js/ui_realty.js',
   './js/ui_stadium.js',
   './js/ui_team.js',
+  './js/ui_tickets.js',
   './js/ui_widgets.js',
   './js/util.js',
   './js/version.js',

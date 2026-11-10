@@ -503,3 +503,16 @@ table.md-cmp td.pos { color: var(--ok); } table.md-cmp td.neg { color: var(--bad
 .md-go { width: 100%; padding: 14px; font-size: 17px; font-weight: 750; border-radius: 12px; box-shadow: 0 8px 22px rgba(24,185,121,.3); }
 /* Kopfzeile bleibt auf dem iPad quer einzeilig: weniger wichtige Chips (Stärke/Moral, Gegner) ausblenden */
 @media (max-width: 1280px) { #topbar { flex-wrap: nowrap; } .tb-chip.opt ~ .tb-chip.opt { display: none; } }
+
+/* Kopfzeile: nie umbrechen – der Weiter-Button bleibt immer rechts in der ersten Zeile.
+   Statt umzubrechen werden optionale Kacheln ausgeblendet bzw. Texte gekürzt. */
+#topbar { flex-wrap: nowrap !important; overflow: hidden; }
+#topbar .btn-next, #topbar [data-act="autoStart"], #topbar [data-act="autoStop"] { flex: 0 0 auto; }
+#topbar .tb-spacer { flex: 1 1 0; min-width: 0; }
+#topbar .tb-club { flex: 0 1 auto; min-width: 0; }
+#topbar .tb-club .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#topbar .tb-chip { flex: 0 1 auto; min-width: 0; }
+#topbar .tb-chip b { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1500px) { #topbar .tb-chip.opt ~ .tb-chip.opt { display: none; } }
+@media (max-width: 1250px) { #topbar .tb-chip.opt { display: none; } }
+@media (max-width: 760px) { #topbar .tb-chip:first-of-type { display: none; } #topbar [data-act="autoStart"] { display: none; } }

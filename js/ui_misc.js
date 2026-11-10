@@ -480,6 +480,8 @@
     R.save.storageInfo().then(function (i) { var el = document.getElementById('storeInfo2'); if (el) el.textContent = i.path || ''; });
     return '<h1>Einstellungen</h1><div class="grid g2"><div class="panel"><h2>Spiel</h2><table class="t"><tr><td>Standard-Spielgeschwindigkeit</td><td><div class="seg">' + [['normal', 'Normal'], ['schnell', 'Schnell'], ['sofort', 'Sofort']].map(function (x) { return '<button class="sm ' + (s.matchSpeed === x[0] ? 'on' : '') + '" data-act="setSpeed2" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></td></tr>' +
       '<tr><td>Grafikdetails (Stadion & Vereinsstadt)</td><td><div class="seg">' + [['hoch', 'Hoch'], ['reduziert', 'Reduziert']].map(function (x) { return '<button class="sm ' + ((R.s3d ? R.s3d.quality() : 'hoch') === x[0] ? 'on' : '') + '" data-act="setGfx" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div><div class="muted small">Reduziert: ohne Schatten, weniger Details – schont Akku und ältere iPads.</div></td></tr>' +
+      '<tr><td>Echte Sponsoren (Firmennamen und Logos, nur privat)</td><td><input type="checkbox" data-chg="setOpt" data-k="realSponsors"' + (s.realSponsors !== false ? ' checked' : '') + '></td></tr>' +
+      (R.logos ? '<tr><td>Sponsorenlogos auf diesem Gerät <div class="muted small" id="logoStat">' + R.logos.status().loaded + ' von ' + R.logos.status().total + ' geladen · aus Wikimedia Commons, Markenrechte bei den Unternehmen</div></td><td><button class="sm" data-act="logosLoad">' + U.lc('refresh-cw', 14) + ' Laden</button></td></tr>' : '') +
       '<tr><td>Retro-Soundeffekte</td><td><input type="checkbox" data-chg="setOpt" data-k="sound"' + (s.sound ? ' checked' : '') + '></td></tr>' +
       (U.cheatDiscovered(st) ? '<tr><td>Bankdirektor-Cheat aktiv</td><td><input type="checkbox" data-chg="setOpt" data-k="cheatEnabled"' + (s.cheatEnabled ? ' checked' : '') + '></td></tr>' : '') +
       '<tr><td>Schwierigkeitsgrad</td><td>' + W.diffSettings[s.difficulty].name + '</td></tr>' + (U.cheatDiscovered(st) ? '<tr><td>Spielstand mit Cheat</td><td>' + (st.cheatUsed ? '<span class="cheat-tag">JA</span> (' + money(st.cheatTotal || 0) + ')' : 'nein') + '</td></tr>' : '') + '</table></div>' +
@@ -489,4 +491,11 @@
   U.acts.setGfx = function (d) { if (R.s3d) R.s3d.setQuality(d.v); U.render(); };
   U.acts.setSpeed2 = function (d) { U.st.settings.matchSpeed = d.v; U.render(); };
   U.acts.setOpt = function (d, el) { U.st.settings[d.k] = el.checked; U.render(); };
+  U.acts.logosLoad = function (d, el) {
+    if (!R.logos) return; if (el) el.disabled = true;
+    var stat = document.getElementById('logoStat');
+    R.logos.loadMissing(function (done, total, name) { if (stat) stat.textContent = 'Lade ' + done + ' / ' + total + ' · ' + name; }).then(function (r) {
+      var s = R.logos.status(); U.toast(r.total ? r.ok + ' von ' + r.total + ' Logos geladen (' + s.loaded + '/' + s.total + ' gesamt).' : 'Alle Logos sind bereits geladen.'); U.render();
+    }, function () { U.toast('Logos konnten nicht geladen werden (offline?).'); U.render(); });
+  };
 })(RFM);

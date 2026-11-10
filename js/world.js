@@ -111,7 +111,14 @@
     var amount = R.round(total * R.randRange(0.85, 1.15), 5000);
     var pool = st && st.sponsorPool && st.sponsorPool.length ? st.sponsorPool : D.sponsorNames;
     var kits = st && st.kitPool && st.kitPool.length ? st.kitPool : D.kitBrands;
-    var name = cat === 'ausruester' ? R.pick(kits) : R.pick(pool);
+    var name;
+    // Echte Unternehmen (Standard), solange der Nutzer keine eigene Namensliste im Editor hinterlegt hat
+    var real = D.realSponsors && D.realSponsors[cat], useReal = real && (!st || !st.settings || st.settings.realSponsors !== false) && !(cat === 'ausruester' ? st && st.kitPool && st.kitPool.length : st && st.sponsorPool && st.sponsorPool.length);
+    if (useReal) {
+      var taken = club && club.sponsors ? Object.keys(club.sponsors).map(function (k) { var s = club.sponsors[k]; return s && s.name; }) : [];
+      var free = real.filter(function (s) { return taken.indexOf(s.n) < 0; });
+      name = R.pick(free.length ? free : real).n;
+    } else name = cat === 'ausruester' ? R.pick(kits) : R.pick(pool);
     return {
       id: nextId(st, 'sponsor'), cat: cat, name: name, amount: amount, years: R.randInt(1, 3),
       bonusTop: R.round(amount * R.randRange(0.08, 0.2), 5000), bonusPromo: R.round(amount * R.randRange(0.1, 0.3), 5000),

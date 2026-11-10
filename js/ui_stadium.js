@@ -92,11 +92,35 @@
     h += '<div class="small muted" style="margin-bottom:6px">' + (sec.kind === 'corner' ? 'Ecke: <b>' + (m.corners[sel].state === 'closed' ? 'geschlossen' : 'offen') + '</b> · ' : '') + 'Dach: <b>' + (msec.roof ? 'ja' : 'nein') + '</b> · ' + tiers.length + '/' + SP.maxTiers(sec) + ' Ränge</div>';
     h += tiers.length ? '<table class="t small">' + tiers.map(function (t, ti) { return '<tr><td>' + SP.TIER_NAMES[ti] + '</td><td><i class="dot" style="background:' + SM.TYPE_COL[t.type] + '"></i>' + SP.TYPES[t.type].n + '</td><td class="num">' + Math.round(t.size * 100) + ' %</td><td class="num">' + num(SP.tierCap(sec, ti, t.type, t.size)) + '</td></tr>'; }).join('') + '</table>' : '<p class="muted small">Noch keine Tribüne – hier ist nur Rasen.</p>';
     if (job) h += '<div class="help small" style="margin-top:8px">' + U.lc('construction', 15) + ' Im Bau: <b>' + esc(job.n) + '</b> – noch ' + job.weeks + ' von ' + job.total + ' Wochen.' + U.bar(job.total - job.weeks, job.total, '#f5b301') + '</div>';
-    if (plan.guest !== sel && tiers.length && can) h += '<button class="sm" style="margin-top:8px" data-act="planGuest" data-k="' + sel + '">' + U.lc('circle-dot', 14) + ' Als Gästeblock festlegen</button>';
+    var gIds = SP.guestIds(plan);
+    if (can && gIds.indexOf(sel) >= 0 && gIds.length > 1) h += '<button class="sm" style="margin-top:8px" data-act="planGuestDel" data-k="' + sel + '">' + U.lc('x', 14) + ' Gästeblock aufheben</button>';
+    if (gIds.indexOf(sel) < 0 && tiers.length && can) h += '<button class="sm" style="margin-top:8px" data-act="planGuestAdd" data-k="' + sel + '">' + U.lc('plus', 14) + ' Als weiteren Gästeblock</button> ';
+    if (gIds.indexOf(sel) < 0 && tiers.length && can) h += '<button class="sm" style="margin-top:8px" data-act="planGuest" data-k="' + sel + '">' + U.lc('circle-dot', 14) + ' Als Gästeblock festlegen</button>';
     if (opts.length) {
-      h += '<h3 style="margin-top:12px">Ausbauoptionen</h3><div class="opt-list">' + opts.map(function (o, i) {
-        return '<button class="opt-card' + (i === oi ? ' on' : '') + '" data-act="planOpt" data-v="' + i + '"><b>' + esc(o.n) + '</b><span>' + (o.cap ? (o.cap > 0 ? '+' : '') + num(o.cap) + ' Plätze · ' : '') + o.weeks + ' Wo.</span><em>' + (o.cost ? money(o.cost) : 'kostenlos') + '</em></button>';
-      }).join('') + '</div>';
+      // Schritt 1: Oberoption (Ausbau / Umwandlung / Rückbau), Schritt 2: Rang und Detailumsetzung
+      var CATS = [['ausbau', 'Ausbau', 'plus', 'Neuer Rang oder Rang vergrößern'], ['umbau', 'Umwandlung', 'refresh-cw', 'Platzart eines Rangs ändern'], ['rueckbau', 'Rückbau', 'minus', 'Obersten Rang abreißen']];
+      var catOf = function (o) { return o.action === 'convert' ? 'umbau' : o.action === 'remove' ? 'rueckbau' : 'ausbau'; };
+      var cat = U.p.cat && opts.some(function (o) { return catOf(o) === U.p.cat; }) ? U.p.cat : null;
+      if (oi != null) cat = catOf(opts[oi]);
+      h += '<h3 style="margin-top:12px">' + (cat ? '<button class="crumb" data-act="planCat" data-k="">' + U.lc('chevron-right', 13) + 'Maßnahme</button> › ' + CATS.filter(function (x) { return x[0] === cat; })[0][1] : 'Was möchtest du tun?') + '</h3>';
+      if (!cat) {
+        h += '<div class="cat-tiles">' + CATS.map(function (x) {
+          var n = opts.filter(function (o) { return catOf(o) === x[0]; }).length;
+          return '<button class="cat-tile' + (n ? '' : ' off') + '"' + (n ? ' data-act="planCat" data-k="' + x[0] + '"' : ' disabled') + '><span class="ic-tile' + (x[0] === 'rueckbau' ? ' bad' : x[0] === 'ausbau' ? ' ok' : ' info') + '">' + U.lc(x[2], 20) + '</span><b>' + x[1] + '</b><small>' + (n ? x[3] : 'hier nicht möglich') + '</small></button>';
+        }).join('') + '</div>';
+      } else {
+        var groups = {}, order = [];
+        opts.forEach(function (o, i) { if (catOf(o) !== cat) return; var g = o.tier + ':' + (o.action === 'grow' ? 'g' : ''); if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(i); });
+        order.forEach(function (g) {
+          var first = opts[groups[g][0]], t = tiers[first.tier];
+          var gh = cat === 'ausbau' ? (first.action === 'new' ? 'Neuer ' + SP.TIER_NAMES[first.tier] : SP.TIER_NAMES[first.tier] + ' vergrößern (' + Math.round(t.size * 100) + ' % → 100 %)')
+            : cat === 'umbau' ? SP.TIER_NAMES[first.tier] + ' · derzeit ' + SP.TYPES[t.type].n : SP.TIER_NAMES[first.tier] + ' (' + SP.TYPES[t.type].n + ')';
+          h += '<div class="opt-group"><div class="opt-gh">' + esc(gh) + '</div><div class="opt-list">' + groups[g].map(function (i) {
+            var o = opts[i], lbl = o.action === 'new' ? SP.TYPES[o.type].n : o.action === 'grow' ? 'Auf 100 % ausbauen' : o.action === 'convert' ? SP.TYPES[t.type].n + ' → ' + SP.TYPES[o.type].n : 'Abreißen';
+            return '<button class="opt-card' + (i === oi ? ' on' : '') + '" data-act="planOpt" data-v="' + i + '"><b>' + (o.type ? '<i class="dot" style="background:' + SM.TYPE_COL[o.type] + '"></i>' : '') + esc(lbl) + '</b><span>' + (o.cap ? (o.cap > 0 ? '+' : '') + num(o.cap) + ' Plätze · ' : '') + o.weeks + ' Wo.</span><em>' + (o.cost ? money(o.cost) : 'kostenlos') + '</em></button>';
+          }).join('') + '</div></div>';
+        });
+      }
     }
     if (imp) {
       var o = imp.opt, afford = c.cash >= o.cost, dAtt = imp.attAfter - imp.attBefore;
@@ -112,12 +136,12 @@
       var mp = SM.build(c, { plan: imp.plan });
       h += '<div class="imp-prev">' + S3.host('preview', { kind: 'lite', model: mp, cam: 'aussen', highlight: [sel], interactive: true, ratio: '16/10', resetView: false, fallback: '<div class="splan-wrap">' + SM.planSVG(mp, { highlight: [sel] }) + '</div>' }) + '<span class="imp-tag">Vorschau nach dem Ausbau</span></div>';
       h += '<button class="primary big-build" data-act="planBuild" data-k="' + sel + '" data-v="' + oi + '"' + (afford ? '' : ' disabled title="Nicht genug Geld"') + '>' + U.lc('construction', 15) + ' Ausbau beauftragen · ' + (o.cost ? money(o.cost) : 'kostenlos') + '</button></div>';
-    } else if (opts.length) h += '<p class="muted small" style="margin-top:8px">Option antippen: Vorschau, Kosten und Auswirkung erscheinen hier.</p>';
+    } else if (opts.length && U.p.cat) h += '<p class="muted small" style="margin-top:8px">Option antippen: Vorschau, Kosten und Auswirkung erscheinen hier.</p>';
     h += '</div>';
     // Kapazität & Gästeblock
     h += '<div class="panel"><h2>Kapazität</h2><div class="grid g2">' + U.ikpi('fans', 'Stehplätze', num(parts.steh)) + U.ikpi('stadium', 'Sitzplätze', num(parts.sitz)) + U.ikpi('stocks', 'Business', num(parts.business)) + U.ikpi('star', 'Logenplätze', num(parts.loge)) + '</div>' +
       (full.steh + full.sitz + full.vip > parts.steh + parts.sitz + parts.vip ? '<p class="small warn" style="margin-top:6px">' + U.lc('construction', 15) + ' Wegen Umbau gesperrt: ' + num(full.steh + full.sitz + full.vip - parts.steh - parts.sitz - parts.vip) + ' Plätze</p>' : '') +
-      '<p class="small" style="margin-top:6px">Gästeblock: <b>' + esc(SP.sec(plan.guest).n) + '</b> · ' + num(SP.guestCap(c)) + ' Plätze' + (gs && gs.season === st.season ? ' · zuletzt ' + num(gs.last) + ' Gästefans' + (gs.short ? ' <span class="warn">(zu klein – Nachfrage ' + num(gs.demand) + ')</span>' : '') : '') + '</p>' +
+      '<p class="small" style="margin-top:6px">' + (SP.guestIds(plan).length > 1 ? 'Gästeblöcke' : 'Gästeblock') + ': <b>' + SP.guestIds(plan).map(function (id) { return esc(SP.sec(id).n); }).join(', ') + '</b> · ' + num(SP.guestCap(c)) + ' Plätze · Pflichtkontingent 10 %: ' + num(Math.round((parts.steh + parts.sitz) * E.GUEST_QUOTA)) + (SP.guestCap(c) < Math.round((parts.steh + parts.sitz) * E.GUEST_QUOTA) ? ' <span class="warn">(Gästeblöcke zu klein – weiteren Block festlegen)</span>' : '') + (gs && gs.season === st.season ? ' · zuletzt ' + num(gs.last) + ' Gästefans' + (gs.short ? ' <span class="warn">(zu klein – Nachfrage ' + num(gs.demand) + ')</span>' : '') : '') + '</p>' +
       '<div class="row between small"><span>Abnutzung Gästeblock</span><b>' + Math.round(plan.wear || 0) + ' %</b></div>' + U.bar(plan.wear || 0, 100, (plan.wear || 0) > 60 ? '#ef4444' : (plan.wear || 0) > 30 ? '#f5b301' : '#22c55e') +
       (can && (plan.wear || 0) >= 5 ? '<button class="sm" style="margin-top:6px" data-act="planRepair">Gästeblock sanieren (' + money(SP.repairCost(c)) + ')</button>' : '') +
       '<p class="muted small" style="margin-top:6px">Je höher die Liga und je größer der Gegner, desto mehr Gästefans reisen an – mehr Einnahmen, aber auch mehr Abnutzung und Randale-Gefahr. Gute Sanitäranlagen und eine regelmäßige Sanierung senken das Risiko.</p></div>';
@@ -125,14 +149,17 @@
     if (plan.jobs.length) h += '<div class="panel" style="margin-top:14px"><h2>Laufende Tribünen-Bauprojekte</h2>' + plan.jobs.map(function (j) { return '<div class="row between small" style="margin-bottom:6px"><span>' + esc(SP.sec(j.sec).n) + ': ' + esc(j.n) + '</span><span class="muted">noch ' + j.weeks + ' Wo.</span></div>' + U.bar(j.total - j.weeks, j.total, '#f5b301'); }).join('') + '</div>';
     return h;
   };
-  U.acts.planSel = function (d) { U.p.sec = d.k; U.p.opt = null; U.render(); };
+  U.acts.planSel = function (d) { U.p.sec = d.k; U.p.opt = null; U.p.cat = null; U.render(); };
+  U.acts.planCat = function (d) { U.p.cat = d.k || null; U.p.opt = null; U.render(); };
   U.acts.planOpt = function (d) { U.p.opt = +d.v; U.render(); };
+  U.acts.planGuestAdd = function (d) { if (SP.addGuest(U.club(), d.k)) U.toast('Zusätzlicher Gästeblock: ' + SP.sec(d.k).n); U.render(); };
+  U.acts.planGuestDel = function (d) { if (SP.removeGuest(U.club(), d.k)) U.toast('Gästeblock aufgehoben: ' + SP.sec(d.k).n); U.render(); };
   U.acts.planGuest = function (d) { if (SP.setGuest(U.club(), d.k)) U.toast('Gästeblock: ' + SP.sec(d.k).n); U.render(); };
   U.acts.planRepair = function () { var r = SP.repair(U.club()); U.toast(r.ok ? 'Gästeblock saniert (' + money(r.cost) + ').' : r.why); U.render(); };
   U.acts.planBuild = function (d) {
     var st = U.st, c = U.club(), o = SP.options(st, c, d.k)[+d.v]; if (!o) return;
     U.confirm('Ausbau beauftragen', '<p><b>' + esc(SP.sec(d.k).n) + '</b>: ' + esc(o.n) + '</p><p>Kosten ' + money(o.cost) + ' · Bauzeit ' + o.weeks + ' Wochen' + (o.cap ? ' · ' + (o.cap > 0 ? '+' : '') + num(o.cap) + ' Plätze' : '') + '</p>', function () {
-      var r = SP.start(st, c, d.k, +d.v); U.closeModal(); U.p.opt = null; U.toast(r.ok ? 'Baustart: ' + r.opt.n : r.why); U.render();
+      var r = SP.start(st, c, d.k, +d.v); U.closeModal(); U.p.opt = null; U.p.cat = null; U.toast(r.ok ? 'Baustart: ' + r.opt.n : r.why); U.render();
     });
   };
 

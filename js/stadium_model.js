@@ -117,6 +117,7 @@
     var gs = m.sectors[plan.guest] || null;
     m.guest = { sector: plan.guest, area: gs ? gs.area : null, center: gs ? gs.center : [0, 0], cap: gs ? gs.cap : 0 };
     if (gs) gs.guest = true;
+    SP.guestIds(plan).forEach(function (id) { if (m.sectors[id]) m.sectors[id].guest = true; }); // weitere Gästeblöcke
     // Ausbaustufe des Stadions (bestimmt Fassade, Materialien, Details)
     var maxT = Math.max.apply(null, SM.AREAS.map(function (a) { return m.areas[a].tiers; }));
     m.stage = (m.closedCorners === 4 && dl >= 3) ? 'modern' : (m.closedCorners > 0 || dl >= 2 || maxT >= 2) ? 'mittel' : 'klein';

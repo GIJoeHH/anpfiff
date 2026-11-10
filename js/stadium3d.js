@@ -633,7 +633,23 @@
     strasse: function () { return 1; }
   };
   // Vereinsbank: Glasturm mit Sockelbau, Vordach, Vorplatz und Straße (gleiche Licht- und Materialwelt wie Stadion/Stadt)
-  function buildBank(group, m, M, I, r) {
+  // Messingschild der (fiktiven) Vereinsbank mit Banklogo: Raute mit Säulen-Giebel, Schriftzug VEREINSBANK und Ort
+  function bankPlaqueTex(city) {
+    return tex('bankPlaque|' + city, 512, 384, function (g, W, H) {
+      var gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#e9cf86'); gr.addColorStop(0.5, '#c9a24a'); gr.addColorStop(1, '#8a6a22');
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      g.strokeStyle = '#5c4510'; g.lineWidth = 10; g.strokeRect(10, 10, W - 20, H - 20); g.strokeStyle = 'rgba(255,240,190,.7)'; g.lineWidth = 3; g.strokeRect(24, 24, W - 48, H - 48);
+      var cx = W / 2, cy = 140; g.fillStyle = '#0b1f3d'; g.beginPath(); g.moveTo(cx, cy - 92); g.lineTo(cx + 92, cy); g.lineTo(cx, cy + 92); g.lineTo(cx - 92, cy); g.closePath(); g.fill();
+      g.strokeStyle = '#f3dc93'; g.lineWidth = 6; g.stroke();
+      g.fillStyle = '#f3dc93'; g.beginPath(); g.moveTo(cx - 46, cy - 14); g.lineTo(cx, cy - 48); g.lineTo(cx + 46, cy - 14); g.closePath(); g.fill();
+      [-30, -10, 10, 30].forEach(function (dx) { g.fillRect(cx + dx - 5, cy - 10, 10, 44); }); g.fillRect(cx - 48, cy + 36, 96, 9);
+      g.fillStyle = '#2a1d02'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = '900 50px -apple-system, Helvetica, Arial'; g.fillText('VEREINSBANK', cx, 280);
+      var c = String(city || '').toUpperCase(); g.font = '700 ' + (c.length > 16 ? 26 : 32) + 'px -apple-system, Helvetica, Arial'; g.fillText(c, cx, 330);
+      for (var i = 0; i < 600; i++) { g.fillStyle = 'rgba(255,255,255,' + Math.random() * 0.06 + ')'; g.fillRect(Math.random() * W, Math.random() * H, 2, 1); }
+    });
+  }
+  function buildBank(group, m, M, I, r, cfg) {
     var B = new Builder(); M._dyn = M._dyn || {}; _grp = group;
     B.quad('ground', [-500, 0, -500], [500, 0, -500], [500, 0, 500], [-500, 0, 500], [[0, 0], [20, 0], [20, 20], [0, 20]]);
     B.quad('paving', [-60, 0.02, -30], [60, 0.02, -30], [60, 0.02, 34], [-60, 0.02, 34], [[0, 0], [15, 0], [15, 8], [0, 8]]);
@@ -648,6 +664,10 @@
     B.box('steel', 0, 22.5, 36, 7, 7.2, 0.6, 0, {});
     B.box('steelDark', -16, 25, 0.5, 0.5, 0, 7.2, 0, { top: false }); B.box('steelDark', 16, 25, 0.5, 0.5, 0, 7.2, 0, { top: false });
     sign(B, 'sgBANK', 'VEREINSBANK', '#0b1424', '#e8eef8', 0, 21.15, 8.0, 20, 1.6, 0);
+    // Banklogo als Messingschild im Erdgeschoss links neben dem Vordach – fest an der Fassade; anklickbar nur bei aktivem Cheat
+    var pl = new T.Mesh(new T.PlaneGeometry(7.2, 5.4), new T.MeshStandardMaterial({ map: bankPlaqueTex(cfg && cfg.city), metalness: 0.65, roughness: 0.32, emissive: '#5a4512', emissiveIntensity: 0.35 }));
+    pl.position.set(-25, 3.9, 21.08); if (cfg && cfg.plaque) pl.userData.act = cfg.plaque; group.add(pl);
+    B.box('steelDark', -25, 21.03, 7.6, 0.06, 1.0, 5.8, 0, {});
     // Nachbargebäude
     [[-78, -12, 30, 34, 26, 'f_concrete'], [78, -40, 28, 30, 34, 'f_brick'], [-90, -70, 40, 30, 44, 'f_office'], [40, -90, 36, 30, 60, 'f_office'], [-30, -110, 50, 30, 30, 'f_brick']].forEach(function (b) { B.box(b[5], b[0], b[1], b[2], b[3], 0, b[4], 0, { topKey: 'roofTop' }); });
     for (var i = 0; i < 9; i++) { treeAt(I, r, -56 + i * 14, 32, 0.8); }
@@ -689,7 +709,7 @@
     }
     var group = new T.Group(); scene.add(group); _grp = group;
     var I = new Inst();
-    if (cfg.kind === 'bank') { var hb = buildBank(group, m, M, I, r); flushInst(group, I, m, hq()); return { scene: scene, heights: hb }; }
+    if (cfg.kind === 'bank') { var hb = buildBank(group, m, M, I, r, cfg); flushInst(group, I, m, hq()); return { scene: scene, heights: hb }; }
     if (cfg.kind === 'focus') { var hf = buildFocus(group, m, M, I, r, cfg.focus); flushInst(group, I, m, hq()); return { scene: scene, heights: hf }; }
     var o = { highlight: cfg.highlight || [], lamps: [] }, info = buildStadium(group, m, M, o);
     buildPlaza(group, m, M, I, r, big);
@@ -743,7 +763,7 @@
     Object.keys(TEX).forEach(function (k) { TEX[k].dispose(); }); TEX = {}; S3._env = null; SNAPS = {};
     if (renderer) { renderer.dispose(); if (renderer.forceContextLoss) renderer.forceContextLoss(); renderer = null; }
   };
-  function hashOf(cfg) { var m = cfg.model; return cfg.kind + '|' + hq() + '|' + JSON.stringify(m.parts) + '|' + JSON.stringify(m.levels) + '|' + m.colors + '|' + Math.round(m.attendance * 4) + '|' + JSON.stringify((cfg.buildings || []).map(function (b) { return b.level; })) + '|' + (cfg.highlight || []).join() + '|' + (cfg.kind === 'focus' && cfg.focus ? cfg.focus.key + cfg.focus.level : ''); }
+  function hashOf(cfg) { var m = cfg.model; return cfg.kind + '|' + (cfg.plaque || '') + '|' + (cfg.city || '') + '|' + hq() + '|' + JSON.stringify(m.parts) + '|' + JSON.stringify(m.levels) + '|' + m.colors + '|' + Math.round(m.attendance * 4) + '|' + JSON.stringify((cfg.buildings || []).map(function (b) { return b.level; })) + '|' + (cfg.highlight || []).join() + '|' + (cfg.kind === 'focus' && cfg.focus ? cfg.focus.key + cfg.focus.level : ''); }
   function getScene(cfg) {
     var h = hashOf(cfg), k = cfg.kind + ':' + h.length + ':' + hsh(h);
     if (!CACHE[k]) {
@@ -793,13 +813,27 @@
     } catch (e) { console.warn(e); }
     setTimeout(runSnaps, 0);
   }
+  // Anklickbare 3D-Objekte (userData.act): Strahl von der Kamera durch den Klickpunkt
+  var ray = null;
+  S3._pick = function (key, x, y) { var L = live[key]; if (L) return pick(key, L.el, { clientX: x, clientY: y }); return 'nolive'; };
+  function pick(key, el, e) {
+    var L = live[key]; if (!L) return; var entry = getScene(L.cfg); if (!entry) return;
+    var hits = []; entry.scene.traverse(function (o) { if (o.userData && o.userData.act) hits.push(o); }); if (!hits.length) return 'nohits';
+    var rc = el.getBoundingClientRect(), cam = new T.PerspectiveCamera(35, rc.width / rc.height, 1, 4000);
+    placeCamera(cam, VIEWS[key + ':' + L.cfg.cam], L.cfg); cam.updateMatrixWorld(); entry.scene.updateMatrixWorld();
+    ray = ray || new T.Raycaster(); ray.setFromCamera({ x: (e.clientX - rc.left) / rc.width * 2 - 1, y: -((e.clientY - rc.top) / rc.height * 2 - 1) }, cam);
+    var hit = ray.intersectObjects(hits, false)[0]; if (!hit) return 'miss';
+    var act = hit.object.userData.act; if (R.ui && R.ui.acts && R.ui.acts[act]) R.ui.acts[act]({ k: hit.object.userData.k }, el);
+    hit.object.scale.set(0.94, 0.94, 1); schedule(key); setTimeout(function () { hit.object.scale.set(1, 1, 1); schedule(key); }, 140); // kurzes „Drücken“
+    return 'hit:' + act;
+  }
   S3.redrawAll = function () { Object.keys(live).forEach(function (k) { if (live[k].el.isConnected) draw(k); }); };
   function setup(key, el, cfg) {
     var v = VIEWS[key + ':' + cfg.cam]; if (!v || cfg.resetView) v = VIEWS[key + ':' + cfg.cam] = camDefaults(cfg);
     if (!cfg.interactive) return;
-    var cv = el.querySelector('.s3d-cv'), pts = {}, last = null, pinch = null;
+    var cv = el.querySelector('.s3d-cv'), pts = {}, last = null, pinch = null, down = null;
     cv.style.touchAction = 'none';
-    cv.addEventListener('pointerdown', function (e) { cv.setPointerCapture(e.pointerId); pts[e.pointerId] = [e.clientX, e.clientY]; last = [e.clientX, e.clientY]; var ids = Object.keys(pts); if (ids.length === 2) pinch = dist2(); el.classList.add('drag'); });
+    cv.addEventListener('pointerdown', function (e) { cv.setPointerCapture(e.pointerId); pts[e.pointerId] = [e.clientX, e.clientY]; down = Object.keys(pts).length === 1 ? [e.clientX, e.clientY] : null; last = [e.clientX, e.clientY]; var ids = Object.keys(pts); if (ids.length === 2) pinch = dist2(); el.classList.add('drag'); });
     cv.addEventListener('pointermove', function (e) {
       if (!pts[e.pointerId]) return; pts[e.pointerId] = [e.clientX, e.clientY];
       var ids = Object.keys(pts);
@@ -809,7 +843,11 @@
       else { v.az -= dx * 0.25; v.el = Math.max(14, Math.min(72, v.el + dy * 0.18)); }
       schedule(key);
     });
-    function up(e) { delete pts[e.pointerId]; if (Object.keys(pts).length < 2) pinch = null; if (!Object.keys(pts).length) el.classList.remove('drag'); }
+    function up(e) {
+      delete pts[e.pointerId]; if (Object.keys(pts).length < 2) pinch = null; if (!Object.keys(pts).length) el.classList.remove('drag');
+      if (e.type === 'pointerup' && down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) < 6) pick(key, el, e); // Klick ohne Ziehen
+      down = null;
+    }
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
     cv.addEventListener('wheel', function (e) { e.preventDefault(); zoom(Math.exp(e.deltaY * 0.0012)); }, { passive: false });
     function dist2() { var a = Object.keys(pts).map(function (k) { return pts[k]; }); return Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]) || 1; }

@@ -449,12 +449,15 @@
   var FX_N = { mor: 'Moral', fit: 'Fitness', fresh: 'Frische', inj: 'Verletzungsgefahr', dev: 'Entwicklung' };
   // Kleine Landschaftsillustration je Trainingslager (Vektor, keine Bilddateien)
   function campArt(id) {
-    var sky = { harz: ['#6f8fb3', '#b9c9d6'], tirol: ['#4a7fc0', '#bcd6ee'], mallorca: ['#3d8fd1', '#f3d39b'], dubai: ['#e08a4b', '#f5d08c'] }[id] || ['#4a7fc0', '#bcd6ee'];
+    var sky = { kaiserau: ['#5b8fd0', '#cfe0f0'], hennef: ['#e28d5a', '#f6d7a2'], tegernsee: ['#4a86cf', '#d6e8f7'], sylt: ['#5aa2e0', '#e1f0fb'], harz: ['#6f8fb3', '#b9c9d6'], tirol: ['#4a7fc0', '#bcd6ee'], mallorca: ['#3d8fd1', '#f3d39b'], dubai: ['#e08a4b', '#f5d08c'] }[id] || ['#4a7fc0', '#bcd6ee'];
     var g = '<svg viewBox="0 0 200 84" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="cs' + id + '" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="' + sky[0] + '"/><stop offset="1" stop-color="' + sky[1] + '"/></linearGradient></defs><rect width="200" height="84" fill="url(#cs' + id + ')"/>';
     if (id === 'harz') g += '<path d="M0 60 Q40 34 80 52 T160 44 T200 50 V84 H0Z" fill="#3f6b45"/><path d="M0 70 Q50 52 100 66 T200 62 V84 H0Z" fill="#2c5233"/>' + [20, 34, 48, 140, 156, 172].map(function (x, i) { return '<path d="M' + x + ' ' + (62 - i % 2 * 4) + ' l6 -16 l6 16z" fill="#1f3d27"/>'; }).join('') + '<rect y="0" width="200" height="84" fill="rgba(200,210,220,.18)"/>';
     if (id === 'tirol') g += '<path d="M0 66 L40 24 L62 44 L96 10 L132 50 L160 30 L200 60 V84 H0Z" fill="#7d8a9c"/><path d="M84 22 L96 10 L108 22 L100 20 L94 25Z M32 32 L40 24 L48 32 L42 31Z" fill="#f4f7fb"/><path d="M0 72 Q60 58 120 70 T200 66 V84 H0Z" fill="#5f8f4e"/>';
     if (id === 'mallorca') g += '<circle cx="160" cy="22" r="10" fill="#fff3c4"/><rect y="52" width="200" height="14" fill="#2b88c7"/><path d="M0 66 H200 V84 H0Z" fill="#ecd3a0"/><path d="M30 66 Q34 46 30 36 M30 36 q-10 0 -16 6 M30 36 q10 -2 16 4 M30 36 q-4 -8 -12 -8 M30 36 q6 -8 14 -6" stroke="#2f5d36" stroke-width="2.4" fill="none"/>';
     if (id === 'dubai') g += '<circle cx="40" cy="26" r="11" fill="#fff1c9"/>' + [[70, 30, 8], [84, 40, 7], [100, 8, 6], [112, 34, 8], [128, 26, 7], [142, 44, 9]].map(function (b) { return '<rect x="' + b[0] + '" y="' + b[1] + '" width="' + b[2] + '" height="' + (70 - b[1]) + '" fill="#6b5a6e"/>'; }).join('') + '<path d="M102 8 l1 -8 l1 8z" fill="#6b5a6e"/><path d="M0 66 Q60 58 120 68 T200 64 V84 H0Z" fill="#e6c48a"/>';
+    if (id === 'kaiserau' || id === 'hennef') g += '<rect y="56" width="200" height="28" fill="#3f8a4a"/><rect x="18" y="60" width="96" height="20" fill="none" stroke="#e8f5e9" stroke-width="1.4"/><line x1="66" y1="60" x2="66" y2="80" stroke="#e8f5e9" stroke-width="1.2"/><rect x="122" y="30" width="62" height="30" fill="' + (id === 'hennef' ? '#d9c7a4' : '#e5e7eb') + '"/><path d="M118 32 L153 18 L188 32Z" fill="#9a3b2e"/>' + [128, 140, 152, 164, 176].map(function (x) { return '<rect x="' + x + '" y="38" width="6" height="7" fill="#7cb3e0"/><rect x="' + x + '" y="49" width="6" height="7" fill="#7cb3e0"/>'; }).join('') + (id === 'hennef' ? '<path d="M28 52 l5 -10 l5 10z" fill="#f59e0b"/><path d="M30 52 l3 -6 l3 6z" fill="#fde68a"/>' : '');
+    if (id === 'tegernsee') g += '<path d="M0 50 L30 22 L52 40 L84 12 L118 44 L150 20 L200 48 V60 H0Z" fill="#6b7a8f"/><path d="M76 20 L84 12 L92 20Z M144 26 L150 20 L156 26Z" fill="#f8fafc"/><rect y="56" width="200" height="16" fill="#2f7fb8"/><path d="M0 72 H200 V84 H0Z" fill="#3f7a46"/><path d="M60 62 h22 l-4 4 h-14z" fill="#f8fafc"/>';
+    if (id === 'sylt') g += '<rect y="50" width="200" height="12" fill="#3b82c4"/><path d="M0 62 Q50 54 100 62 T200 60 V84 H0Z" fill="#ead7a4"/><path d="M0 70 Q40 60 80 70 T160 66 T200 70 V84 H0Z" fill="#c9b27a"/><rect x="150" y="18" width="10" height="40" fill="#f8fafc"/><rect x="150" y="26" width="10" height="6" fill="#dc2626"/><rect x="150" y="40" width="10" height="6" fill="#dc2626"/><path d="M148 18 h14 l-3 -6 h-8z" fill="#1f2937"/>';
     return g + '</svg>';
   }
   U.screens.training = function () {
@@ -486,7 +489,34 @@
         (isBooked ? '<span class="pill ok">' + U.lc('check', 13) + 'Eingeplant</span>' : canPlan && free && !booked ? '<button class="sm secondary" data-act="campPlan" data-k="' + cp.id + '" data-w="' + free.k + '">Einplanen (' + esc(free.n) + ')</button>' : '<span class="muted small">' + (weeks.length ? (booked ? 'Lager für diese Pause bereits gebucht' : 'Planung durch die Vereinsführung') : 'Buchbar in Vorbereitung und Winterpause') + '</span>') + '</div></div>';
     });
     h += '</div>';
+    h += U.shortCampPanel(st, c);
     return h;
+  };
+  // Kurz-Trainingslager in Deutschland (während der Saison, max. 3, auf Anraten des Trainers)
+  U.shortCampPanel = function (st, c) {
+    if (st.phase !== 'season') return '';
+    var s = S.shortCampState(st), adv = S.shortCampAdvice(st, c), coach = S.userIsCoach(st), left = S.SHORT_CAMPS_MAX - s.n;
+    var can = U.can('business') || coach;
+    var head = coach ? (adv ? '<b>Deine Einschätzung als Trainer:</b> ' + esc(adv.why.join(' ')) : 'Du entscheidest als Trainer selbst, ob die Mannschaft einen Impuls braucht.')
+      : adv ? '<b>' + esc(U.coachName ? U.coachName(c) : 'Der Trainer') + ' wünscht sich ein Kurz-Trainingslager:</b> ' + esc(adv.why.join(' ')) : 'Der Trainer sieht derzeit keinen Bedarf. Sobald Frische, Moral oder Teamchemie absacken, meldet er sich.';
+    var h = '<div class="sec-h">Kurz-Trainingslager in Deutschland <span style="margin-left:auto">' + s.n + ' / ' + S.SHORT_CAMPS_MAX + ' genutzt in dieser Saison</span></div>' +
+      '<div class="note ' + (adv ? 'warn' : '') + '" style="margin-bottom:10px">' + U.lc(adv ? 'megaphone' : 'info', 15) + ' ' + head + '</div><div class="camp-cards short">';
+    D.shortCamps.forEach(function (cp) {
+      var chk = S.canShortCamp(st, c, cp.id);
+      var fx = [['Frische', cp.fresh], ['Moral', cp.mor], ['Teamchemie', cp.chem * 2]];
+      h += '<div class="camp"><div class="camp-art">' + campArt(cp.id) + '<span class="camp-cost">' + money(cp.cost) + '</span></div><div class="camp-b"><b>' + cp.name + '</b> <span class="muted small">' + cp.region + '</span><p>' + cp.desc + '</p><div class="camp-fx">' +
+        fx.map(function (x) { return '<div><span>' + x[0] + ' +' + x[1] + '</span>' + U.bar(x[1], 16, '#22c55e') + '</div>'; }).join('') + '</div>' +
+        (can ? (chk.ok ? '<button class="sm primary" data-act="shortCamp" data-k="' + cp.id + '">' + U.lc('bus', 14) + ' Diese Woche fahren</button>' : '<span class="muted small">' + esc(chk.why) + '</span>') : '<span class="muted small">Entscheidung liegt beim Trainer.</span>') + '</div></div>';
+    });
+    return h + '</div>' + (left <= 0 ? '' : '');
+  };
+  U.acts.shortCamp = function (d) {
+    var st = U.st, c = U.club(), cp = D.shortCamps.filter(function (x) { return x.id === d.k; })[0];
+    U.confirm('Kurz-Trainingslager', 'Mit der Mannschaft diese Woche für einige Tage nach <b>' + esc(cp.name) + '</b> (' + esc(cp.region) + ') fahren? Kosten ' + money(cp.cost) + '.', function () {
+      var r = S.applyShortCamp(st, c, d.k);
+      if (!r.ok) U.toast(r.why); else U.modal(U.lc('bus', 16) + ' Kurz-Trainingslager', '<p>' + esc(r.text) + '</p>', '<button class="primary" data-act="closeModal">OK</button>');
+      U.render();
+    });
   };
   U.acts.campPlan = function (d) { var r = S.setPlan(U.st, d.w, { type: 'camp', camp: d.k }); U.toast(r.ok ? 'Trainingslager eingeplant.' : r.why); U.render(); };
   U.acts.setTraining = function (d) { var c = U.club(); c.training = d.k; if (U.st.manager.role === 'gf') c.trainingByUser = true; U.render(); U.toast('Trainingsschwerpunkt: ' + D.training[d.k].n); };
@@ -497,7 +527,7 @@
     var can = S.planOwnerIsUser(st) && U.can('business') || st.manager.role === 'manager';
     var cur = S.isBreak(st) ? S.breakKey(st) : null, opps = S.friendlyOpponents(st, c), plan = st.plan || {};
     var title = weeks[0].k.charAt(0) === 'p' ? 'Saisonvorbereitung planen' : 'Winterpause planen';
-    var h = '<div class="panel" style="margin-bottom:16px"><div class="panel-h"><h2>' + U.lc('calendar', 17) + ' ' + title + '</h2><span class="muted small">' + (can ? 'Planung: Sie (' + S.roleName(st.manager.role) + ')' : 'Planung: Vereinsführung') + '</span></div><table class="t plan-t"><tr><th>Woche</th><th>Programm</th><th></th></tr>';
+    var h = '<div class="panel" id="planPanel" style="margin-bottom:16px"><div class="panel-h"><h2>' + U.lc('calendar', 17) + ' ' + title + '</h2><span class="muted small">' + (can ? 'Planung: Sie (' + S.roleName(st.manager.role) + ')' : 'Planung: Vereinsführung') + '</span></div><table class="t plan-t"><tr><th>Woche</th><th>Programm</th><th></th></tr>';
     weeks.forEach(function (w) {
       var it = plan[w.k], past = w.past || (it && it.done), now = cur === w.k;
       var desc = w.cup ? '<span class="plan-ev cup">' + U.lc('trophy', 14) + '1. Pokalrunde</span>' + (it && it.type === 'camp' ? ' ' : '') : '';

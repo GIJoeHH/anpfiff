@@ -131,6 +131,7 @@
     });
     S.drawCup(st, 0);
     st.releg = null; st.week = 0; st.phase = 'preseason'; st.prep = 1; st.winter = 0; st.campDone = false; st.winterCampDone = false;
+    S.setPlanEvent(st, 'preseason');
     var keep = {}; Object.keys(st.plan || {}).forEach(function (k) { if (k.charAt(0) === 'p' && !st.plan[k].done) keep[k] = st.plan[k]; }); st.plan = keep;
     // Saisonziele / Vorstandserwartung
     [1, 2, 3].forEach(function (l) {
@@ -238,6 +239,7 @@
     var isLeagueWeek = st.phase === 'season';
     if (isLeagueWeek) st.week++;
     st.tick = (st.tick || 0) + 1; // fortlaufende Kalenderwoche (auch Vorbereitung/Winterpause)
+    if (R.realty) R.realty.tick(st); // Immobilien: Monatsbuchungen am Monatsende (idempotent je Kalenderwoche)
 
     prep.list.forEach(function (fx) {
       var m = played[fx.key];
@@ -284,6 +286,7 @@
       if (st.week >= S.SEASON_WEEKS) S.toRelegation(st);
       else if (st.week === S.WINTER_AFTER) {
         st.phase = 'winter'; st.winter = 1; st.winterCampDone = false;
+        S.setPlanEvent(st, 'winter');
         S.news(st, 'Winterpause!', 'Nach dem ' + S.WINTER_AFTER + '. Spieltag ruht der Ball für ' + S.WINTER_WEEKS + ' Wochen. Zeit für Trainingslager, Testspiele und Transfers (Transferfenster bis einschließlich 19. Spieltag).', 'liga');
       }
     } else if (st.phase === 'preseason' || st.phase === 'winter') {
@@ -365,11 +368,13 @@
   S.guestAftermath = function (st, home, away, att, fx) {
     var g = att.guests || 0; if (!g || !R.stadium) return;
     R.stadium.ensure(home);
-    var plan = home.stadium, derby = home.rivals.indexOf(away.id) >= 0, lgF = { 1: 1.3, 2: 1, 3: 0.8 }[home.league] || 1;
-    plan.wear = Math.min(100, (plan.wear || 0) + g / 1800 * (derby ? 2 : 1) * (fx.comp === 'friendly' ? 0.3 : 1));
+    var plan = home.stadium, mu = E.matchup(st, home, away), derby = mu.derby >= 0.4, lgF = { 1: 1.3, 2: 1, 3: 0.8 }[home.league] || 1;
+    // Fanfreundschaft: viele Gäste, aber friedlich – keine Abnutzung, keine Randale
+    if (!mu.friend) plan.wear = Math.min(100, (plan.wear || 0) + g / 1800 * (1 + mu.derby * 1.4) * (fx.comp === 'friendly' ? 0.3 : 1));
     home.guestStats = { season: st.season, last: g, demand: att.guestDemand, cap: att.guestCap, short: att.guestDemand > att.guestCap * 1.15 && g >= att.guestCap * 0.97 };
     var san = E.level(home, 'sanitaer') ? home.fac.sanitaer || 0 : 0;
-    var p = Math.min(0.35, g / 1000 * 0.014 * (derby ? 2.2 : 1) * lgF * (1 + plan.wear / 45) * (1 - san * 0.12));
+    var p = Math.min(0.35, g / 1000 * 0.014 * (1 + mu.derby * 1.7) * lgF * (1 + plan.wear / 45) * (1 - san * 0.12));
+    if (mu.friend) return;
     if (st.pendingEvent || fx.comp === 'friendly' || !R.chance(p)) return;
     var type = S.forceDamageType || (R.chance(0.6) ? 'wc' : R.stadium.guestType(home) === 'steh' ? 'zaun' : 'sitze');
     var dmg = R.round({ wc: 6000 + san * 9000, zaun: 9000, sitze: 4000 }[type] * (1 + g / 2500) * (derby ? 1.5 : 1), 1000);
@@ -415,6 +420,9 @@
   };
   // Wer plant Vorbereitung/Winterpause? Manager und Geschäftsführer selbst, beim Trainer die Vereinsführung
   S.planOwnerIsUser = function (st) { return st.manager.role !== 'trainer'; };
+  // Ereignis zu Beginn von Vorbereitung/Winterpause: führt den Spieler verpflichtend zur Planungsseite
+  S.setPlanEvent = function (st, kind) { st.planEvent = (st.manager && !st.manager.unemployed && S.planOwnerIsUser(st)) ? { kind: kind, season: st.season, seen: false } : null; };
+  S.planEventOpen = function (st) { var e = st.planEvent; return !!(e && !e.seen && e.season === st.season && ((e.kind === 'winter' && st.phase === 'winter') || (e.kind === 'preseason' && st.phase === 'preseason'))); };
   // Testspiel-Gegner: Vorschläge (stärker/ähnlich/schwächer)
   S.friendlyOpponents = function (st, club) {
     var all = Object.keys(st.clubs).map(function (k) { return st.clubs[k]; }).filter(function (c) { return c.id !== club.id; });
@@ -556,6 +564,44 @@
       }
       W.recalc(p);
     }
+  };
+
+  // ---------- Kurz-Trainingslager während der Saison (Deutschland, max. 3 je Saison) ----------
+  S.SHORT_CAMPS_MAX = 3;
+  S.userIsCoach = function (st) { return st.manager.role !== 'gf'; };
+  S.shortCampState = function (st) { if (!st.shortCamps || st.shortCamps.season !== st.season) st.shortCamps = { season: st.season, n: 0, weeks: [] }; return st.shortCamps; };
+  // Meint der (KI-)Trainer, die Mannschaft braucht einen Impuls? Gründe aus Frische, Moral und Zusammenhalt
+  S.shortCampAdvice = function (st, club) {
+    var sq = W.squad(st, club.id).filter(function (p) { return !p.inj; }); if (!sq.length) return null;
+    var fit = R.avg(sq, function (p) { return p.fitness; }), mor = R.avg(sq, function (p) { return p.morale; }), why = [];
+    if (fit < 80) why.push('Die Spieler sind müde (Frische ' + Math.round(fit) + ').');
+    if (mor < 55) why.push('Die Stimmung ist schlecht (Moral ' + Math.round(mor) + ').');
+    if (club.chemistry < 50) why.push('Die Mannschaft wirkt nicht als Einheit (Teamchemie ' + Math.round(club.chemistry) + ').');
+    return why.length ? { why: why, fit: fit, mor: mor } : null;
+  };
+  S.canShortCamp = function (st, club, id) {
+    var c = D.shortCamps.filter(function (x) { return x.id === id; })[0], s = S.shortCampState(st);
+    if (!c) return { ok: false, why: 'Unbekanntes Trainingslager' };
+    if (st.phase !== 'season') return { ok: false, why: 'Kurz-Trainingslager gibt es nur während der laufenden Saison (Vorbereitung und Winterpause haben eigene Trainingslager).' };
+    if (s.n >= S.SHORT_CAMPS_MAX) return { ok: false, why: 'In dieser Saison wurden bereits ' + S.SHORT_CAMPS_MAX + ' Kurz-Trainingslager durchgeführt.' };
+    if (s.weeks.indexOf(st.week) >= 0) return { ok: false, why: 'Diese Woche war die Mannschaft schon im Trainingslager.' };
+    if (!S.userIsCoach(st) && !S.shortCampAdvice(st, club)) return { ok: false, why: 'Der Trainer sieht derzeit keinen Bedarf für ein Trainingslager.' };
+    if (club.cash < c.cost) return { ok: false, why: 'Nicht genug Geld für das Trainingslager (' + R.fmtMoney(c.cost) + ').' };
+    return { ok: true, camp: c };
+  };
+  S.applyShortCamp = function (st, club, id) {
+    var chk = S.canShortCamp(st, club, id); if (!chk.ok) return chk;
+    var c = chk.camp, s = S.shortCampState(st);
+    club.cash -= c.cost; E.book(club, 'Trainingslager', -c.cost);
+    s.n++; s.weeks.push(st.week);
+    W.squad(st, club.id).forEach(function (p) {
+      if (!p.inj) p.fitness = R.clamp(p.fitness + c.fresh, 0, 100);
+      p.morale = R.clamp(p.morale + c.mor, 0, 100);
+    });
+    club.chemistry = R.clamp(club.chemistry + c.chem * 2, 0, 100);
+    var text = c.name + ' (' + c.region + '): ' + c.desc + ' Frische +' + c.fresh + ', Moral +' + c.mor + ', Teamchemie +' + c.chem * 2 + '. Noch ' + (S.SHORT_CAMPS_MAX - s.n) + ' Kurz-Trainingslager in dieser Saison möglich.';
+    S.news(st, 'Kurz-Trainingslager in ' + c.name, text, 'training');
+    return { ok: true, text: text, left: S.SHORT_CAMPS_MAX - s.n };
   };
 
   S.applyCamp = function (st, club, campId) {

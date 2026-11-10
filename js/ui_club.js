@@ -27,6 +27,9 @@
   function hashStr(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
   U.brandLogo = function (name, size, isKit) {
     size = size || 64; name = String(name || '?');
+    // Echtes Firmenlogo, wenn es auf diesem Gerät geladen wurde (nur privat, siehe js/logos.js)
+    var real = R.logos && (!U.st || R.logos.enabled(U.st)) ? R.logos.get(name) : null;
+    if (real) return '<span class="brand-img" style="width:' + size + 'px;height:' + size + 'px;padding:' + Math.round(size * 0.1) + 'px" aria-label="' + esc(name) + '"><img src="' + real + '" alt="' + esc(name) + '"></span>';
     var h = hashStr(name), col = LOGO_COL[h % LOGO_COL.length], shape = (h >> 4) % 3, ic = isKit ? '👕' : '';
     if (!ic) for (var i = 0; i < LOGO_IC.length; i++) if (LOGO_IC[i][0].test(name)) { ic = LOGO_IC[i][1]; break; }
     var words = name.replace(/[&.,]/g, ' ').split(/\s+/).filter(function (w) { return w && !/^(AG|GmbH|SE|und|&|Zum|Der|Die|Das|Holding)$/i.test(w); });
@@ -150,13 +153,8 @@
     var h = '<h1 class="row" style="gap:10px">' + U.crest(c, 34) + esc(c.stadiumName) + '</h1>' + U.roleNote('business');
     h += '<div class="grid g4" style="margin-bottom:14px">' + U.ikpi('stadium', 'Kapazität', R.fmtNum(E.capacity(c))) + U.ikpi('star', 'Attraktivität', att + '/100', '', U.bar(att, 100, '#fbbf24')) + U.ikpi('traffic', 'Verkehrskapazität', R.fmtNum(tcap) + ' Fans') + U.ikpi('fans', 'Ø Zuschauer', avg ? R.fmtNum(avg) : '–', '', U.fillBar(avg ? avg / E.capacity(c) * 100 : 0)) + '</div>';
     h += U.stadiumStage(st, c);
-    h += '<div class="grid g2" style="margin-top:14px">';
-    // Ticketpreise
-    var ref = E.refPrices[c.league], fakeAway = st.clubs[st.leagues[c.league].clubIds.filter(function (x) { return x !== c.id; })[0]];
-    var est = E.attendance(st, c, fakeAway, 'league');
-    h += '<div class="panel"><h2>Eintrittspreise</h2>' + ['steh', 'sitz', 'vip'].map(function (k) {
-      return '<div class="row between" style="margin-bottom:6px"><span>' + { steh: 'Stehplatz', sitz: 'Sitzplatz', vip: parts.biz ? 'Logen (Business 35 %)' : 'VIP' }[k] + ' <span class="muted small">(' + R.fmtNum(parts[k]) + ' Plätze, üblich ~' + ref[k] + ' €)</span></span><span><input type="number" style="width:80px" data-chg="ticket" data-k="' + k + '" value="' + c.tickets[k] + '" min="1"' + (U.can('business') ? '' : ' disabled') + '> €</span></div>';
-    }).join('') + '<div class="help small">Prognose gegen einen Durchschnittsgegner: <b>' + R.fmtNum(est.total) + '</b> Zuschauer (' + Math.round(est.total / Math.max(1, est.capacity) * 100) + ' %), Erlös ' + money(est.ticket + est.cater + est.parking) + ', Nachfrage ' + R.fmtNum(est.demand) + ', Zufriedenheit ' + est.satisfaction + '/100' + (est.congestion > 0.05 ? '<br><span class="warn">' + U.lc('triangle-alert', 14) + ' Verkehrsengpass: Staus kosten Zuschauer und Fanzufriedenheit.</span>' : '') + '</div></div>';
+    // Ticketpreise & Zuschauerprognose (js/ui_tickets.js)
+    h += '<div style="margin-top:14px">' + U.ticketPanel(st, c) + '</div><div class="grid g2" style="margin-top:14px">';
     h += '<div class="panel"><h2>Zuschauerverlauf</h2>' + (c.attendanceHist.length > 1 ? U.sparkline(c.attendanceHist, 300, 90, '#3b82f6') : '<p class="muted small">Noch keine Heimspiele.</p>') + '<p class="muted small">Rekord: ' + R.fmtNum(c.records.attendance) + '</p></div></div>';
     h += '<div class="seg" style="margin:16px 0 12px">' + [['plan', 'Stadionplan (Tribünen)'], ['stadion', 'Ausstattung'], ['infra', 'Verkehrsinfrastruktur']].map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="tab" data-s="stadion" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
     var effects = { steh: 'Mehr günstige Plätze – mehr Stimmung.', sitz: 'Mehr Sitzplätze: höhere Erlöse, mehr Komfort.', dach: 'Komfort und Attraktivität.', vip: 'Hohe Erlöse pro Platz, Hospitality.', licht: 'Abendspiele und Attraktivität.', video: 'Attraktivität.', rasen: 'Attraktivität und Spielqualität.', sanitaer: 'Zufriedenheit der Zuschauer.', hosp: 'Höherer Umsatz pro Zuschauer.', technik: 'Moderner Komfort.', oepnv: 'Transportiert viele Fans – ersetzt Parkplatzbedarf. Große Projekte mit städtischem Zuschuss.', strasse: 'Begrenzt, wie viele Autos ankommen können.', parken: 'Parkplätze bringen Parkgebühren, benötigen aber eine gute Straße.' };
@@ -214,16 +212,15 @@
   U.screens.bank = function () {
     var st = U.st, c = U.club(), can = U.can('business'), tab = U.p.tab || 'uebersicht';
     if (tab === 'bank') tab = 'kredit';
-    var debt = E.debt(c), stocksV = E.portfolioValue(st, c, 'stocks'), cryptoV = E.portfolioValue(st, c, 'crypto'), net = c.cash + c.savings + stocksV + cryptoV - debt;
+    var debt = E.debt(c), stocksV = E.portfolioValue(st, c, 'stocks'), cryptoV = E.portfolioValue(st, c, 'crypto'), net = c.cash + c.savings + stocksV + cryptoV - debt + (R.realty ? R.realty.portfolio(st, c).equity : 0);
     var h = '<div class="page-h"><div><h1>Bank &amp; Finanzen</h1><div class="page-sub">Vereinsbank ' + esc(c.city) + ' · Konto von ' + esc(c.name) + '</div></div><div class="row"><span class="pill ' + (net < 0 ? 'bad' : 'ok') + '">' + U.lc('wallet', 13) + 'Nettovermögen ' + money(net) + '</span></div></div>' + U.roleNote('business');
-    h += '<div class="seg" style="margin-bottom:16px">' + [['uebersicht', 'Übersicht', 'landmark'], ['kredit', 'Kredite & Tagesgeld', 'piggy-bank'], ['aktien', 'Aktienmarkt', 'chart-line'], ['krypto', 'Kryptowährungen', 'bitcoin'], ['bilanz', 'Finanzbericht', 'receipt']].map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="tab" data-s="bank" data-tab="' + x[0] + '">' + U.lc(x[2], 15) + x[1] + '</button>'; }).join('') + '</div>';
+    h += '<div class="seg" style="margin-bottom:16px">' + [['uebersicht', 'Übersicht', 'landmark'], ['kredit', 'Kredite & Tagesgeld', 'piggy-bank'], ['aktien', 'Aktienmarkt', 'chart-line'], ['krypto', 'Kryptowährungen', 'bitcoin'], ['immo', 'Immobilien', 'building-2'], ['bilanz', 'Finanzbericht', 'receipt']].map(function (x) { return '<button class="' + (tab === x[0] ? 'on' : '') + '" data-act="tab" data-s="bank" data-tab="' + x[0] + '">' + U.lc(x[2], 15) + x[1] + '</button>'; }).join('') + '</div>';
     if (tab === 'uebersicht') {
       var lim = E.creditLimit(st, c), rate = E.loanRate(st, c);
       var row = function (ic, l, v, cls, sub, tone) { return '<div class="fin-row"><div class="ic-tile ' + (tone || '') + '">' + U.lc(ic, 19) + '</div><div class="fin-l"><span>' + l + '</span>' + (sub ? '<small>' + sub + '</small>' : '') + '</div><b class="' + (cls || '') + '">' + v + '</b></div>'; };
-      // Fiktives Banklogo im Erdgeschoss links neben dem Vordach (fest an der Fassade); bei aktivem Cheat ist es das geheime Bankdirektor-Schild
-      var labels = [{ x: -24, y: 21.3, z: 4.2, html: '<span class="bank-logo"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="none" stroke="#d8b866" stroke-width="1.6"/><path d="M7 8l5 9 5-9" fill="none" stroke="#d8b866" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.2 8h5.6" stroke="#d8b866" stroke-width="1.4" stroke-linecap="round"/></svg><span><b>VEREINSBANK</b><i>' + esc(c.city) + '</i></span></span>', cls: 'bank-sign' + (st.settings.cheatEnabled ? ' cheat' : ''), act: st.settings.cheatEnabled ? 'bankSign' : null }];
-      h += '<div class="bank-hero"><div class="panel tight bank-img">' + (R.s3d ? R.s3d.host('bank', { kind: 'bank', model: R.stadiumModel.build(c), cam: 'bank', labels: labels, interactive: true, ratio: '16/10',
-        fallback: '<div class="bank-fb">' + U.lc('landmark', 48) + '<b>Vereinsbank ' + esc(c.city) + '</b>' + (st.settings.cheatEnabled ? '<div class="director-sign static" data-act="bankSign">BANKDIREKTOR</div>' : '') + '</div>' }) : '') + '</div>';
+      // Banklogo als Messingschild in 3D an der Fassade links neben dem Vordach (fest, dreht nicht mit); bei aktivem Cheat anklickbar
+      h += '<div class="bank-hero"><div class="panel tight bank-img">' + (R.s3d ? R.s3d.host('bank', { kind: 'bank', model: R.stadiumModel.build(c), cam: 'bank', labels: [], city: c.city, plaque: st.settings.cheatEnabled ? 'bankSign' : null, interactive: true, ratio: '16/10',
+        fallback: '<div class="bank-fb">' + U.lc('landmark', 48) + '<b>Vereinsbank ' + esc(c.city) + '</b>' + (st.settings.cheatEnabled ? '<div class="director-sign static" data-act="bankSign">' + U.lc('landmark', 16) + ' VEREINSBANK</div>' : '') + '</div>' }) : '') + '</div>';
       h += '<div class="panel"><div class="panel-h"><h2>' + U.lc('landmark', 17) + ' Finanzstatus</h2><span class="muted small">' + esc(c.name) + '</span></div>' +
         row('wallet', 'Girokonto', '<span data-cash>' + money(c.cash) + '</span>', c.cash < 0 ? 'neg' : '', c.cash < 0 ? 'Dispozins 12 %' : '', c.cash < 0 ? 'bad' : '') +
         row('piggy-bank', 'Tagesgeld', money(c.savings), '', (st.savingsRate * 100).toFixed(2).replace('.', ',') + ' % Zins', 'ok') +
@@ -253,6 +250,7 @@
         '<p class="muted small">Jederzeit verfügbar. Die Zinsen werden monatlich (alle ' + E.INTEREST_MONTH + ' Spielwochen) dem Girokonto gutgeschrieben.</p></div></div>';
     }
     if (tab === 'aktien' || tab === 'krypto') h += U.marketView(st, c, tab, can);
+    if (tab === 'immo' && U.realtyPanel) h += U.realtyPanel(st, c);
     if (tab === 'bilanz') h += U.forecastPanel(st, c, true) + U.financeReport(c);
     return h;
   };
@@ -381,9 +379,7 @@
   U.acts.bankSign = function () {
     var st = U.st, r = E.bankCheat(st, U.club());
     if (!r) return;
-    var el = document.querySelector('.bank-sign'); // kurzes Aufleuchten statt Wackeln – die Position bleibt fest
-    if (el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
-    U.renderTop();
+        U.renderTop();
     if (U.cheatSessionSt !== st) {
       // erster Klick dieser Sitzung: Spruch
       U.cheatSessionSt = st;
