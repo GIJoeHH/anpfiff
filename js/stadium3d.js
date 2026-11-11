@@ -727,15 +727,15 @@
     if (cam === 'stadt') return { az: -22, el: 34, dist: 760, tx: 0, ty: 0, tz: 25, fov: 34 };
     if (cam === 'bank') return { az: -24, el: 14, dist: 150, tx: 0, ty: 22, tz: 4, fov: 36 };
     if (cam === 'focus' && cfg.focus) { var sl = SM.CITY_SLOTS[cfg.focus.key]; var faz = { medizin: 152, museum: 160, eventhalle: 160 }[cfg.focus.key]; return { az: faz != null ? faz : -32, el: 28, dist: Math.max(sl.w, sl.d) * (cfg.kind === 'world' ? 1.05 : 0.72) + 22, tx: sl.x, ty: 4, tz: sl.y + (faz != null ? -4 : 4), fov: 34 }; }
-    if (cam === 'innen') return { az: 0, el: 0, dist: 0, fov: 52, inside: true, yaw: 0, pitch: -8 };
+    if (cam === 'innen') return { az: 0, el: 0, dist: 0, fov: 62, inside: true, yaw: 0, pitch: 6 }; // Standpunkt Mittelkreis, Rundumblick
     var d = Math.max(ex.x * 1.15, ex.y * 1.5) * (cfg.kind === 'world' ? 2.6 : 1.95) + (m.roofH || 8) * 0.9;
     return { az: -26, el: 27, dist: d, tx: cfg.kind === 'world' ? -16 : 0, ty: 4, tz: 4, fov: 34 };
   }
   function placeCamera(camera, v, cfg) {
-    camera.fov = v.fov; camera.near = 1; camera.far = 4000;
+    camera.fov = v.fov; camera.near = v.inside ? 0.2 : 1; camera.far = 4000;
     if (v.inside) {
-      var m = cfg.model, S = m.areas.S, d = S.depth || 0, y = (S.top || 2) + 1.8, z = SM.GEO.Iy + Math.max(2, d * 0.75);
-      if (!S.tiers) { y = 9; z = SM.GEO.Iy - 2; }
+      // Am Mittelkreis in Augenhöhe stehen und sich frei um 360° umsehen
+      var y = 1.75, z = 0;
       camera.position.set(0, y, z);
       var yaw = v.yaw * DEG, pitch = v.pitch * DEG;
       camera.lookAt(Math.sin(yaw) * 100, y + Math.tan(pitch) * 100, z - Math.cos(yaw) * 100);
@@ -782,7 +782,7 @@
     pending[key] = cfg;
     return '<div class="s3d-wrap"><div class="s3d s3d-' + cfg.kind + '" data-s3d="' + key + '" style="aspect-ratio:' + (cfg.ratio || '16/9') + '">' +
       '<canvas class="s3d-cv"></canvas><div class="s3d-labels"></div>' +
-      (cfg.interactive ? '<div class="s3d-hint">' + (cfg.cam === 'innen' ? 'Ziehen zum Umschauen' : 'Ziehen zum Drehen · Zoom mit Mausrad/zwei Fingern') + '</div>' : '') + '</div>' + (cfg.overlay || '') + '</div>';
+      (cfg.interactive ? '<div class="s3d-hint">' + (cfg.cam === 'innen' ? 'Ziehen zum Umsehen – 360° vom Mittelkreis · Zoom mit Mausrad/zwei Fingern' : 'Ziehen zum Drehen · Zoom mit Mausrad/zwei Fingern') + '</div>' : '') + '</div>' + (cfg.overlay || '') + '</div>';
   };
   S3.mountAll = function (root) {
     var keys = Object.keys(pending); live = {};
@@ -839,7 +839,7 @@
       var ids = Object.keys(pts);
       if (ids.length === 2 && pinch) { var d = dist2(); zoom(pinch / d); pinch = d; return; }
       var dx = e.clientX - last[0], dy = e.clientY - last[1]; last = [e.clientX, e.clientY];
-      if (v.inside) { v.yaw = Math.max(-75, Math.min(75, v.yaw + dx * 0.15)); v.pitch = Math.max(-40, Math.min(10, v.pitch - dy * 0.12)); }
+      if (v.inside) { v.yaw = ((v.yaw - dx * 0.22) % 360 + 360) % 360; v.pitch = Math.max(-35, Math.min(45, v.pitch + dy * 0.15)); }
       else { v.az -= dx * 0.25; v.el = Math.max(14, Math.min(72, v.el + dy * 0.18)); }
       schedule(key);
     });

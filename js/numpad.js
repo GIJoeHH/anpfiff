@@ -7,12 +7,11 @@
   var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
 
   function fmt(v) { return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  function hasMult(el) { return isMoney(el) || el.hasAttribute('data-mult'); }
   function isMoney(el) { return el.hasAttribute('data-money') || (+el.getAttribute('step') || 0) >= 1000 || /Amt$|^feeIn$|^wIn$|^sIn$|^bIn$/.test(el.id || ''); }
-  function isUnits(el) { return el.hasAttribute('data-units'); } // große Stückzahlen (z. B. Aktien): Tsd./Mio. ohne €
   function hintText(el) {
     var v = +el.value || 0;
     if (!v) return '';
-    if (isUnits(el)) return '= ' + fmt(v) + ' Stück' + (Math.abs(v) >= 1000000 ? ' · ' + (v / 1e6).toFixed(2).replace('.', ',') + ' Mio.' : '');
     return '= ' + fmt(v) + ' €' + (Math.abs(v) >= 10000 ? ' · ' + R.fmtMoney(v) : '');
   }
   function updHint(el) { var h = el._hint; if (h) h.textContent = hintText(el); }
@@ -21,7 +20,7 @@
     for (var i = 0; i < list.length; i++) {
       var el = list[i];
       if (el._np) continue; el._np = true;
-      if (isMoney(el) || isUnits(el)) {
+      if (isMoney(el)) {
         var h = document.createElement('span'); h.className = 'num-hint';
         el.insertAdjacentElement('afterend', h); el._hint = h; updHint(el);
         el.addEventListener('input', function () { updHint(this); });
@@ -33,8 +32,14 @@
   function start() { decorate(document); mo.observe(document.body, { childList: true, subtree: true }); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 
-  if (!touch) return;
   // ---------- Zahlenpad ----------
+  // Touch: alle Zahlenfelder. Mac/PC: nur Felder mit data-pad (z. B. Börse) – dort geht auch die Tastatur (Ziffern, T = Tsd., M = Mio., Enter, Esc).
+  if (!touch) document.addEventListener('keydown', function (e) {
+    if (!pad || pad.style.display !== 'flex') return;
+    var k = e.key, map = { Enter: 'ok', Escape: 'cancel', Backspace: '⌫', t: 'tsd', T: 'tsd', m: 'mio', M: 'mio', ',': ',', '.': ',', Delete: 'clr' };
+    var np = /^[0-9]$/.test(k) ? k : map[k]; if (!np) return;
+    e.preventDefault(); var b = pad.querySelector('[data-np="' + np + '"]'); if (b) b.click();
+  }, true);
   var pad = null, target = null, buf = '', mult = 1;
   function label(el) {
     var l = el.closest('label'); if (l) { var t = l.childNodes[0]; if (t && t.nodeType === 3) return t.textContent.trim(); }
@@ -45,16 +50,15 @@
   function render() {
     var money = target && isMoney(target), v = value();
     pad.querySelector('.np-v').textContent = buf === '' ? '0' : fmt(v);
-    pad.querySelector('.np-u').textContent = money ? (Math.abs(v) >= 10000 ? R.fmtMoney(v) : '€') : target && isUnits(target) ? 'Stück' : '';
+    pad.querySelector('.np-u').textContent = money ? (Math.abs(v) >= 10000 ? R.fmtMoney(v) : '€') : '';
     pad.querySelector('[data-np=tsd]').classList.toggle('on', mult === 1000);
     pad.querySelector('[data-np=mio]').classList.toggle('on', mult === 1000000);
   }
   function open(el) {
     target = el; mult = 1;
     var v = +el.value || 0;
-    var big = isMoney(el) || isUnits(el);
-    if (big && v && v % 1000000 === 0) { mult = 1000000; buf = String(v / 1000000); }
-    else if (big && v && v % 1000 === 0) { mult = 1000; buf = String(v / 1000); }
+    if (hasMult(el) && v && v % 1000000 === 0) { mult = 1000000; buf = String(v / 1000000); }
+    else if (hasMult(el) && v && v % 1000 === 0) { mult = 1000; buf = String(v / 1000); }
     else buf = v ? String(v) : '';
     if (!pad) {
       pad = document.createElement('div'); pad.id = 'numpad';
@@ -79,9 +83,9 @@
         render();
       });
     }
-    var money = isMoney(el), big = money || isUnits(el);
-    pad.querySelector('.np-mul').style.display = big ? '' : 'none';
-    pad.querySelector('[data-np=","]').style.visibility = big ? '' : 'hidden';
+    var money = hasMult(el);
+    pad.querySelector('.np-mul').style.display = money ? '' : 'none';
+    pad.querySelector('[data-np=","]').style.visibility = money ? '' : 'hidden';
     pad.querySelector('.np-t').textContent = label(el);
     pad.style.display = 'flex';
     render();
@@ -102,6 +106,7 @@
   document.addEventListener('click', function (e) {
     var el = e.target.closest && e.target.closest('input[type=number]');
     if (!el || el.disabled) return;
+    if (!touch && !el.hasAttribute('data-pad')) return;
     e.preventDefault(); el.blur(); open(el);
   }, true);
   R.numpad = { open: open, close: close, fmt: fmt };

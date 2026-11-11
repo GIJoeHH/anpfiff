@@ -8,14 +8,15 @@
   var U = R.ui, E = R.econ, S = R.season, esc = R.esc, money = R.fmtMoney, num = function (v) { return R.fmtNum(Math.round(v)); };
   var NAMES = { steh: 'Stehplatz', sitz: 'Sitzplatz', biz: 'Business-Seat', loge: 'Loge', dksteh: 'Dauerkarte Steh', dksitz: 'Dauerkarte Sitz' };
   var DESC = { steh: 'Tageskarte je Spiel', sitz: 'Tageskarte je Spiel', biz: 'Tribünenplatz inkl. Essen im Stadioninneren · je Spiel', loge: 'Privatraum für ' + E.LOGE_SEATS + ' Gäste, eigenes Catering · Saisonmiete' };
+  function lk(c) { return R.world.lk ? R.world.lk(c) : c.league; } // ANWURF!: 3. Liga in Staffeln
   function shortMoney(v) { v = Math.round(v); return v >= 1e6 ? (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace('.', ',') + ' Mio' : v >= 1e4 ? Math.round(v / 1000) + ' Tsd' : R.fmtNum(v); }
   function shortNum(v) { return v >= 1e4 ? Math.round(v / 1000) + ' Tsd' : R.fmtNum(Math.round(v)); }
 
   // Kommende Heimspiele (Liga) mit Gegner
   U.nextHomeGames = function (st, c, n) {
-    var out = [], lg = st.leagues[c.league]; if (!lg) return out;
+    var out = [], lg = st.leagues[lk(c)]; if (!lg) return out;
     var from = st.phase === 'season' ? st.week + 1 : 1;
-    for (var w = from; w <= S.SEASON_WEEKS && out.length < n; w++) S.roundsOf(st, c.league, w).forEach(function (r) { (lg.fixtures[r] || []).forEach(function (f) { if (f.h === c.id && out.length < n) out.push({ week: w, opp: st.clubs[f.a], comp: 'league' }); }); });
+    for (var w = from; w <= S.SEASON_WEEKS && out.length < n; w++) S.roundsOf(st, lk(c), w).forEach(function (r) { (lg.fixtures[r] || []).forEach(function (f) { if (f.h === c.id && out.length < n) out.push({ week: w, opp: st.clubs[f.a], comp: 'league' }); }); });
     return out;
   };
   function badge(mu) {
@@ -29,7 +30,7 @@
   }
   function nextGame(st, c) {
     var games = U.nextHomeGames(st, c, 1);
-    return games[0] || { opp: st.clubs[st.leagues[c.league].clubIds.filter(function (x) { return x !== c.id; })[0]], comp: 'league', week: null };
+    return games[0] || { opp: st.clubs[st.leagues[lk(c)].clubIds.filter(function (x) { return x !== c.id; })[0]], comp: 'league', week: null };
   }
 
   U.ticketPanel = function (st, c) {
@@ -67,7 +68,7 @@
   }
   // Dauerkarten-Kurve: Saisonerlös der Platzart (Dauerkarten + verbleibende Tageskarten) je Dauerkartenpreis
   function sweepST(c, k, base) {
-    var sx = c.seasonTix[k], single = c.tickets[k] * E.HOME_GAMES, pts = [], lo = Math.max(10, single * 0.25), hi = Math.max(single * 1.25, sx.price * 1.2), N = 36;
+    var sx = c.seasonTix[k], single = c.tickets[k] * base.games, pts = [], lo = Math.max(10, single * 0.25), hi = Math.max(single * 1.25, sx.price * 1.2), N = 36;
     for (var i = 0; i <= N; i++) {
       var p = R.round(lo + (hi - lo) * i / N, 5); if (pts.length && pts[pts.length - 1].p === p) continue;
       var r = E.stSeasonRevenue(c, k, base, p, sx.limit); pts.push({ p: p, rev: r.total, att: r.sold, cap: Math.round((base.cap[k] || 0) * E.ST_MAX_SHARE), st: r.stRev });
@@ -138,8 +139,8 @@
     h += '<div class="note small" style="margin-bottom:8px">' + (sold ? U.lc('lock', 13) + ' Verkauf für diese Saison abgeschlossen: <b>' + num(sold.steh + sold.sitz) + '</b> Dauerkarten (' + money(sold.stRev) + ') und <b>' + sold.logen + '</b> Logen (' + money(sold.logeRev) + '). Neue Preise und Limits gelten für den Verkauf vor der nächsten Saison.' : pre ? U.lc('info', 13) + ' Der Verkauf läuft in der Vorbereitung und wird zum 1. Spieltag abgerechnet – Preise und Limits jetzt festlegen.' : U.lc('info', 13) + ' Der nächste Verkauf startet in der Vorbereitung der neuen Saison.') + '</div>';
     h += '<div class="tk-rows">' + ['steh', 'sitz'].map(function (k) {
       var r = E.stSeasonRevenue(c, k, base, sx[k].price, sx[k].limit), cap = Math.round((base.cap[k] || 0) * E.ST_MAX_SHARE), dem = Math.round(E.stDemand(c, k, base, sx[k].price));
-      var disc = 1 - sx[k].price / Math.max(1, c.tickets[k] * E.HOME_GAMES);
-      return '<div class="tk-row dk"><div class="tk-l"><b>' + NAMES['dk' + k] + '</b><small class="muted">' + E.HOME_GAMES + ' Heimspiele · ' + (disc >= 0 ? Math.round(disc * 100) + ' % Rabatt' : Math.round(-disc * 100) + ' % teurer') + ' ggü. Tageskarten</small></div>' +
+      var disc = 1 - sx[k].price / Math.max(1, c.tickets[k] * base.games);
+      return '<div class="tk-row dk"><div class="tk-l"><b>' + NAMES['dk' + k] + '</b><small class="muted">' + base.games + ' Heimspiele · ' + (disc >= 0 ? Math.round(disc * 100) + ' % Rabatt' : Math.round(-disc * 100) + ' % teurer') + ' ggü. Tageskarten</small></div>' +
         '<div class="tk-price col">' + (can ? '<label><input type="number" min="10" max="20000" value="' + sx[k].price + '" data-inp="tkSt" data-k="' + k + '" data-f="price"> €</label><label class="small muted">Limit <input type="number" min="0" placeholder="∞" title="Leer lassen = unbegrenzt" value="' + (sx[k].limit == null ? '' : sx[k].limit) + '" data-inp="tkSt" data-k="' + k + '" data-f="limit"></label>' : '<b>' + num(sx[k].price) + ' €</b><small>Limit ' + (sx[k].limit == null ? 'unbegrenzt' : num(sx[k].limit)) + '</small>') + '</div>' +
         '<div class="tk-f"><div class="tk-txt">' + (sold ? 'verkauft <b>' + num(sold[k]) + '</b> · ' : '') + 'Prognose <b>' + num(r.sold) + '</b> Dauerkarten · <b>' + money(r.stRev) + '</b> <span class="muted">(Nachfrage ' + num(dem) + ' · höchstens ' + num(cap) + ' = 85 % der Plätze' + (sx[k].limit != null ? ' · Limit ' + num(sx[k].limit) : '') + ')</span></div>' + bar(r.sold, cap, '#a78bfa') + '</div></div>';
     }).join('');

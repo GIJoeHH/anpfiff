@@ -282,7 +282,6 @@
     var depot = 0, cost = 0; defs.forEach(function (sd) { var pf = c.portfolio[sd.id]; if (pf && mk[sd.id]) { depot += pf.qty * mk[sd.id].price; cost += pf.cost; } });
     var h = '<div class="mkt-head"><div class="help" style="margin:0;flex:1">' + U.lc(crypto ? 'triangle-alert' : 'info', 15) + ' ' + (crypto ? 'Fiktive Kryptowährungen – extrem schwankend: Kurssprünge, Crashs und Spekulationsblasen jederzeit möglich. Kein Echtgeld.' : 'Fiktiver Aktienmarkt – Kurse ändern sich wöchentlich, 0,5 % Gebühr pro Kauf/Verkauf. Börsencrashs kommen unregelmäßig und drücken alle Kurse.') + '</div>' +
       '<div class="mkt-depot"><span>Depotwert</span><b>' + money(depot) + '</b><em class="' + (depot - cost >= 0 ? 'pos' : 'neg') + '">' + (cost ? (depot - cost >= 0 ? '+' : '') + money(depot - cost) : '–') + '</em></div>' +
-      '<div class="seg" title="Kauf und Verkauf nach Stückzahl oder nach Betrag in Euro">' + [[0, 'Stück'], [1, 'Betrag €']].map(function (x) { return '<button class="sm ' + (!!U.p.byEur === !!x[0] ? 'on' : '') + '" data-act="mktMode" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       '<div class="seg">' + RANGES.map(function (x) { return '<button class="sm ' + (range === x[0] ? 'on' : '') + '" data-act="chartRange" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div><div class="mkt-grid">';
     defs.forEach(function (sd) {
       var m = mk[sd.id]; if (!m) return;
@@ -298,7 +297,13 @@
         (sd.club && bvb ? '<div style="margin-top:8px"><div class="row between small"><span>Ihr Anteil: <b>' + (stake * 100).toFixed(2).replace('.', ',') + ' %</b></span><span class="muted">Mehrheit ab 50 % · ' + R.fmtNum(sd.shares) + ' Aktien</span></div><div class="stake"><i style="width:' + Math.min(100, stake * 100) + '%"></i></div>' +
           (bvb.takenOverBy === c.id ? '<div class="small pos" style="margin-top:4px">Übernommen – der Verein steigt zum Saisonende ab.</div>' : '<div class="small muted" style="margin-top:4px">Mit der Aktienmehrheit übernehmen Sie alle Spieler und das Vermögen von ' + esc(bvb.short) + ' – der Verein muss zwangsweise absteigen. Große Käufe treiben den Kurs. Mehrheit bei aktuellem Kurs: ca. ' + money(Math.max(0, sd.shares * 0.5001 - (pf ? pf.qty : 0)) * m.price) + '.</div>') + '</div>' : '') +
         '<div class="mkt-hold"><div><span>Bestand</span><b>' + (pf ? R.fmtNum(pf.qty) : '–') + '</b></div><div><span>Depotwert</span><b>' + (pf ? money(val) : '–') + '</b></div><div><span>Gewinn/Verlust</span><b class="' + (pf ? (val - pf.cost >= 0 ? 'pos' : 'neg') : '') + '">' + (pf ? (val - pf.cost >= 0 ? '+' : '') + money(val - pf.cost) : '–') + '</b></div><div><span>Einstieg Ø</span><b>' + (pf ? U.fmtPrice(buyIn) : '–') + '</b></div></div>' +
-        (can ? '<div class="mkt-act"><input type="number" id="q_' + sd.id + '" ' + (U.p.byEur ? 'data-money placeholder="Betrag in €" step="1000"' : 'data-units placeholder="Stück"') + ' min="1"><button class="sm primary" data-act="assetBuy" data-k="' + sd.id + '">Kaufen</button><button class="sm" data-act="assetSell" data-k="' + sd.id + '"' + (pf ? '' : ' disabled') + '>Verkaufen</button><button class="sm ghost" data-act="assetDetail" data-k="' + sd.id + '" data-t="' + tab + '">Details</button><span class="muted small">' + (U.p.byEur ? 'verfügbar ' + money(Math.max(0, c.cash)) : 'max. ' + R.fmtNum(Math.floor(Math.max(0, c.cash) / (m.price * 1.005))) + ' Stück') + '</span></div>' : '') + '</div>';
+        (can ? (function () {
+          var eur = U.p.tradeMode === 'eur', maxQ = Math.floor(Math.max(0, c.cash) / (m.price * 1.005));
+          return '<div class="mkt-act"><div class="seg seg-xs" title="Kauf und Verkauf nach Stückzahl oder nach Betrag in Euro"><button class="sm ' + (eur ? '' : 'on') + '" data-act="tradeMode" data-v="qty">Stück</button><button class="sm ' + (eur ? 'on' : '') + '" data-act="tradeMode" data-v="eur">€</button></div>' +
+            '<input type="number" id="q_' + sd.id + '" placeholder="' + (eur ? 'Betrag in €' : 'Stück') + '" min="1" data-pad data-mult' + (eur ? ' data-money' : '') + '>' +
+            '<button class="sm primary" data-act="assetBuy" data-k="' + sd.id + '">Kaufen</button><button class="sm" data-act="assetSell" data-k="' + sd.id + '"' + (pf ? '' : ' disabled') + '>Verkaufen</button><button class="sm ghost" data-act="assetDetail" data-k="' + sd.id + '" data-t="' + tab + '">Details</button>' +
+            '<span class="muted small">max. ' + (eur ? money(Math.max(0, c.cash)) : R.fmtNum(maxQ) + ' Stück') + '</span></div>';
+        })() : '') + '</div>';
     });
     return h + '</div>';
   };
@@ -413,10 +418,17 @@
   U.acts.loanRepayAll = function () { var r = E.repayLoan(U.st, U.club(), 1e15); U.toast(r.ok ? 'Getilgt: ' + money(r.amount) : r.why); U.render(); };
   U.acts.savIn = function () { U.toast(E.deposit(U.club(), amt('savAmt')) ? 'Eingezahlt.' : 'Nicht möglich.'); U.render(); };
   U.acts.savOut = function () { U.toast(E.withdraw(U.club(), amt('savAmt')) ? 'Ausgezahlt.' : 'Nicht möglich.'); U.render(); };
-  function qtyFor(st, k, sell) { var v = amt('q_' + k); if (!U.p.byEur || !v) return v; var pr = E.price(st, k); return pr ? Math.floor(v / (pr * (sell ? 0.995 : 1.005))) : 0; } // Betrag → Stückzahl inkl. 0,5 % Gebühr
-  U.acts.mktMode = function (d) { U.p.byEur = d.v === '1'; U.render(); };
+  // Ordergröße: Stückzahl oder Eurobetrag (wird in ganze Stück umgerechnet, inkl. 0,5 % Gebühr beim Kauf)
+  function orderQty(st, c, k, sell) {
+    var v = amt('q_' + k); if (U.p.tradeMode !== 'eur') return v;
+    var price = E.price(st, k); if (!price || !v) return 0;
+    return Math.floor(v / (price * (sell ? 1 : 1.005)));
+  }
+  U.acts.tradeMode = function (d) { U.p.tradeMode = d.v; U.render(); };
   U.acts.assetBuy = function (d) {
-    var st = U.st, c = U.club(), r = E.buyAsset(st, c, d.k, qtyFor(st, d.k, false)); U.toast(r.ok ? 'Gekauft für ' + money(r.cost) : r.why); U.render();
+    var st = U.st, c = U.club(), q = orderQty(st, c, d.k, false);
+    if (U.p.tradeMode === 'eur' && amt('q_' + d.k) && !q) { U.toast('Betrag reicht nicht für ein Stück'); return; }
+    var r = E.buyAsset(st, c, d.k, q); U.toast(r.ok ? 'Gekauft: ' + R.fmtNum(r.qty || q) + ' Stück für ' + money(r.cost) : r.why); U.render();
     var bv = d.k === 'BVB' ? E.bvbClub(st) : null;
     if (r.ok && r.takeover && bv && !bv.takenOverBy) {
       var n = W.squad(st, bv.id).length + W.youthOf(st, bv.id).length;
@@ -430,5 +442,5 @@
     if (U.autosave) U.autosave(); U.render();
     U.modal('Übernahme abgeschlossen', '<p>' + r.players + ' Spieler und ' + money(r.cash) + ' gehören jetzt Ihrem Verein. ' + esc(r.club.short) + ' steigt zum Saisonende zwangsweise ab.</p><p class="muted small">Tipp: Ihr Kader ist jetzt riesig – unter „Mannschaft“ und auf dem Transfermarkt können Sie Spieler verkaufen.</p>', '<button class="primary" data-act="closeModal">Weiter</button>');
   };
-  U.acts.assetSell = function (d) { var q = qtyFor(U.st, d.k, true), pf = U.club().portfolio[d.k]; if (U.p.byEur && amt('q_' + d.k) && pf) q = Math.min(pf.qty, q); var r = E.sellAsset(U.st, U.club(), d.k, q || 1e12); U.toast(r.ok ? 'Verkauft: ' + money(r.revenue) + ' (' + (r.profit >= 0 ? '+' : '') + money(r.profit) + ')' : r.why); U.render(); };
+  U.acts.assetSell = function (d) { var q = orderQty(U.st, U.club(), d.k, true); if (U.p.tradeMode === 'eur' && amt('q_' + d.k) && !q) { U.toast('Betrag reicht nicht für ein Stück'); return; } var r = E.sellAsset(U.st, U.club(), d.k, q || 1e12); U.toast(r.ok ? 'Verkauft: ' + money(r.revenue) + ' (' + (r.profit >= 0 ? '+' : '') + money(r.profit) + ')' : r.why); U.render(); };
 })(RFM);
