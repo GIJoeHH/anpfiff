@@ -355,7 +355,7 @@
   // Begrenzung nur im Stadion (Ausstattung, Verkehr, Tribünen im Stadionplan): max. 10 gleichzeitig.
   // Vereinsstadt und Abteilungen (Medizin, Jugend, Training) sind unbegrenzt.
   E.MAX_BUILDS = 10;
-  E.STADIUM_GROUPS = ['stadion', 'infra'];
+  E.STADIUM_GROUPS = ['stadion']; // nur Bauvorhaben im Stadion zählen zum Limit – Nahverkehr, Straße und Parkplätze liegen außerhalb
   E.isStadiumKey = function (key) { return E.STADIUM_GROUPS.indexOf(D.facilities[key].group) >= 0; };
   E.buildCount = function (club) { return club.construction.filter(function (c) { return E.isStadiumKey(c.key); }).length + (club.stadium && club.stadium.jobs ? club.stadium.jobs.length : 0); };
   E.canBuild = function (st, club, key) {
