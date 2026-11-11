@@ -38,28 +38,39 @@
   function noise(g, w, h, n, a, r) { for (var i = 0; i < n; i++) { g.fillStyle = 'rgba(' + (r() < 0.5 ? '0,0,0' : '255,255,255') + ',' + (a * r()) + ')'; g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2); } }
   // Sitzreihen mit Publikum: 16 m (u) × 12 m (v), Reihen à 0,8 m, Treppenaufgänge
   function seatTex(type, col, dens, guest, alt) {
-    var key = 'seat|' + type + '|' + col + '|' + dens + '|' + (guest ? 1 : 0) + '|' + alt;
-    return tex(key, 256, 256, function (g, w, h) {
-      var r = rng(hsh(key)), rows = 15, rh = h / rows;
+    var key = 'seat2|' + type + '|' + col + '|' + dens + '|' + (guest ? 1 : 0) + '|' + alt;
+    // 512 px = 16 m → 32 px/m: Reihen 0,8 m, Sitzbreite 0,5 m, Personen ~0,45 m breit (aus der Nähe als Menschen erkennbar)
+    return tex(key, 512, 512, function (g, w, h) {
+      g.translate(0, h); g.scale(1, -1); // Kopf zeigt die Tribüne hinauf
+      var r = rng(hsh(key)), rows = 15, rh = h / rows, seat = 16, stair = 22;
       var base = type === 'steh' ? '#8b8780' : type === 'business' ? '#3a3f47' : type === 'loge' ? '#2b2f36' : col;
-      var crowdCols = guest ? ['#d4d4d8', '#b91c1c', '#111827', '#e5e7eb', '#7f1d1d'] : [alt, alt, col, col, col, '#111827', '#f8fafc', '#1f2937', '#6b7280'];
+      var crowdCols = guest ? ['#d4d4d8', '#b91c1c', '#111827', '#e5e7eb', '#7f1d1d'] : [alt, alt, col, col, col, '#111827', '#f8fafc', '#1f2937', '#6b7280', '#374151'];
+      var skin = ['#f1c7a5', '#d8a27c', '#8d5a3b', '#f3d6bd', '#c68e66'], hair = ['#2b1d14', '#5a3b24', '#111111', '#a0794d', '#d9c08a', '#6b6b6b'];
       for (var i = 0; i < rows; i++) {
         var y = i * rh;
-        g.fillStyle = type === 'steh' ? (i % 2 ? '#86827a' : '#918d85') : shade(base, i % 2 ? 0.92 : 1.0); g.fillRect(0, y, w, rh);
-        g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, y, w, 2.2); // Stufenkante
-        if (type !== 'steh') { g.fillStyle = 'rgba(0,0,0,.18)'; for (var sx = 0; sx < w; sx += 5) g.fillRect(sx, y + 3, 1, rh - 5); } // Sitzschalen
-        else if (i % 4 === 2) { g.fillStyle = '#c9c4ba'; g.fillRect(0, y + rh * 0.5, w, 1.2); } // Wellenbrecher
-        for (var px = 14; px < w - 2; px += 4.3) {
+        g.fillStyle = type === 'steh' ? (i % 2 ? '#86827a' : '#918d85') : shade(base, i % 2 ? 0.9 : 1.0); g.fillRect(0, y, w, rh);
+        g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, y, w, 3); // Stufenkante
+        if (type !== 'steh') { // Sitzschalen mit Lehne
+          for (var sx = stair + 2; sx < w - 2; sx += seat) { g.fillStyle = shade(base, 1.18); g.fillRect(sx + 2, y + rh * 0.3, seat - 4, rh * 0.42); g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(sx + 2, y + rh * 0.72, seat - 4, 2); }
+        } else if (i % 4 === 2) { g.fillStyle = '#c9c4ba'; g.fillRect(0, y + rh * 0.55, w, 2.5); } // Wellenbrecher
+        for (var px = stair + 2; px < w - seat + 2; px += seat) {
           if (r() > dens) continue;
-          var pc = crowdCols[Math.floor(r() * crowdCols.length)];
-          g.fillStyle = pc; g.fillRect(px + r(), y + rh * 0.35, 3.2, rh * 0.5);
-          g.fillStyle = ['#f1c7a5', '#d8a27c', '#8d5a3b', '#f3d6bd'][Math.floor(r() * 4)]; g.fillRect(px + 0.6 + r(), y + rh * 0.12, 2.1, 2.4);
+          var cx = px + seat / 2 + (type === 'steh' ? (r() - 0.5) * 6 : (r() - 0.5) * 1.5), bw = 11 + r() * 3, top = y + rh * (0.34 + r() * 0.06);
+          g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(cx - bw / 2 + 1.5, top + 2, bw, rh * 0.62); // Schatten
+          g.fillStyle = crowdCols[Math.floor(r() * crowdCols.length)]; g.fillRect(cx - bw / 2, top, bw, rh * 0.6); // Oberkörper
+          g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(cx - bw / 2, top, bw, 2);
+          if (r() < 0.12) { g.fillStyle = guest ? '#b91c1c' : alt; g.fillRect(cx - bw / 2 - 1, top + 3, bw + 2, 3); } // Schal
+          var hr = 3.4 + r() * 0.6, hy = top - hr + 1;
+          g.fillStyle = skin[Math.floor(r() * skin.length)]; g.beginPath(); g.arc(cx, hy, hr, 0, Math.PI * 2); g.fill(); // Kopf
+          g.fillStyle = hair[Math.floor(r() * hair.length)]; g.beginPath(); g.arc(cx, hy - 1, hr, Math.PI, Math.PI * 2); g.fill(); // Haare
+          if (r() < 0.06) { g.fillStyle = skin[0]; g.fillRect(cx - bw / 2 - 2, top - 9, 3, 10); } // Arm hoch
         }
       }
-      g.fillStyle = '#a7a39b'; g.fillRect(0, 0, 11, h); g.fillStyle = 'rgba(0,0,0,.25)'; for (var j = 0; j < rows; j++) g.fillRect(0, j * rh + rh / 2, 11, 1); // Treppe
-      noise(g, w, h, 900, 0.08, r);
+      g.fillStyle = '#a7a39b'; g.fillRect(0, 0, stair, h); g.fillStyle = 'rgba(0,0,0,.25)'; for (var j = 0; j < rows; j++) g.fillRect(0, j * rh + rh / 2, stair, 2); // Treppe
+      noise(g, w, h, 1800, 0.06, r);
     });
   }
+
   function pitchTex(q) {
     return tex('pitch|' + q, 1024, 704, function (g, w, h) {
       var s = 8, ox = (128 - 105) / 2 * s, oy = (88 - 68) / 2 * s, r = rng(5);
@@ -727,14 +738,14 @@
     if (cam === 'stadt') return { az: -22, el: 34, dist: 760, tx: 0, ty: 0, tz: 25, fov: 34 };
     if (cam === 'bank') return { az: -24, el: 14, dist: 150, tx: 0, ty: 22, tz: 4, fov: 36 };
     if (cam === 'focus' && cfg.focus) { var sl = SM.CITY_SLOTS[cfg.focus.key]; var faz = { medizin: 152, museum: 160, eventhalle: 160 }[cfg.focus.key]; return { az: faz != null ? faz : -32, el: 28, dist: Math.max(sl.w, sl.d) * (cfg.kind === 'world' ? 1.05 : 0.72) + 22, tx: sl.x, ty: 4, tz: sl.y + (faz != null ? -4 : 4), fov: 34 }; }
-    if (cam === 'innen') return { az: 0, el: 0, dist: 0, fov: 62, inside: true, yaw: 0, pitch: 6 }; // Standpunkt Mittelkreis, Rundumblick
+    if (cam === 'innen') return { az: 0, el: 0, dist: 0, fov: 70, inside: true, yaw: 0, pitch: 7 }; // Erhöhter Zuschauerblick auf Spielfeld und Tribünen
     var d = Math.max(ex.x * 1.15, ex.y * 1.5) * (cfg.kind === 'world' ? 2.6 : 1.95) + (m.roofH || 8) * 0.9;
     return { az: -26, el: 27, dist: d, tx: cfg.kind === 'world' ? -16 : 0, ty: 4, tz: 4, fov: 34 };
   }
   function placeCamera(camera, v, cfg) {
     camera.fov = v.fov; camera.near = v.inside ? 0.2 : 1; camera.far = 4000;
     if (v.inside) {
-      // Am Mittelkreis in Augenhöhe stehen und sich frei um 360° umsehen
+      // Auf dem Anstoßpunkt in Augenhöhe: rundum ragen die Ränge auf – der Blick, den jeder Fan einmal erleben möchte.
       var y = 1.75, z = 0;
       camera.position.set(0, y, z);
       var yaw = v.yaw * DEG, pitch = v.pitch * DEG;
@@ -782,7 +793,7 @@
     pending[key] = cfg;
     return '<div class="s3d-wrap"><div class="s3d s3d-' + cfg.kind + '" data-s3d="' + key + '" style="aspect-ratio:' + (cfg.ratio || '16/9') + '">' +
       '<canvas class="s3d-cv"></canvas><div class="s3d-labels"></div>' +
-      (cfg.interactive ? '<div class="s3d-hint">' + (cfg.cam === 'innen' ? 'Ziehen zum Umsehen – 360° vom Mittelkreis · Zoom mit Mausrad/zwei Fingern' : 'Ziehen zum Drehen · Zoom mit Mausrad/zwei Fingern') + '</div>' : '') + '</div>' + (cfg.overlay || '') + '</div>';
+      (cfg.interactive ? '<div class="s3d-hint">' + (cfg.cam === 'innen' ? 'Ziehen zum Umsehen (360°) – Blick vom Anstoßpunkt · Zoom mit Mausrad/zwei Fingern' : 'Ziehen zum Drehen · Zoom mit Mausrad/zwei Fingern') + '</div>' : '') + '</div>' + (cfg.overlay || '') + '</div>';
   };
   S3.mountAll = function (root) {
     var keys = Object.keys(pending); live = {};
