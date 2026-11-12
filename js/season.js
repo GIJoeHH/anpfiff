@@ -1136,7 +1136,7 @@
         var prize = Math.round(pr[0] - (pr[0] - pr[1]) * i / Math.max(1, ft[l].length - 1));
         c.cash += prize; E.book(c, 'Prämien', prize);
         var row = st.finalRows[l][i];
-        c.history.push({ season: st.season, type: 'saison', league: l, pos: i + 1, pts: row.pts, gf: row.gf, ga: row.ga });
+        c.history.push({ season: st.season, type: 'saison', league: l, pos: i + 1, pts: row.pts, gf: row.gf, ga: row.ga, p: row.p, w: row.w, d: row.d, l: row.l });
         c.lastPos = i + 1;
         // Ewige Tabelle
         var at = st.allTime[id] || (st.allTime[id] = { p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0, seasons: 0, l1: 0 });

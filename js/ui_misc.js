@@ -16,16 +16,18 @@
     var h = '<h1>Liga & Statistiken</h1><div class="row" style="margin-bottom:12px"><div class="seg">' + tabs.map(function (x) { return '<button class="sm ' + (tab === x[0] ? 'on' : '') + '" data-act="ligaTab" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
     var lsel = '<div class="seg" style="margin-bottom:10px">' + [1, 2, 3].map(function (l) { return '<button class="sm ' + (lvl === l ? 'on' : '') + '" data-act="ligaLvl" data-l="' + l + '">' + D.leagueNames[l] + '</button>'; }).join('') + '</div>';
     if (tab === 'tabelle') {
-      var mode = U.p.mode || '';
-      h += lsel + ' <div class="seg" style="margin-bottom:10px">' + [['', 'Gesamt'], ['home', 'Heim'], ['away', 'Auswärts'], ['form', 'Form (5 Spiele)']].map(function (x) { return '<button class="sm ' + (mode === x[0] ? 'on' : '') + '" data-act="ligaMode" data-m="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
-      var t = S.table(st, lvl, mode || null);
-      h += '<div class="panel tight">' + U.table('tab' + lvl + mode, [
-        { k: 'n', l: '#', num: true, nosort: true, f: function (r, i) { return i + 1; } },
-        { k: 'club', l: 'Verein', nosort: true, f: function (r) { return U.clubLink(st.clubs[r.id], true) + (r.pen ? ' <span class="tag red">−' + r.pen + '</span>' : ''); } },
-        { k: 'p', l: 'Sp', num: true, nosort: true }, { k: 'w', l: 'S', num: true, nosort: true }, { k: 'd', l: 'U', num: true, nosort: true }, { k: 'l', l: 'N', num: true, nosort: true },
-        { k: 'g', l: 'Tore', num: true, nosort: true, f: function (r) { return r.gf + ':' + r.ga; } }, { k: 'gd', l: 'Diff', num: true, nosort: true, f: function (r) { return r.gf - r.ga; } },
-        { k: 'pts', l: 'Pkt', num: true, nosort: true, f: function (r) { return '<b>' + r.pts + '</b>'; } }, { k: 'form', l: 'Form', nosort: true, f: function (r) { return U.formDots(r.form); } }
-      ], t, { rowClass: function (r, i) { var z = !mode ? (lvl > 1 && i < 2 ? 'zone-up' : lvl > 1 && i === 2 ? 'zone-rel' : lvl < 3 && i === 15 ? 'zone-rel' : lvl < 3 && i >= 16 ? 'zone-down' : '') : ''; return z + (c && r.id === c.id ? ' me' : ''); } }) + '</div><p class="muted small">Grün = direkter Aufstieg, Gelb = Relegation, Rot = Abstieg. Aus der 3. Liga steigt niemand ab.</p>';
+      // Entwurf 04: Kopfkarte, Umschalter, Tabelle mit Wappen, Zonen und farbigen Formkästchen
+      var mode = U.p.mode || '', md0 = S.roundsUpTo ? S.roundsUpTo(st, lvl, st.week) : st.week;
+      var t = S.table(st, lvl, mode || null), nT = t.length;
+      h += lsel + '<div class="panel lg-head"><div><div class="tr-hero-k">' + esc(D.leagueNames[lvl]).toUpperCase() + ' · ' + (md0 ? md0 + '. SPIELTAG' : 'VOR DEM SAISONSTART') + '</div><h2>Jeder Punkt erzählt eine Geschichte.</h2></div>' +
+        '<div class="seg">' + [['', 'Gesamt'], ['home', 'Heim'], ['away', 'Auswärts'], ['form', 'Form (5)']].map(function (x) { return '<button class="sm ' + (mode === x[0] ? 'on' : '') + '" data-act="ligaMode" data-mode="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
+      var zone = function (i) { if (mode) return ''; return lvl > 1 && i < 2 ? 'up' : lvl > 1 && i === 2 ? 'rel' : lvl < 3 && i === nT - 3 ? 'rel' : lvl < 3 && i >= nT - 2 ? 'down' : lvl === 1 && i === 0 ? 'champ' : ''; };
+      h += '<div class="panel tight lg-wrap"><table class="lg-t"><thead><tr><th>Pl.</th><th class="l">Verein</th><th>Sp.</th><th>S</th><th>U</th><th>N</th><th>Tore</th><th>Diff.</th><th>Pkt.</th><th class="l">Form</th></tr></thead><tbody>' +
+        t.map(function (r, i) { var cl = st.clubs[r.id], d = r.gf - r.ga, z = zone(i);
+          return '<tr class="' + (c && r.id === c.id ? 'me ' : '') + (z ? 'z-' + z : '') + '" data-act="clubInfo" data-id="' + r.id + '"><td class="pl"><i></i>' + (i + 1) + '</td><td class="l"><span class="lg-club">' + U.crest(cl, 24) + '<b>' + esc(cl.name) + '</b>' + (r.pen ? ' <span class="tag red">−' + r.pen + '</span>' : '') + '</span></td>' +
+            '<td>' + r.p + '</td><td>' + r.w + '</td><td>' + r.d + '</td><td>' + r.l + '</td><td>' + r.gf + ':' + r.ga + '</td><td class="' + (d > 0 ? 'pos' : d < 0 ? 'neg' : '') + '">' + (d > 0 ? '+' + d : d < 0 ? '−' + (-d) : 0) + '</td><td class="pts">' + r.pts + '</td>' +
+            '<td class="l"><span class="lg-form">' + r.form.slice(-5).map(function (f) { return '<em class="' + f + '">' + f + '</em>'; }).join('') + '</span></td></tr>'; }).join('') + '</tbody></table>' +
+        '<div class="lg-foot">Sieg: 3 Punkte · Unentschieden: 1 Punkt' + (mode ? '' : (lvl === 1 ? ' · <i class="z champ"></i>Meister' : '') + (lvl > 1 ? ' · <i class="z up"></i>Aufstieg' : '') + (lvl < 3 ? ' · <i class="z down"></i>Abstieg' : '') + ' · <i class="z rel"></i>Relegation') + ' · Markierung: eigener Verein</div></div>';
     }
     if (tab === 'spielplan') {
       var nMd = st.leagues[lvl].fixtures.length, playedMd = S.roundsUpTo(st, lvl, st.week);

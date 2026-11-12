@@ -486,22 +486,29 @@
   }
   U.screens.training = function () {
     var st = U.st, c = U.club(), gf = st.manager.role === 'gf', can = U.can('sport') || gf;
-    var h = '<div class="page-h"><div><h1>Training</h1><div class="page-sub">Trainingszentrum: ' + esc(E.level(c, 'training').n) + ' · Trainingsorganisation: ' + D.budgetLevels[c.budgets.trainorg] + ' · Trainer: ' + esc(U.coachName(c)) + (E.staffLvl(c, 'co') ? ' · Co-Trainer ' + U.stars(E.staffLvl(c, 'co'), 3) : '') + (E.staffLvl(c, 'fitness') ? ' · Fitnesstrainer ' + U.stars(E.staffLvl(c, 'fitness'), 3) : '') + '</div></div></div>';
+    // Entwurf 02: Hero-Banner, drei Kennzahlen, Schwerpunkt-Karten mit Teamwert, Wochenfokus
+    var h = '<div class="tr-hero panel"><div class="tr-hero-k">Die Woche gehört uns.</div><h1>Tempo. Präzision. Zusammenspiel.</h1><p>Belastung und Erholung ausbalancieren. Als Mannschaft besser werden.</p>' +
+      '<div class="tr-hero-meta">' + U.lc('dumbbell', 14) + ' ' + esc(E.level(c, 'training').n) + ' · Trainingsorganisation ' + D.budgetLevels[c.budgets.trainorg] + ' · Trainer ' + esc(U.coachName(c)) + (E.staffLvl(c, 'co') ? ' · Co-Trainer ' + U.stars(E.staffLvl(c, 'co'), 3) : '') + (E.staffLvl(c, 'fitness') ? ' · Fitnesstrainer ' + U.stars(E.staffLvl(c, 'fitness'), 3) : '') + '</div></div>';
     if (gf) h += '<div class="help" style="margin-bottom:12px">' + U.lc('handshake', 16) + ' <b>Mitspracherecht des Geschäftsführers:</b> ' + (c.trainingByUser ? 'Sie geben den Trainingsschwerpunkt vor – ' + esc(U.coachName(c)) + ' und sein Stab setzen ihn um.' : esc(U.coachName(c)) + ' wählt den Schwerpunkt selbst. Tippen Sie auf eine Karte, um ihn vorzugeben.') +
       (c.trainingByUser ? ' <button class="sm" data-act="trainingToCoach">Wieder dem Trainer überlassen</button>' : '') + '</div>';
     var sq = W.squad(st, c.id), avgFit = Math.round(R.avg(sq, function (p) { return p.fitness; })), avgMor = Math.round(R.avg(sq, function (p) { return p.morale; })), injN = sq.filter(function (p) { return p.inj; }).length, suspN = sq.filter(function (p) { return p.susp > 0; }).length;
+    var kpi = function (l, v, sub, col) { return '<div class="panel tr-kpi"><span>' + l + '</span><b>' + v + ' <small>/ 100</small></b>' + U.bar(v, 100, col) + '<em>' + sub + '</em></div>'; };
     var col = function (v, lo, hi) { return v < lo ? 'var(--bad)' : v < hi ? 'var(--warn)' : 'var(--ok)'; };
-    h += '<div class="grid g4" style="margin-bottom:16px">' + U.ikpi('zap', 'Ø Frische', avgFit, '', U.bar(avgFit, 100, col(avgFit, 70, 85))) + U.ikpi('heart-pulse', 'Ø Moral', avgMor, '', U.bar(avgMor, 100, col(avgMor, 40, 60))) + U.ikpi('users', 'Teamchemie', Math.round(c.chemistry), '', U.bar(c.chemistry, 100, 'var(--act)')) +
-      U.ikpi('stethoscope', 'Ausfälle', injN + suspN, injN + suspN > 3 ? 'neg' : '', '<div class="small muted">' + injN + ' verletzt · ' + suspN + ' gesperrt</div>') + '</div>';
-    h += U.planPanel(st, c);
-    h += '<div class="sec-h">Trainingsschwerpunkt <span style="margin-left:auto">gilt jede Woche, bis Sie ihn ändern</span></div><div class="tr-cards">';
+    h += '<div class="grid g3" style="margin-bottom:16px">' + kpi('Frische', avgFit, 'Mannschaftsdurchschnitt', col(avgFit, 70, 85)) + kpi('Moral', avgMor, 'Mannschaftsdurchschnitt', col(avgMor, 40, 60)) + kpi('Teamchemie', Math.round(c.chemistry), (injN + suspN ? injN + ' verletzt · ' + suspN + ' gesperrt' : 'Alle Spieler einsatzbereit'), 'var(--act)') + '</div>';
+    // Schwerpunkte: Teamwert = Ø der trainierten Attribute (Regeneration: Ø Frische)
+    var FA = { fitness: ['sta', 'spd'], taktik: ['pas', 'def'], angriff: ['sho', 'tec'], defensive: ['def', 'sta'], technik: ['tec', 'pas'], regeneration: null };
+    var teamVal = function (k) { var a = FA[k]; if (!a) return avgFit; return Math.round(R.avg(sq, function (p) { return (p.attr[a[0]] + p.attr[a[1]]) / 2; })); };
+    h += '<div class="tr-grid">';
     Object.keys(D.training).forEach(function (k) {
-      var t = D.training[k], on = c.training === k, plus = [], minus = [];
-      Object.keys(FX_N).forEach(function (f) { var v = t.fx[f]; if (!v) return; var good = f === 'inj' ? v < 0 : v > 0; (good ? plus : minus).push('<span class="fx-chip ' + (good ? 'ok' : 'bad') + '">' + U.lc(v > 0 ? 'trending-up' : 'trending-down', 13) + FX_N[f] + (Math.abs(v) > 1 ? ' ++' : '') + '</span>'); });
-      h += '<div class="tr-card' + (on ? ' on' : '') + (can ? '' : ' ro') + '" ' + (can ? 'data-act="setTraining" data-k="' + k + '" tabindex="0" role="button"' : '') + '><div class="tr-top"><div class="ic-tile' + (on ? ' ok' : '') + '">' + U.lc(TR_IC[k], 22) + '</div><div><b>' + t.n + '</b><span>' + (t.attrs !== '–' ? 'Fördert: ' + t.attrs : 'Erholung statt Entwicklung') + '</span></div>' + (on ? '<span class="pill ok">' + U.lc('check', 13) + 'Aktiv</span>' : '') + '</div><p>' + t.d + '</p>' +
-        '<div class="fx-list">' + plus.join('') + minus.join('') + '</div></div>';
+      var t = D.training[k], on = c.training === k, v = teamVal(k), eff = Object.keys(FX_N).filter(function (f) { return t.fx[f]; }).map(function (f) { return FX_N[f] + (t.fx[f] > 0 ? ' ↑' : ' ↓'); }).join(', ');
+      h += '<div class="tr-focus' + (on ? ' on' : '') + (can ? '' : ' ro') + '" ' + (can ? 'data-act="setTraining" data-k="' + k + '" tabindex="0" role="button"' : '') + ' title="' + esc(t.d + ' Wirkung: ' + eff) + '"><div class="tr-f-top"><div><b>' + t.n + '</b><span>' + (t.attrs !== '–' ? esc(t.attrs) : 'Erholung & Frische') + '</span></div>' + (on ? '<span class="pill ok">Aktiv</span>' : '') + '</div>' +
+        '<div class="tr-f-bar"><i style="width:' + Math.min(100, v) + '%"></i></div><em>' + v + '</em></div>';
     });
     h += '</div>';
+    var cur = D.training[c.training] || D.training.technik, plus = [], minus = [];
+    Object.keys(FX_N).forEach(function (f) { var v2 = cur.fx[f]; if (!v2) return; var good = f === 'inj' ? v2 < 0 : v2 > 0; (good ? plus : minus).push('<span class="fx-chip ' + (good ? 'ok' : 'bad') + '">' + U.lc(v2 > 0 ? 'trending-up' : 'trending-down', 13) + FX_N[f] + (Math.abs(v2) > 1 ? ' ++' : '') + '</span>'); });
+    h += '<div class="panel tr-week"><div><h2>Wochenfokus: ' + cur.n + '</h2><p class="muted">' + esc(cur.d) + '</p><div class="fx-list">' + plus.join('') + minus.join('') + '</div></div><button class="primary" data-act="trPlanJump">Training planen ' + U.lc('chevron-right', 15) + '</button></div>';
+    h += '<div id="trPlan">' + U.planPanel(st, c) + '</div>';
     h += '<div class="sec-h">Trainingslager <span style="margin-left:auto">je Pause ein Lager, dauert eine Woche</span></div><div class="camp-cards">';
     var weeks = S.planWeeks(st), canPlan = S.planOwnerIsUser(st) && U.can('business') || st.manager.role === 'manager', plan = st.plan || {};
     var free = weeks.filter(function (w) { return !w.past && !w.cup && !plan[w.k]; })[0];
@@ -542,6 +549,7 @@
       U.render();
     });
   };
+  U.acts.trPlanJump = function () { var el = document.getElementById('trPlan'); if (!el) return; if (!el.firstChild) { U.toast('Geplant wird in der Vorbereitung und Winterpause – jetzt gilt der Wochenfokus.'); return; } el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   U.acts.campPlan = function (d) { var r = S.setPlan(U.st, d.w, { type: 'camp', camp: d.k }); U.toast(r.ok ? 'Trainingslager eingeplant.' : r.why); U.render(); };
   U.acts.setTraining = function (d) { var c = U.club(); c.training = d.k; if (U.st.manager.role === 'gf') c.trainingByUser = true; U.render(); U.toast('Trainingsschwerpunkt: ' + D.training[d.k].n); };
   U.acts.trainingToCoach = function () { U.club().trainingByUser = false; S.aiCoachDuties(U.st, U.club()); U.render(); U.toast('Der Trainer entscheidet wieder selbst.'); };
