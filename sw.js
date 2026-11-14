@@ -1,5 +1,5 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = 'f0d97e96e9';
+const VERSION = 'ba9147de4a';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
@@ -12,11 +12,13 @@ const CORE = [
   './index.html',
   './js/crests.js',
   './js/data.js',
+  './js/data_euro.js',
   './js/data_real.js',
   './js/dbimport.js',
   './js/deals.js',
   './js/economy.js',
   './js/editor.js',
+  './js/euro.js',
   './js/icons.js',
   './js/logos.js',
   './js/match.js',
@@ -33,6 +35,7 @@ const CORE = [
   './js/ui_club.js',
   './js/ui_core.js',
   './js/ui_deals.js',
+  './js/ui_euro.js',
   './js/ui_gfx.js',
   './js/ui_history.js',
   './js/ui_match.js',

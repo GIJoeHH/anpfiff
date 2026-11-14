@@ -27,7 +27,7 @@
     [H, A].forEach(function (x) { if (!x.userControlled || !x.manualLineup) M.autoBest(st, x); });
     var tab = U.p.tab || 'aufstellung', mt = U.p.mt || 'vorschau';
     var title = fx.comp === 'league' ? D.leagueNames[c.league] + ' – ' + (st.week + 1) + '. Spieltag' : fx.comp === 'releg' ? 'Relegation – ' + (st.relegLeg === 0 ? 'Hinspiel' : 'Rückspiel') : S.fxLabel(st, fx);
-    h += '<div class="md-grid">';
+    h += U.compBanner(st, fx) + '<div class="md-grid">';
     // ----- Links: Aufstellung / Taktik / Teamansprache / Analyse -----
     h += '<div class="panel md-left"><div class="seg md-tabs">' + [['aufstellung', 'Aufstellung'], ['taktik', 'Taktik'], ['ansprache', 'Teamansprache'], ['analyse', 'Analyse']].map(function (x) { return '<button class="sm ' + (tab === x[0] ? 'on' : '') + '" data-act="mdTab" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
     if (tab === 'aufstellung') {
@@ -53,12 +53,12 @@
     h += '</div>';
     // ----- Mitte: Spielvorschau -----
     var t = fx.comp === 'league' || H.league === A.league ? S.table(st, H.league) : null, rowOf = function (id) { var r = t && t.filter(function (x) { return x.id === id; })[0]; return r ? { r: r, pos: t.indexOf(r) + 1 } : null; };
-    var rH = rowOf(H.id), rA = rowOf(A.id), est = fx.neutral ? null : E.attendance(st, H, A, fx.comp), derby = H.rivals.indexOf(A.id) >= 0;
+    var rH = rowOf(H.id), rA = rowOf(A.id), est = fx.neutral || H.foreign ? null : E.attendance(st, H, A, fx.comp), derby = H.rivals.indexOf(A.id) >= 0;
     h += '<div class="panel md-mid"><div class="md-title">' + esc(title).toUpperCase() + (derby ? ' <span class="pill warn">Derby</span>' : '') + '</div>' +
       '<div class="md-vs"><div>' + U.crest(H, 58) + '<b>' + esc(H.name) + '</b></div><span>–</span><div>' + U.crest(A, 58) + '<b>' + esc(A.name) + '</b></div></div>' +
       '<div class="seg md-tabs">' + [['vorschau', 'Vorschau'], ['direkt', 'Direktvergleich'], ['stat', 'Statistiken'], ['berichte', 'Berichte']].map(function (x) { return '<button class="sm ' + (mt === x[0] ? 'on' : '') + '" data-act="mdMid" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
     if (mt === 'vorschau') {
-      h += '<div class="md-chips"><div>' + U.lc('stadium', 16) + '<span><b>' + esc(fx.neutral ? 'Neutraler Platz' : H.stadiumName) + '</b><small>' + (fx.neutral ? 'Endspiel' : R.fmtNum(E.capacity(H)) + ' Plätze') + '</small></span></div><div>' + U.lc('calendar-days', 16) + '<span><b>' + (fx.comp === 'league' ? (st.week + 1) + '. Spieltag' : esc(S.fxLabel(st, fx))) + '</b><small>' + (fx.h === c.id ? 'Heimspiel' : 'Auswärtsspiel') + '</small></span></div>' +
+      h += '<div class="md-chips"><div>' + U.lc('stadium', 16) + '<span><b>' + esc(fx.neutral ? (fx.venue ? fx.venue.name + ', ' + fx.venue.city : 'Neutraler Platz') : H.foreign ? H.city + ' (' + H.countryName + ')' : H.stadiumName) + '</b><small>' + (fx.neutral ? (fx.venue ? R.fmtNum(fx.venue.cap) + ' Plätze' : 'Endspiel') : H.foreign ? 'Auswärtsspiel' : R.fmtNum(E.capacity(H)) + ' Plätze') + '</small></span></div><div>' + U.lc('calendar-days', 16) + '<span><b>' + (fx.comp === 'league' ? (st.week + 1) + '. Spieltag' : esc(S.fxLabel(st, fx))) + '</b><small>' + (fx.h === c.id ? 'Heimspiel' : 'Auswärtsspiel') + '</small></span></div>' +
         (est ? '<div>' + U.lc('users', 16) + '<span><b>' + R.fmtNum(est.total) + '</b><small>' + (est.total >= est.capacity * 0.98 ? 'ausverkauft' : 'erwartete Zuschauer') + '</small></span></div>' : '') + '</div>';
       if (rH && rA) {
         var rowCmp = function (label, a, b, cls) { return '<tr><td class="l ' + (cls ? cls(a) : '') + '">' + a + '</td><td>' + label + '</td><td class="r ' + (cls ? cls(b) : '') + '">' + b + '</td></tr>'; };
@@ -66,7 +66,8 @@
         h += '<table class="md-cmp"><thead><tr><th class="l">' + U.crest(H, 18) + ' ' + esc(H.short) + '</th><th></th><th class="r">' + esc(A.short) + ' ' + U.crest(A, 18) + '</th></tr></thead><tbody>' +
           rowCmp('Tore', rH.r.gf, rA.r.gf) + rowCmp('Gegentore', rH.r.ga, rA.r.ga) + rowCmp('Tordifferenz', sd(rH.r.gf - rH.r.ga), sd(rA.r.gf - rA.r.ga), dCls) + rowCmp('Punkte', rH.r.pts, rA.r.pts) + rowCmp('Tabellenplatz', st.week ? rH.pos + '.' : '–', st.week ? rA.pos + '.' : '–') +
           '<tr><td class="l">' + (H.form && H.form.length ? formLetters(H.form) : '–') + '</td><td>Form</td><td class="r">' + (A.form && A.form.length ? formLetters(A.form) : '–') + '</td></tr></tbody></table>';
-      } else h += '<p class="muted small">' + esc(H.short) + ' (' + D.leagueNames[H.league] + ') gegen ' + esc(A.short) + ' (' + D.leagueNames[A.league] + ').</p>';
+      } else if (fx.comp === 'euro') h += U.euroPreview(st, fx);
+      else h += '<p class="muted small">' + esc(H.short) + ' (' + D.leagueNames[H.league] + ') gegen ' + esc(A.short) + ' (' + D.leagueNames[A.league] + ').</p>';
     } else if (mt === 'direkt') {
       var hh = h2hGames(st, H.id, A.id);
       h += hh.length ? '<table class="t small">' + hh.map(function (g) { return '<tr><td>' + g.w + '. Spieltag</td><td>' + esc(st.clubs[g.h].short) + ' – ' + esc(st.clubs[g.a].short) + '</td><td class="num"><b>' + g.hg + ':' + g.ag + '</b></td></tr>'; }).join('') + '</table>' : U.empty('arrow-left-right', 'Diese Saison noch kein direktes Duell.');
@@ -117,7 +118,7 @@
     m.userLive = true;
     var side = m.userSide;
     if (side >= 0 && U.can('sport')) { var sp = D.speeches.filter(function (s) { return s.id === U.speech; })[0]; if (sp) M.applySpeech(m, side, sp, false); }
-    L.att = fx.neutral ? null : E.attendance(st, st.clubs[m.clubs[0]], st.clubs[m.clubs[1]], fx.comp === 'friendly' ? 'friendly' : fx.comp);
+    L.att = fx.neutral || st.clubs[m.clubs[0]].foreign ? null : E.attendance(st, st.clubs[m.clubs[0]], st.clubs[m.clubs[1]], fx.comp === 'friendly' ? 'friendly' : fx.comp);
     L.m = m; L.paused = false; L.halftimeDone = false; L.lastEv = m.events.length; L.shown = 0; L.anim = U.initAnim(m); L.flash = null;
     U.liveActive = true;
     U.go('match');

@@ -20,6 +20,7 @@
   S.calText = function (st, short) {
     if (st.phase === 'preseason') return (short ? 'Vorb. ' : 'Vorbereitung ') + (st.prep || 1) + '/' + S.PREP_WEEKS;
     if (st.phase === 'winter') return (short ? 'Winter ' : 'Winterpause ') + (st.winter || 1) + '/' + S.WINTER_WEEKS;
+    if (st.phase === 'season' && S.finalDay && S.finalDay(st)) return short ? 'Final 4' : 'Final 4 – Finaltag';
     if (st.phase === 'season') return short ? st.week + '/34' : st.week + '. Spieltag';
     return st.phase === 'releg' ? 'Relegation' : 'Saisonende';
   };
@@ -27,7 +28,8 @@
     if (fx.comp === 'league') return (st.week + 1) + '. Spieltag';
     if (fx.comp === 'friendly') return 'Testspiel (' + S.calText(st) + ')';
     if (fx.comp === 'releg') return 'Relegation';
-    var ci = S.cupRoundNow(st); return 'Pokal – ' + (st.cup.rounds[ci] ? st.cup.rounds[ci].name : '');
+    if (fx.comp === 'euro') return R.euro.label(st, fx);
+    var ci = fx.key && fx.key.charAt(0) === 'C' ? +fx.key.split('-')[1] : S.cupRoundNow(st); return 'Pokal – ' + (st.cup.rounds[ci] ? st.cup.rounds[ci].name : '');
   };
   S.isBreak = function (st) { return st.phase === 'preseason' || st.phase === 'winter'; };
   // Wochen-Schlüssel für die Planung der Vorbereitung/Winterpause
@@ -145,6 +147,7 @@
       S.ensureSponsors(st, uc);
     }
     Object.keys(st.clubs).forEach(function (k) { var c = st.clubs[k]; c.fin.season = {}; c.attendanceHist = []; if (!c.userControlled) S.aiSponsors(st, c); });
+    if (R.euro && R.euro.startSeason) R.euro.startSeason(st); // Meister-Liga und Top-Liga auslosen
   };
 
   S.targetFor = function (club) {
@@ -192,6 +195,15 @@
   // Liefert alle Partien der Woche; Partien mit Beteiligung des Nutzers werden markiert.
   S.prepareWeek = function (st) {
     var list = [], uc = st.manager.unemployed ? null : st.manager.clubId;
+    if (R.euro && R.euro.ensure) R.euro.ensure(st);
+    if (S.finalDay(st)) {
+      // Finaltag des Final 4: nur die Endspiele (Pokal und Europapokal)
+      var cfi = S.CUP_FINAL, cfr = st.cup && st.cup.rounds[cfi];
+      if (cfr && !st.cup.winner) cfr.ties.forEach(function (t, i) { if (!t.winner) list.push({ key: 'C-' + cfi + '-' + i, comp: 'final', h: t.h, a: t.a, neutral: true, venue: S.cupVenue(), extraTime: true }); });
+      R.euro.weekFixtures(st, true).forEach(function (x) { if (x.h === uc || x.a === uc) list.push(x); });
+      list.forEach(function (x) { x.user = (x.h === uc || x.a === uc); });
+      return { list: list, finalDay: true };
+    }
     if (st.phase === 'preseason' || st.phase === 'season' || st.phase === 'winter') {
       var week = st.week + 1;
       if (st.phase === 'season' && week > S.SEASON_WEEKS) return { list: [], week: week };
@@ -205,6 +217,8 @@
         if (pl && pl.type === 'test' && st.clubs[pl.opp] && !list.some(function (x) { return x.h === uc || x.a === uc; }))
           list.push({ key: 'F-' + S.breakKey(st), comp: 'friendly', h: pl.home ? uc : pl.opp, a: pl.home ? pl.opp : uc });
       }
+      // Europapokal: Spiele des eigenen Vereins (alle übrigen laufen als Schnellergebnis, siehe js/euro.js)
+      if (st.phase === 'season' && R.euro && R.euro.weekFixtures && uc) R.euro.weekFixtures(st).forEach(function (x) { if (x.h === uc || x.a === uc) list.push(x); });
       if (st.phase === 'season') [1, 2, 3].forEach(function (l) {
         S.roundsOf(st, l, week).forEach(function (r) {
           st.leagues[l].fixtures[r].forEach(function (f, i) { list.push({ key: 'L-' + l + '-' + r + '-' + i, comp: 'league', h: f.h, a: f.a }); });
@@ -227,10 +241,50 @@
     return m;
   };
 
+  // ---------- Neutrale Plätze, Final 4 ----------
+  S.NEUTRAL = { total: 68000, ticket: 3200000, cater: 400000, capacity: 70000, share: 1800000 };
+  S.cupVenue = function () { var v = D.euro && D.euro.cupVenue; return v ? { name: v[0], city: v[1], country: v[2], cap: v[3] } : null; };
+  // Zuschauer und Einnahmen auf neutralem Platz; mit Spielort (fx.venue) richten sie sich nach dessen Größe
+  S.neutralGate = function (st, fx, home, away) {
+    var v = fx.venue, N = S.NEUTRAL, cap = v ? v.cap : N.capacity, share = v ? Math.round(cap * D.euro.gatePerSeat / 1000) * 1000 : N.share;
+    [home, away].forEach(function (c) { if (c.foreign) return; c.cash += share; E.book(c, 'Eintrittsgelder', share); });
+    return { total: v ? Math.round(cap * 0.97) : N.total, ticket: v ? share * 2 : N.ticket, cater: v ? Math.round(share * 0.22) : N.cater, parking: 0, capacity: cap, parts: {}, venue: v || null };
+  };
+  // Auswärtsspiel im Europapokal: Kulisse des Gastgebers, keine eigenen Einnahmen
+  S.awayGate = function (home) { var cap = Math.round((home.fans || 10000) / 100) * 100; return { total: Math.round(cap * 0.93), ticket: 0, cater: 0, parking: 0, capacity: cap, parts: {} }; };
+  // Finaltag nur im Handball (Final 4): das Endspiel folgt direkt auf das Halbfinale, ohne dass eine Woche vergeht
+  S.finalDay = function (st) {
+    if (st.phase !== 'season' || !D.euro || !D.euro.final4) return false;
+    var cf = st.cup && st.cup.rounds[S.CUP_FINAL];
+    if (cf && !st.cup.winner && cf.ties[0] && !cf.ties[0].winner) return true;
+    return !!(R.euro && R.euro.finalOpen && R.euro.finalOpen(st));
+  };
+  S.playFinalDay = function (st, played) {
+    var prep = S.prepareWeek(st), results = [];
+    prep.list.forEach(function (fx) {
+      var m = played[fx.key];
+      if (!m) { m = S.createMatch(st, fx); M.simulate(m); }
+      m.st = st;
+      var att = S.neutralGate(st, fx, st.clubs[fx.h], st.clubs[fx.a]);
+      m.attendance = att.total; m.attInfo = att;
+      M.finalize(m);
+      var sum = M.summary(m);
+      S.storeResult(st, fx, sum, m);
+      results.push({ fx: fx, sum: sum, match: m });
+      if (fx.user) S.userMatchAftermath(st, fx, sum, m);
+    });
+    if (R.euro) R.euro.simWeek(st, true);
+    S.advanceCup(st);
+    st.lastResults = results.map(function (r) { return { key: r.fx.key, comp: r.fx.comp, h: r.fx.h, a: r.fx.a, hg: r.sum.hg, ag: r.sum.ag, pens: r.sum.pens, user: r.fx.user }; });
+    st.rngState = R.rng.state;
+    return results;
+  };
+
   // ---------- Woche abschließen ----------
   // played: { key: fertiges Match-Objekt } (vom Nutzer live gespielte Partien)
   S.completeWeek = function (st, played) {
     played = played || {};
+    if (S.finalDay(st)) return S.playFinalDay(st, played);
     var prep = S.prepareWeek(st);
     var results = [];
     var suspendedAtStart = {};
@@ -255,8 +309,9 @@
         att = E.attendance(st, home, away, 'friendly');
         if (home.userControlled) E.matchdayIncome(st, home, att);
       } else if (fx.neutral) {
-        att = { total: 68000, ticket: 3200000, cater: 400000, parking: 0, capacity: 70000, parts: {} };
-        [home, away].forEach(function (c) { c.cash += 1800000; E.book(c, 'Eintrittsgelder', 1800000); });
+        att = S.neutralGate(st, fx, home, away);
+      } else if (home.foreign) {
+        att = S.awayGate(home);
       } else {
         att = E.attendance(st, home, away, fx.comp);
         E.matchdayIncome(st, home, att);
@@ -273,8 +328,8 @@
       var sum = M.summary(m);
       var resH = sum.hg - sum.ag;
       if (fx.comp !== 'friendly') {
-        E.fanGrowthWeekly(st, home, resH, fx.neutral ? null : att);
-        E.fanGrowthWeekly(st, away, -resH, null);
+        if (!home.foreign) E.fanGrowthWeekly(st, home, resH, fx.neutral ? null : att);
+        if (!away.foreign) E.fanGrowthWeekly(st, away, -resH, null);
         S.storeResult(st, fx, sum, m);
       } else S.friendlyAftermath(st, fx, sum, m);
       results.push({ fx: fx, sum: sum, match: m });
@@ -284,6 +339,7 @@
     Object.keys(suspendedAtStart).forEach(function (id) { var p = st.players[id]; if (p && p.susp > 0) p.susp--; });
 
     if (st.phase === 'season') {
+      if (R.euro && R.euro.simWeek) R.euro.simWeek(st, false, st.week); // übrige Europapokalspiele dieser Woche
       S.weeklyUpdate(st);
       S.advanceCup(st);
       if (st.week >= S.SEASON_WEEKS) S.toRelegation(st);
@@ -319,6 +375,7 @@
   S.storeResult = function (st, fx, sum, m) {
     var parts = fx.key.split('-');
     if (parts[0] === 'L') { st.leagues[+parts[1]].fixtures[+parts[2]][+parts[3]].r = sum; }
+    else if (parts[0] === 'E') R.euro.store(st, fx.key, sum);
     else if (parts[0] === 'C') {
       var ci = +parts[1], tie = st.cup.rounds[ci].ties[+parts[2]];
       tie.r = sum;
@@ -357,7 +414,7 @@
     var head = tpl.replace(/\{W\}/g, winner ? winner.short.toUpperCase() : '').replace(/\{L\}/g, loser ? loser.short.toUpperCase() : '')
       .replace(/\{H\}/g, H.short.toUpperCase()).replace(/\{A\}/g, A.short.toUpperCase()).replace(/\{S\}/g, sum.hg + ':' + sum.ag).replace(/\{T\}/g, 'TRAINER');
     var scorers = sum.ev.filter(function (e) { return e.t === 'goal'; }).map(function (e) { var p = st.players[e.p]; return (p ? p.last : '?') + ' (' + e.m + '.)'; }).join(', ');
-    S.news(st, head, (fx.comp === 'league' ? st.week + '. Spieltag' : fx.comp === 'releg' ? 'Relegation' : 'Pokal') + ': ' + H.name + ' – ' + A.name + ' ' + sum.hg + ':' + sum.ag + (sum.pens ? ' (i.E. ' + sum.pens[0] + ':' + sum.pens[1] + ')' : '') + '. ' + (scorers ? 'Tore: ' + scorers + '. ' : '') + 'Zuschauer: ' + R.fmtNum(m.attendance || 0) + '.', 'match');
+    S.news(st, head, (fx.comp === 'league' ? st.week + '. Spieltag' : fx.comp === 'releg' ? 'Relegation' : fx.comp === 'euro' ? R.euro.label(st, fx) : 'Pokal') + ': ' + H.name + ' – ' + A.name + ' ' + sum.hg + ':' + sum.ag + (sum.pens ? ' (i.E. ' + sum.pens[0] + ':' + sum.pens[1] + ')' : '') + '. ' + (scorers ? 'Tore: ' + scorers + '. ' : '') + 'Zuschauer: ' + R.fmtNum(m.attendance || 0) + '.', 'match');
     // Vertrauen des Vorstands
     var exp = uc.expectedPos || 9;
     var oppC = st.clubs[side === 0 ? fx.a : fx.h];

@@ -205,7 +205,7 @@
       sc.add(base + 1, wrap(fac, 'technik'));
       // Dach: geschwungener Glasring (Abdeckung je nach Ausbau)
       if (dach > 0) {
-        var cover = [[0, 0], [Math.PI * 1.05, Math.PI * 1.95], [Math.PI * 0.55, Math.PI * 2.45], [0, full]][dach];
+        var cover = [[0, 0], [Math.PI * 1.05, Math.PI * 1.95], [Math.PI * 0.55, Math.PI * 2.45], [0, full]][Math.min(dach, 3)];
         var oRx = rx + 1, oRy = ry + 1, iRx = irx + (rx - irx) * 0.42, iRy = iry + (ry - iry) * 0.42;
         var roof = sc.poly(ring(oRx, oRy, H + 1.5, cover[0], cover[1]).concat(ring(iRx, iRy, H + 3.2, cover[1], cover[0])), sc.grad('#ffffff', '#b9d4ee', true), 'fill-opacity=".5" stroke="#f8fafc" stroke-width="1.2"');
         roof += sc.poly(ring(iRx, iRy, H + 3.2, cover[0], cover[1]), 'none', 'stroke="#ffffff" stroke-width="2"');
