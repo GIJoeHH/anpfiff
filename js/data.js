@@ -346,6 +346,7 @@
     stocks: ['Börsenguru', 'Erziele 1 Mio. € Gewinn mit Aktien oder Krypto.'],
     millionaire: ['Vereinsmillionär', 'Habe 50 Mio. € auf dem Konto.'],
     bankdirector: ['Der Bankdirektor kennt mich persönlich', 'Finde den geheimen Buchhaltungskeller.'],
+    kartenhai: ['Der Kartenhai', 'Verkaufe Eintrittskarten zu Mondpreisen – und sie gehen trotzdem weg.'],
     clinic: ['Chefarzt', 'Baue die Vereins-Privatklinik.'],
     ubahn: ['Nächster Halt: Stadion', 'Baue den eigenen U-Bahn-Stadionbahnhof.'],
     seasons10: ['Urgestein', 'Spiele zehn Saisons.']
