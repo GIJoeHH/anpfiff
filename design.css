@@ -645,3 +645,6 @@ table.md-cmp td.pos { color: var(--ok); } table.md-cmp td.neg { color: var(--bad
 /* Einstellungen: Spiel, Speichern & Synchronisieren, Kurzanleitung untereinander */
 .set-stack { display: flex; flex-direction: column; gap: 14px; } .set-stack > .panel { min-width: 0; overflow-x: auto; }
 .set-stack .t td { white-space: normal; } .set-stack .t td:first-child { width: 42%; }
+
+.nav-item.nav-cloud { color: #f2c464; }
+.nav-item.nav-cloud .ic { color: #f2c464; }
