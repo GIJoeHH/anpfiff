@@ -1,5 +1,5 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = '405947c15d';
+const VERSION = '010c861333';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
@@ -8,6 +8,7 @@ const CORE = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './img/bank.jpg',
+  './img/tecis.jpg',
   './index.html',
   './js/crests.js',
   './js/data.js',
