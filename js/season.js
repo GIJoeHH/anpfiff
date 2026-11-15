@@ -284,6 +284,7 @@
   // played: { key: fertiges Match-Objekt } (vom Nutzer live gespielte Partien)
   S.completeWeek = function (st, played) {
     played = played || {};
+    st.lastUserMatches = []; // alle eigenen Spiele dieser Woche (Spielbericht mit Auswahl)
     if (S.finalDay(st)) return S.playFinalDay(st, played);
     var prep = S.prepareWeek(st);
     var results = [];
@@ -394,6 +395,14 @@
     }
   };
 
+  // Bericht merken: Bezeichnung des Wettbewerbs (für die Auswahl im Spielbericht)
+  S.keepUserMatch = function (st, fx) {
+    var lm = st.lastUserMatch; if (!lm) return;
+    lm.label = fx.comp === 'league' ? st.week + '. Spieltag' : fx.comp === 'friendly' ? 'Testspiel' : S.fxLabel(st, fx);
+    lm.kind = fx.comp === 'euro' ? fx.euro : fx.comp === 'cup' || fx.comp === 'final' ? 'cup' : fx.comp === 'releg' ? 'releg' : fx.comp === 'friendly' ? 'friendly' : 'league';
+    st.lastUserMatches = st.lastUserMatches || [];
+    st.lastUserMatches.push(lm);
+  };
   S.userMatchAftermath = function (st, fx, sum, m) {
     var uc = S.userClub(st); if (!uc) return;
     var side = fx.h === uc.id ? 0 : 1;
@@ -422,6 +431,7 @@
     var delta = won ? (expectWin ? 2 : 4) : (my === op && !sum.pens ? (expectWin ? -1.5 : 1) : (expectWin ? -5 : -2.5));
     st.manager.trust = R.clamp(st.manager.trust + delta, 0, 100);
     st.lastUserMatch = { key: fx.key, comp: fx.comp, h: fx.h, a: fx.a, sum: sum, att: m.attInfo, ratings: m.rating, side: side, events: m.events.slice(-60).map(function (e) { return { min: e.min, type: e.type, side: e.side, text: e.text }; }), stats: { poss: m.stats.poss, shots: m.stats.shots, onT: m.stats.onTarget, chances: m.stats.chances, corners: m.stats.corners, fouls: m.stats.fouls }, goals: m.goals, assists: m.assists, motm: m.motm, headline: head };
+    S.keepUserMatch(st, fx);
   };
 
   // ---------- Wöchentliche Prozesse ----------
@@ -539,6 +549,7 @@
       var H = st.clubs[fx.h], A = st.clubs[fx.a];
       S.news(st, 'Testspiel: ' + H.short + ' – ' + A.short + ' ' + sum.hg + ':' + sum.ag, 'Zuschauer: ' + R.fmtNum(m.attendance || 0) + '. Die Mannschaft sammelt Spielpraxis, die Teamchemie wächst.', 'match');
       st.lastUserMatch = { key: fx.key, comp: fx.comp, h: fx.h, a: fx.a, sum: sum, att: m.attInfo, ratings: m.rating, side: fx.h === uc.id ? 0 : 1, events: m.events.slice(-60).map(function (e) { return { min: e.min, type: e.type, side: e.side, text: e.text }; }), stats: { poss: m.stats.poss, shots: m.stats.shots, onT: m.stats.onTarget, chances: m.stats.chances, corners: m.stats.corners, fouls: m.stats.fouls }, goals: m.goals, assists: m.assists, motm: m.motm, headline: 'TESTSPIEL: ' + H.short.toUpperCase() + ' ' + sum.hg + ':' + sum.ag + ' ' + A.short.toUpperCase() };
+      S.keepUserMatch(st, fx);
     }
   };
 

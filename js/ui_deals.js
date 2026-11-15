@@ -84,11 +84,10 @@
   // Nach jedem Spieltag: Ereigniskarte → Abrechnung → neues Großangebot
   U.afterWeekPopups = function () {
     var st = U.st;
-    if (st.pendingEvent) { U.showEvent(); return; }
+    // Ereigniskarten und Börsenmeldungen stehen als Mail im Posteingang der Zentrale (js/ui_mail.js)
     if (R.season.planEventOpen(st)) { U.showPlanEvent(); return; }
     if (st.dealReport) { U.showDealReport(); return; }
     if (st.deal && st.dealPopup) { U.showDeal(); return; }
-    if (st.marketAlerts && st.marketAlerts.length) { U.showMarketAlerts(); return; }
   };
   // Börsenereignisse (Crash, Kurssprünge, Rekordhöhen)
   U.showMarketAlerts = function () {
