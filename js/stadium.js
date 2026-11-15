@@ -30,7 +30,7 @@
 
   // ---------- Aus alten Kapazitäten übernehmen ----------
   SP.fromCaps = function (steh, sitz, vip) {
-    var plan = { v: 2, sectors: {}, guest: 'E2', jobs: [], wear: 0 };
+    var plan = { v: SP.VERSION, sectors: {}, guest: 'E2', jobs: [], wear: 0 };
     SP.SECTORS.forEach(function (s) { plan.sectors[s.id] = { tiers: [] }; });
     function fill(type, amount, order) {
       for (var i = 0; i < order.length && amount > 0; i++) {
@@ -49,8 +49,21 @@
     fill('loge', vip, order(['N2', 'N1', 'N3', 'S2'], [0, 1, 2]));
     // Gästeblock: ein Hintertor-Sektor mit Plätzen, sonst eine Ecke/Seite
     var g = ['E2', 'E1', 'W2', 'W1', 'SE', 'S3', 'N3'].filter(function (id) { return plan.sectors[id].tiers.length; })[0];
-    plan.guest = g || 'E2';
+    plan.guest = g || 'E2'; plan.guests = [plan.guest];
+    SP.fillGuests(plan, 0.9);
     return plan;
+  };
+  // Gästebereich auf das 10-%-Kontingent bringen: angrenzende Sektoren hinzunehmen, bis die Plätze reichen (höchstens 4 Sektoren)
+  SP.fillGuests = function (p, need) {
+    var quota = 0; SP.SECTORS.forEach(function (s) { var c = SP.secCap(p, s.id); quota += c.steh + c.sitz; }); quota *= 0.1;
+    var g = SP.guestIds(p), first = g[0] && SP.sec(g[0]), side = first ? first.side : 'E';
+    var cand = SP.SECTORS.filter(function (s) { return s.side === side; }).concat(SP.SECTORS.filter(function (s) { return s.kind === 'corner' && s.id.indexOf(side) >= 0; }), SP.SECTORS.filter(function (s) { return s.kind === 'goal'; }))
+      .map(function (s) { return s.id; }).filter(function (id, i, a) { return a.indexOf(id) === i && p.sectors[id].tiers.length; });
+    for (var i = 0; i < cand.length && g.length < 4 && SP.planGuestCap(p, false) < quota * need; i++) {
+      if (g.indexOf(cand[i]) < 0) { g.push(cand[i]); if (p.gTiers) delete p.gTiers[cand[i]]; }
+      p.guests = g; p.guest = g[0];
+    }
+    return p;
   };
   SP.ensure = function (club) {
     if (club.stadium && club.stadium.v) return club.stadium.v < SP.VERSION ? SP.migrate(club) : club.stadium;
@@ -68,7 +81,7 @@
     else if (j.action === 'remove') t.splice(j.tier, 1);
   };
   // Spielstände aus älteren Versionen bereinigen (v1 → v2): fehlende Felder, ungültige Ränge, Gästeblock ohne Plätze
-  SP.VERSION = 2;
+  SP.VERSION = 3; // v3: zu kleine Gästebereiche älterer Spielstände einmalig auf das 10-%-Kontingent erweitert
   SP.migrate = function (club) {
     var p = club && club.stadium; if (!p || !p.v) return p;
     p.sectors = p.sectors || {}; p.jobs = Array.isArray(p.jobs) ? p.jobs : []; p.wear = +p.wear || 0;
@@ -84,6 +97,7 @@
     }
     p.guests = (Array.isArray(p.guests) ? p.guests : [p.guest]).filter(function (id) { return p.sectors[id] && p.sectors[id].tiers.length; });
     if (!p.guests.length || p.guests.indexOf(p.guest) < 0) p.guests.unshift(p.guest);
+    if ((p.v || 1) < 3) SP.fillGuests(p, 0.6);
     p.v = SP.VERSION;
     return p;
   };
@@ -106,8 +120,21 @@
   };
   // Mehrere Gästeblöcke möglich (plan.guests); plan.guest bleibt der erste Block (ältere Spielstände)
   SP.guestIds = function (p) { if (!p) return []; var g = Array.isArray(p.guests) && p.guests.length ? p.guests : (p.guest ? [p.guest] : []); return g.filter(function (id) { return p.sectors[id]; }); };
-  SP.guestCap = function (club) { var p = club.stadium; return SP.guestIds(p).reduce(function (s, id) { return s + SP.secCap(p, id, { live: true }).total; }, 0); };
-  SP.guestType = function (club) { var p = club.stadium, cnt = {}; SP.guestIds(p).forEach(function (id) { p.sectors[id].tiers.forEach(function (t, ti) { cnt[t.type] = (cnt[t.type] || 0) + SP.tierCap(SP.sec(id), ti, t.type, t.size); }); }); var k = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; })[0]; return k || 'steh'; };
+  // Einzelne Ränge eines Sektors als Gästebereich: plan.gTiers[id] = [Rang-Indizes]; ohne Eintrag gilt der ganze Sektor
+  SP.guestTiers = function (p, id) {
+    if (!p || !p.sectors[id] || SP.guestIds(p).indexOf(id) < 0) return [];
+    var n = p.sectors[id].tiers.length, all = [], i; for (i = 0; i < n; i++) all.push(i);
+    var g = p.gTiers && Array.isArray(p.gTiers[id]) ? p.gTiers[id].filter(function (t) { return t >= 0 && t < n; }) : null;
+    return g && g.length ? g.slice().sort(function (a, b) { return a - b; }) : all;
+  };
+  SP.isGuestTier = function (p, id, ti) { return SP.guestTiers(p, id).indexOf(ti) >= 0; };
+  SP.guestPartial = function (p, id) { var n = (p && p.sectors[id] && p.sectors[id].tiers.length) || 0, g = SP.guestTiers(p, id).length; return g > 0 && g < n; };
+  SP.guestLabel = function (p, id) { return SP.sec(id).n + (SP.guestPartial(p, id) ? ' (' + SP.guestTiers(p, id).map(function (ti) { return SP.TIER_NAMES[ti]; }).join(', ') + ')' : ''); };
+  SP.planGuestCap = function (p, live) {
+    return SP.guestIds(p).reduce(function (s, id) { var sec = SP.sec(id); return s + SP.guestTiers(p, id).reduce(function (n, ti) { var t = p.sectors[id].tiers[ti]; return n + (live && busy(p, id, ti) ? 0 : SP.tierCap(sec, ti, t.type, t.size)); }, 0); }, 0);
+  };
+  SP.guestCap = function (club) { return SP.planGuestCap(club.stadium, true); };
+  SP.guestType = function (club) { var p = club.stadium, cnt = {}; SP.guestIds(p).forEach(function (id) { SP.guestTiers(p, id).forEach(function (ti) { var t = p.sectors[id].tiers[ti]; cnt[t.type] = (cnt[t.type] || 0) + SP.tierCap(SP.sec(id), ti, t.type, t.size); }); }); var k = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; })[0]; return k || 'steh'; };
   SP.upkeep = function (club) {
     var plan = club.stadium, u = 0;
     SP.SECTORS.forEach(function (s) { plan.sectors[s.id].tiers.forEach(function (t, ti) { u += SP.tierCap(s, ti, t.type, t.size) * SP.TYPES[t.type].up; }); });
@@ -182,8 +209,21 @@
     });
     return done;
   };
-  SP.removeGuest = function (club, id) { var p = SP.ensure(club), g = SP.guestIds(p); if (g.length <= 1 || g.indexOf(id) < 0) return false; p.guests = g.filter(function (x) { return x !== id; }); p.guest = p.guests[0]; return true; };
-  SP.addGuest = function (club, id) { var p = SP.ensure(club); if (!p.sectors[id] || !p.sectors[id].tiers.length) return false; var g = SP.guestIds(p); if (g.indexOf(id) < 0) g.push(id); p.guests = g; p.guest = g[0]; return true; };
+  SP.removeGuest = function (club, id) { var p = SP.ensure(club), g = SP.guestIds(p); if (g.length <= 1 || g.indexOf(id) < 0) return false; p.guests = g.filter(function (x) { return x !== id; }); p.guest = p.guests[0]; if (p.gTiers) delete p.gTiers[id]; return true; };
+  SP.addGuest = function (club, id) { var p = SP.ensure(club); if (!p.sectors[id] || !p.sectors[id].tiers.length) return false; var g = SP.guestIds(p); if (g.indexOf(id) < 0) g.push(id); p.guests = g; p.guest = g[0]; if (p.gTiers) delete p.gTiers[id]; return true; };
+  // Einen Rang als Gästebereich an- oder abwählen (der Sektor wird bei Bedarf Gästeblock; mindestens ein Gästebereich bleibt)
+  SP.toggleGuestTier = function (club, id, ti) {
+    var p = SP.ensure(club), t = p.sectors[id] && p.sectors[id].tiers; if (!t || !t[ti]) return false;
+    var g = SP.guestIds(p), cur = SP.guestTiers(p, id);
+    p.gTiers = p.gTiers || {};
+    if (cur.indexOf(ti) >= 0) {
+      var rest = cur.filter(function (x) { return x !== ti; });
+      if (!rest.length) return g.length > 1 ? SP.removeGuest(club, id) : false;
+      p.gTiers[id] = rest;
+    } else if (g.indexOf(id) < 0) { g.push(id); p.guests = g; p.guest = g[0]; p.gTiers[id] = [ti]; }
+    else { var nx = cur.concat([ti]); if (nx.length >= t.length) delete p.gTiers[id]; else p.gTiers[id] = nx.sort(function (a, b) { return a - b; }); }
+    return true;
+  };
   // ---------- Gesamtzustand des Stadions (0–100) und Sanierung ----------
   // Der Zustand sinkt jede Woche etwas (Alterung, Witterung) und an Heimspieltagen je nach Auslastung.
   // Unter 70 leidet die Attraktivität, unter 60 steigen die Unterhaltskosten (Sanierungsstau).
@@ -210,7 +250,7 @@
     return { ok: true, cost: o.cost, to: o.to, n: o.n };
   };
 
-  SP.setGuest = function (club, id) { var p = SP.ensure(club); if (!p.sectors[id] || !p.sectors[id].tiers.length) return false; p.guest = id; p.guests = [id]; p.wear = Math.min(p.wear || 0, 40); return true; };
+  SP.setGuest = function (club, id) { var p = SP.ensure(club); if (!p.sectors[id] || !p.sectors[id].tiers.length) return false; p.guest = id; p.guests = [id]; p.gTiers = {}; p.wear = Math.min(p.wear || 0, 40); return true; };
   // Gästeblock sanieren (Abnutzung durch Gästefans)
   SP.repairCost = function (club) { var p = club.stadium; return Math.round(((p && p.wear) || 0) * (800 + SP.guestCap(club) * 2.5) / 1000) * 1000; };
   SP.repair = function (club) { var c = SP.repairCost(club); if (!c) return { ok: false, why: 'Kein Sanierungsbedarf' }; if (club.cash < c) return { ok: false, why: 'Nicht genug Geld' }; club.cash -= c; E.book(club, 'Unterhalt Anlagen', -c); club.stadium.wear = 0; return { ok: true, cost: c }; };

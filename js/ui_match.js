@@ -108,8 +108,8 @@
   // Zuschauerzeile Heim/Gäste (Anzeigetafel, Vorschau)
   U.attLine = function (att, H, A, cls) {
     if (!att || att.guests == null) return '';
-    var home = Math.max(0, att.total - att.guests);
-    return '<div class="' + cls + '"><em>' + U.lc('users', 13) + ' <b>' + R.fmtNum(att.total) + '</b> Zuschauer' + (att.total >= (att.capacity || 1e9) * 0.98 ? ' · ausverkauft' : '') + '</em><span>' + esc(H.short) + ' ' + R.fmtNum(home) + ' · ' + esc(A.short) + ' ' + R.fmtNum(att.guests) + '</span></div>';
+    var gAll = att.guestsAll != null ? att.guestsAll : att.guests, home = Math.max(0, att.total - gAll);
+    return '<div class="' + cls + '"><em>' + U.lc('users', 13) + ' <b>' + R.fmtNum(att.total) + '</b> Zuschauer' + (att.total >= (att.capacity || 1e9) * 0.98 ? ' · ausverkauft' : '') + '</em><span>' + esc(H.short) + ' ' + R.fmtNum(home) + ' · ' + esc(A.short) + ' ' + R.fmtNum(gAll) + '</span></div>';
   };
   U.startLive = function (fixtures) { U.live = { queue: fixtures, idx: 0, played: {} }; U.liveNext(); };
   U.liveNext = function () {
@@ -444,7 +444,7 @@
     // Zeitung
     var article = U.articleText(lm);
     h += '<div class="newspaper"><div class="mast">DIE ABSEITSFALLE · SPORTTEIL</div><div class="head">' + esc(lm.headline) + '</div><p>' + esc(article) + '</p></div>';
-    if (lm.att) h += '<div class="panel"><h2>Zuschauer & Umsatz</h2><table class="t small"><tr><td>Zuschauer</td><td class="num">' + R.fmtNum(lm.att.total) + ' / ' + R.fmtNum(lm.att.capacity || 0) + '</td></tr>' + (lm.att.guests != null ? '<tr><td>' + U.lc('home', 13) + ' Heimfans (' + esc(H.short) + ')</td><td class="num">' + R.fmtNum(lm.att.total - lm.att.guests) + '</td></tr><tr><td>' + U.lc('bus', 13) + ' Gästefans (' + esc(A.short) + ')</td><td class="num">' + R.fmtNum(lm.att.guests) + '</td></tr>' : '') + (lm.att.ticket != null && lm.h === st.manager.clubId ? '<tr><td>Ticketerlöse</td><td class="num">' + money(lm.att.ticket) + '</td></tr><tr><td>Gastronomie</td><td class="num">' + money(lm.att.cater) + '</td></tr><tr><td>Parken</td><td class="num">' + money(lm.att.parking) + '</td></tr><tr><td>Zufriedenheit</td><td class="num">' + lm.att.satisfaction + '/100</td></tr>' : '<tr><td colspan="2" class="muted">Auswärtsspiel – Einnahmen beim Gastgeber.</td></tr>') + '</table></div>';
+    if (lm.att) h += '<div class="panel"><h2>Zuschauer & Umsatz</h2><table class="t small"><tr><td>Zuschauer</td><td class="num">' + R.fmtNum(lm.att.total) + ' / ' + R.fmtNum(lm.att.capacity || 0) + '</td></tr>' + (lm.att.guests != null ? '<tr><td>' + U.lc('home', 13) + ' Heimfans (' + esc(H.short) + ')</td><td class="num">' + R.fmtNum(lm.att.total - (lm.att.guestsAll != null ? lm.att.guestsAll : lm.att.guests)) + '</td></tr><tr><td>' + U.lc('bus', 13) + ' Gästefans (' + esc(A.short) + ')</td><td class="num">' + R.fmtNum(lm.att.guestsAll != null ? lm.att.guestsAll : lm.att.guests) + (lm.att.guestsOut ? ' <span class="muted">(davon ' + R.fmtNum(lm.att.guestsOut) + ' außerhalb des Gästeblocks)</span>' : '') + '</td></tr>' : '') + (lm.att.ticket != null && lm.h === st.manager.clubId ? '<tr><td>Ticketerlöse</td><td class="num">' + money(lm.att.ticket) + '</td></tr><tr><td>Gastronomie</td><td class="num">' + money(lm.att.cater) + '</td></tr><tr><td>Parken</td><td class="num">' + money(lm.att.parking) + '</td></tr><tr><td>Zufriedenheit</td><td class="num">' + lm.att.satisfaction + '/100</td></tr>' : '<tr><td colspan="2" class="muted">Auswärtsspiel – Einnahmen beim Gastgeber.</td></tr>') + '</table></div>';
     // Weitere Ergebnisse
     var c = U.club();
     if (c && st.lastResults) {
@@ -456,7 +456,7 @@
   U.articleText = function (lm) {
     var st = U.st, H = st.clubs[lm.h], A = st.clubs[lm.a], s = lm.sum;
     var goals = s.ev.filter(function (e) { return e.t === 'goal'; });
-    var t = 'Vor ' + R.fmtNum(lm.att ? lm.att.total : 0) + ' Zuschauern ' + (lm.att && lm.att.guests > 0 ? '(davon ' + R.fmtNum(lm.att.guests) + ' Gästefans) ' : '') + (s.hg === s.ag ? 'trennten sich ' + H.short + ' und ' + A.short + ' ' + s.hg + ':' + s.ag + '. ' : (s.hg > s.ag ? H.short : A.short) + ' setzte sich mit ' + Math.max(s.hg, s.ag) + ':' + Math.min(s.hg, s.ag) + ' durch. ');
+    var t = 'Vor ' + R.fmtNum(lm.att ? lm.att.total : 0) + ' Zuschauern ' + (lm.att && lm.att.guests > 0 ? '(davon ' + R.fmtNum(lm.att.guestsAll != null ? lm.att.guestsAll : lm.att.guests) + ' Gästefans) ' : '') + (s.hg === s.ag ? 'trennten sich ' + H.short + ' und ' + A.short + ' ' + s.hg + ':' + s.ag + '. ' : (s.hg > s.ag ? H.short : A.short) + ' setzte sich mit ' + Math.max(s.hg, s.ag) + ':' + Math.min(s.hg, s.ag) + ' durch. ');
     if (goals.length) { var f = goals[0], fp = st.players[f.p]; t += 'Den ersten Treffer erzielte ' + (fp ? fp.last : 'ein Unbekannter') + ' in der ' + f.m + '. Minute. '; }
     var lastG = goals[goals.length - 1]; if (lastG && lastG.m >= 85 && goals.length > 1) { var lp = st.players[lastG.p]; t += 'Spät wurde es dramatisch: ' + (lp ? lp.last : '') + ' traf in der ' + lastG.m + '. Minute. '; }
     var mp = st.players[lm.motm]; if (mp) t += 'Bester Mann auf dem Platz: ' + W.playerName(mp) + ' (Note ' + (lm.ratings[lm.motm] || 0).toFixed(1) + '). ';

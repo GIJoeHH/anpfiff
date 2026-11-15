@@ -11,8 +11,8 @@
   E.capacity = function (club) { var p = E.capacityParts(club); return p.steh + p.sitz + p.vip; };
   E.capacityParts = function (club) { if (plan(club)) { var q = R.stadium.parts(club); return { steh: q.steh, sitz: q.sitz, vip: q.vip, biz: q.business }; } return { steh: lv(club, 'steh').cap, sitz: lv(club, 'sitz').cap, vip: lv(club, 'vip').vip }; };
   E.PLAN_KEYS = ['steh', 'sitz', 'vip']; // ersetzt durch den Stadionplan
-  // Gästeblock: Kapazität (Stadionplan) bzw. 8 % der Stehplätze/Sitzplätze bei Vereinen ohne Plan
-  E.guestCap = function (club) { if (plan(club)) return R.stadium.guestCap(club); var p = E.capacityParts(club); return Math.round((p.steh + p.sitz) * 0.08); };
+  // Gästeblock: Kapazität (Stadionplan) bzw. 10 % der Stehplätze/Sitzplätze bei Vereinen ohne Plan (wie in der Bundesliga üblich)
+  E.guestCap = function (club) { if (plan(club)) return R.stadium.guestCap(club); var p = E.capacityParts(club); return Math.round((p.steh + p.sitz) * 0.10); };
   E.transportCap = function (club) {
     return lv(club, 'oepnv').fans + Math.min(lv(club, 'parken').cars * 2.6, lv(club, 'strasse').fans);
   };
@@ -212,7 +212,7 @@
     // Gästefans: je höher die Liga und je größer/besser der Gegner, desto mehr reisen an (Derby: noch mehr)
     var gDemand = 0, gCap = 0, gType = 'steh', guests = 0, guestFree = 0, guestFreeOk = false, guestQuota = 0, guestBlocks = 0, homeInGuest = 0;
     if (away && comp !== 'final') {
-      var lgF = { 1: 0.05, 2: 0.034, 3: 0.022 }[home.league] || 0.02;
+      var lgF = { 1: 0.078, 2: 0.052, 3: 0.034 }[home.league] || 0.03; // kalibriert an den Auswärtsfahrer-Zahlen der Bundesliga (Ø ca. 9 % der Fanbasis)
       gDemand = away.fans * lgF * (0.55 + away.reputation / 110) * (1 + 1.2 * mu.derby) * (mu.friend ? 1.6 : 1) * (1.15 - Math.min(0.45, mu.km / 1600)) * (comp === 'cup' || comp === 'euro' ? 1.25 : comp === 'releg' ? 1.6 : comp === 'friendly' ? 0.15 : 1) * (0.85 + E.sportFactor(st, away) * 0.15);
       var blocks = E.guestCap(home); if (home.blockedArea) blocks = Math.round(blocks * 0.8);
       gType = plan(home) ? R.stadium.guestType(home) : ((parts.steh || 0) > 0 ? 'steh' : 'sitz');
@@ -244,6 +244,17 @@
       // übrige Nachfrage füllt freie Gästetickets (gleiche Platzart)
       if (guestFreeOk && k === gType && d > res[k]) { var extra = Math.round(Math.min(guestFree - homeInGuest, d - res[k])); if (extra > 0) { res[k] += extra; dayTk[k] += extra; homeInGuest += extra; } }
     });
+    // Gästefans außerhalb des Gästeblocks: Wer im Gästeblock kein Ticket mehr bekommt, kauft teils normale Karten
+    // (freie Plätze nach den Heimfans; im Derby deutlich weniger wegen Fantrennung)
+    var gOut = { steh: 0, sitz: 0 }, guestsOut = 0;
+    if (away && comp !== 'final' && comp !== 'friendly' && gDemand > 0) {
+      var over = Math.max(0, gDemand * priceFactor(prices[gType], ref[gType]) - guests) * (mu.derby > 0 ? 0.15 : 0.45);
+      ['sitz', 'steh'].forEach(function (k) {
+        // zuerst freie Plätze, dann ein Teil der Tageskarten im freien Verkauf (Konkurrenz mit den Heimfans)
+        var x = Math.round(Math.min(Math.max(0, parts[k] - res[k]), over)); if (x > 0) { gOut[k] = x; over -= x; guestsOut += x; }
+        var sw = Math.round(Math.min(over, dayTk[k] * Math.min(0.25, over / (over + (dem[k] || 0) + 1)))); if (sw > 0) { res[k] -= sw; dayTk[k] -= sw; gOut[k] += sw; over -= sw; guestsOut += sw; }
+      });
+    }
     // Business-Seats (Tribünenplatz mit Essen im Stadioninneren, Preis je Spiel) und Logen (Privaträume, Saisonmiete)
     var bizCap = parts.biz || 0, logeCap = parts.vip - bizCap;
     var bizD = bizCap * (0.35 + home.reputation / 180) * sport * pfx(prices.biz, ref.biz) * (comp === 'final' ? 1.5 : 1) * (comp === 'friendly' ? 0.3 : 1);
@@ -251,7 +262,7 @@
     var resLoge = Math.round(Math.min(logeCap, logenN * E.LOGE_SEATS * (comp === 'friendly' ? 0.4 : 0.92))), resBiz = Math.round(Math.min(bizCap, bizD));
     dem.biz = bizD; dem.loge = logenN;
     res.vip = resLoge + resBiz;
-    var total = res.steh + res.sitz + res.vip + guests;
+    var total = res.steh + res.sitz + res.vip + guests + guestsOut;
     // Verkehr: Engpass → Staus, Zuschauerverlust, Unzufriedenheit
     var tcap = E.transportCap(home);
     var congestion = 0;
@@ -259,18 +270,18 @@
       var lost = (total - tcap) * 0.45;
       congestion = R.clamp((total - tcap) / Math.max(1, total), 0, 1);
       var keep = (total - lost) / total;
-      res.steh = Math.round(res.steh * keep); res.sitz = Math.round(res.sitz * keep); dayTk.steh = Math.round(dayTk.steh * keep); dayTk.sitz = Math.round(dayTk.sitz * keep); resLoge = Math.round(resLoge * keep); resBiz = Math.round(resBiz * keep); res.vip = resLoge + resBiz; guests = Math.round(guests * keep);
-      total = res.steh + res.sitz + res.vip + guests;
+      res.steh = Math.round(res.steh * keep); res.sitz = Math.round(res.sitz * keep); dayTk.steh = Math.round(dayTk.steh * keep); dayTk.sitz = Math.round(dayTk.sitz * keep); resLoge = Math.round(resLoge * keep); resBiz = Math.round(resBiz * keep); res.vip = resLoge + resBiz; guests = Math.round(guests * keep); guestsOut = Math.round(guestsOut * keep); gOut.steh = Math.round(gOut.steh * keep); gOut.sitz = Math.round(gOut.sitz * keep);
+      total = res.steh + res.sitz + res.vip + guests + guestsOut;
     }
     var transitShare = Math.min(0.75, lv(home, 'oepnv').fans / Math.max(1, total));
     var carsUsed = Math.min(lv(home, 'parken').cars, total * (1 - transitShare) / 2.6);
     // Eintritt je Spiel: nur Tageskarten und Business (Dauerkarten und Logen werden vor der Saison bezahlt)
     var promoF = home.ticketPromo > 0 ? 0.9 : 1;
-    var ticket = (dayTk.steh * prices.steh + dayTk.sitz * prices.sitz) * promoF + resBiz * prices.biz + guests * prices[gType];
+    var ticket = (dayTk.steh * prices.steh + dayTk.sitz * prices.sitz) * promoF + resBiz * prices.biz + guests * prices[gType] + gOut.steh * prices.steh + gOut.sitz * prices.sitz;
     if (home.freeTickets) { var ft = Math.min(home.freeTickets, dayTk.steh + dayTk.sitz); ticket -= ft * prices.steh * promoF; }
     var cater = total * (3 + (lv(home, 'hosp').att || 0) * 0.5) + resLoge * 40 + resBiz * 15;
     var parking = carsUsed * (lv(home, 'parken').fee || 0);
-    return { matchup: mu, shark: shark && dayTk.steh + dayTk.sitz + resBiz + guests > 0, oppPos: oppPos, guestQuota: guestQuota, guestBlocks: guestBlocks, guestType: gType, homeInGuest: homeInGuest, guestFreeOk: guestFreeOk, guestEmpty: Math.max(0, gCap - guests - homeInGuest),
+    return { matchup: mu, shark: shark && dayTk.steh + dayTk.sitz + resBiz + guests > 0, oppPos: oppPos, guestQuota: guestQuota, guestBlocks: guestBlocks, guestType: gType, homeInGuest: homeInGuest, guestFreeOk: guestFreeOk, guestEmpty: Math.max(0, gCap - guests - homeInGuest), guestsOut: guestsOut, guestsAll: guests + guestsOut,
       factors: { fans: home.fans, league: leagueF, sport: sport, opp: oppF, oppPos: oppPosF, derby: derby, friend: friendF, comp: compF, attr: attrF }, prices: { steh: prices.steh, sitz: prices.sitz, biz: prices.biz, loge: prices.loge }, dem: dem, capK: capK, holders: sh, dayTk: dayTk, resBiz: resBiz, resLoge: resLoge, bizCap: bizCap, logeCap: logeCap, logeBoxes: E.logeBoxes(home),
       total: total, parts: res, guests: guests, guestDemand: Math.round(gDemand), guestCap: gCap, capacity: E.capacity(home), ticket: ticket, cater: cater, parking: parking, congestion: congestion, demand: Math.round(demand), satisfaction: R.clamp(Math.round(100 - congestion * 120 - Math.max(0, (prices.steh / ref.steh - 1) * 40)), 0, 100) };
   };
