@@ -20,7 +20,7 @@
       var mode = U.p.mode || '', md0 = S.roundsUpTo ? S.roundsUpTo(st, lvl, st.week) : st.week;
       var t = S.table(st, lvl, mode || null), nT = t.length;
       h += lsel + '<div class="panel lg-head"><div><div class="tr-hero-k">' + esc(D.leagueNames[lvl]).toUpperCase() + ' · ' + (md0 ? md0 + '. SPIELTAG' : 'VOR DEM SAISONSTART') + '</div><h2>Jeder Punkt erzählt eine Geschichte.</h2></div>' +
-        '<div class="seg">' + [['', 'Gesamt'], ['home', 'Heim'], ['away', 'Auswärts'], ['form', 'Form (5)']].map(function (x) { return '<button class="sm ' + (mode === x[0] ? 'on' : '') + '" data-act="ligaMode" data-mode="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
+        '<div class="seg">' + [['', 'Gesamt'], ['home', 'Heim'], ['away', 'Auswärts'], ['form', 'Form (5)']].map(function (x) { return '<button class="sm ' + (mode === x[0] ? 'on' : '') + '" data-act="ligaMode" data-m="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
       var zone = function (i) { if (mode) return ''; return lvl > 1 && i < 2 ? 'up' : lvl > 1 && i === 2 ? 'rel' : lvl < 3 && i === nT - 3 ? 'rel' : lvl < 3 && i >= nT - 2 ? 'down' : lvl === 1 && i === 0 ? 'champ' : ''; };
       h += '<div class="panel tight lg-wrap"><table class="lg-t"><thead><tr><th>Pl.</th><th class="l">Verein</th><th>Sp.</th><th>S</th><th>U</th><th>N</th><th>Tore</th><th>Diff.</th><th>Pkt.</th><th class="l">Form</th></tr></thead><tbody>' +
         t.map(function (r, i) { var cl = st.clubs[r.id], d = r.gf - r.ga, z = zone(i);
