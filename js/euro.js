@@ -183,7 +183,7 @@
   };
   X.venueIdx = function (season, k) { return ((season || 0) * 3 + (k === 'tl' ? 7 : 0)) % C.venues.length; };
   X.venue = function (st, k) { var c = st.euro && st.euro[k], v = C.venues[c && c.venue != null ? c.venue : X.venueIdx(st.season, k)]; return { name: v[0], city: v[1], country: v[2], cap: v[3] }; };
-  function pay(st, id, amount) { if (X.defs[id] || !(amount > 0)) return; var c = st.clubs[id]; if (!c) return; amount = Math.round(amount); c.cash += amount; E.book(c, 'Prämien', amount); var e = st.euro; if (e) { e.earn = e.earn || {}; e.earn[id] = (e.earn[id] || 0) + amount; } }
+  function pay(st, id, amount) { if (X.defs[id] || !(amount > 0)) return; var c = st.clubs[id]; if (!c) return; amount = Math.round(amount); c.cash += amount; E.book(c, 'Prämien', amount); if (S.compEarn) S.compEarn(st, c, 'euro', 'prize', amount); var e = st.euro; if (e) { e.earn = e.earn || {}; e.earn[id] = (e.earn[id] || 0) + amount; } }
   function groupFixtures(t) {
     var a = t[0], b = t[1], c = t[2], d = t[3];
     return [[[a, d], [b, c]], [[c, a], [d, b]], [[a, b], [d, c]], [[b, a], [c, d]], [[a, c], [b, d]], [[d, a], [c, b]]]
@@ -344,6 +344,19 @@
       if (ri < 3) X.drawKO(st, k, ri + 1); else X.finished(st, k);
     });
   };
+  var RD_TO = { 'Achtelfinale': 'das Achtelfinale', 'Viertelfinale': 'das Viertelfinale', 'Halbfinale': 'das Halbfinale', 'Finale': 'das Finale' };
+  // Persönliche Meldung an den eigenen Verein (Posteingang): Weiterkommen mit Prämie bzw. Ausscheiden mit Gesamteinnahmen
+  function userMail(st, uc, k, o) {
+    if (!E.addMail) return;
+    var earn = S.earnText ? S.earnText(st, uc, 'euro', 'die ' + X.NAMES[k]) : 'Prämien insgesamt: ' + R.fmtMoney(X.earned(st, uc.id)) + '.';
+    o.kind = 'euro'; o.text = o.text + ' ' + earn; E.addMail(st, o);
+  }
+  function tieRes(t, uc) {
+    var g = 0, o = 0, last = null; (t.r || []).forEach(function (r) { if (!r) return; last = r; });
+    if (t.r && t.r.length === 2 && t.r[0] && t.r[1]) { g = (t.h === uc.id ? t.r[0].hg + t.r[1].ag : t.r[0].ag + t.r[1].hg); o = (t.h === uc.id ? t.r[0].ag + t.r[1].hg : t.r[0].hg + t.r[1].ag); return 'Gesamtergebnis ' + g + ':' + o + (last && last.pens ? ' (i. E.)' : ''); }
+    if (!last) return ''; var home = t.h === uc.id;
+    return (home ? last.hg + ':' + last.ag : last.ag + ':' + last.hg) + (last.pens ? ' (i. E. ' + (home ? last.pens[0] + ':' + last.pens[1] : last.pens[1] + ':' + last.pens[0]) + ')' : '');
+  }
   X.drawKO = function (st, k, ri) {
     var c = st.euro[k], def = X.ROUNDS[ri], ties = [], uc = S.userClub(st), legs = X.legsOf(ri);
     function tie(h, a) { return { h: h, a: a, r: legs === 2 ? [null, null] : [null], winner: null }; }
@@ -368,12 +381,15 @@
       S.news(st, n + ': ' + def.n + ' gegen ' + opp.short + '!', uc.name + ' trifft im ' + def.n + ' der ' + n + ' auf ' + opp.name + ' (' + X.countryOf(st, opp.id) + '). ' +
         (def.neutral ? 'Gespielt wird ' + (def.f4 ? 'beim Final 4 ' : '') + 'in ' + v.city + ' (' + v.name + ', ' + R.fmtNum(v.cap) + ' Plätze). ' : legs === 2 ? (mine.a === uc.id ? 'Das Rückspiel findet zu Hause statt. ' : 'Das Hinspiel findet zu Hause statt. ') : '') +
         'Prämie für das Weiterkommen: ' + R.fmtMoney(C.prize[k].ko[ri]) + '.', 'liga');
+      userMail(st, uc, k, { tone: 'good', icon: 'trophy', title: n + ': Wir haben ' + RD_TO[def.n] + ' erreicht!', text: (ri ? 'Weiter geht die Reise – ' : 'Die Gruppenphase ist geschafft – ') + 'nächster Gegner ist ' + opp.name + ' (' + X.countryOf(st, opp.id) + '). Die Prämie von ' + R.fmtMoney(C.prize[k].ko[ri]) + ' wurde überwiesen.' });
     } else if (ri === 0) {
       var gi = X.groupOf(st, k, uc.id), pos = X.table(st, k, gi).map(function (r) { return r.id; }).indexOf(uc.id) + 1;
       S.news(st, n + ': Aus in der Gruppenphase', uc.name + ' beendet die Gruppe ' + X.GROUP_LETTERS[gi] + ' auf Platz ' + pos + ' und scheidet aus dem Europapokal aus.', 'liga');
+      userMail(st, uc, k, { tone: 'bad', icon: 'flag', important: true, title: n + ': Unsere Reise endet leider in der Gruppenphase', text: 'Platz ' + pos + ' in Gruppe ' + X.GROUP_LETTERS[gi] + ' reicht nicht für das Achtelfinale.' });
     } else {
       var lost = c.ko[ri - 1].ties.filter(function (t) { return t.h === uc.id || t.a === uc.id; })[0];
       if (lost) S.news(st, n + ': Endstation ' + X.ROUNDS[ri - 1].n, uc.name + ' scheidet im ' + X.ROUNDS[ri - 1].n + ' gegen ' + X.info(st, lost.winner).name + ' aus.', 'liga');
+      if (lost) userMail(st, uc, k, { tone: 'bad', icon: 'flag', important: true, title: n + ': Unsere Reise endet leider im ' + X.ROUNDS[ri - 1].n, text: 'Gegen ' + X.info(st, lost.winner).name + ' ist Schluss (' + tieRes(lost, uc) + ').' });
     }
   };
   X.finished = function (st, k) {
@@ -385,6 +401,11 @@
     st.euro.hist.push({ season: st.season, comp: k, club: w.name, city: v.city });
     S.news(st, n.toUpperCase() + ': ' + w.name + ' triumphiert in ' + v.city + '!', 'Finale in ' + v.name + ': ' + X.info(st, fin.h).short + ' – ' + X.info(st, fin.a).short + ' ' + r.hg + ':' + r.ag +
       (r.pens ? ' (' + C.shootoutText + ' ' + r.pens[0] + ':' + r.pens[1] + ')' : '') + '. ' + l.name + ' bleibt nur der zweite Platz.', 'titel');
+    var ucF = S.userClub(st);
+    if (ucF && (fin.h === ucF.id || fin.a === ucF.id)) {
+      if (fin.winner === ucF.id) userMail(st, ucF, k, { tone: 'good', icon: 'trophy', important: true, title: n + ': Der Titel gehört uns!', text: 'Finalsieg in ' + v.city + ' gegen ' + l.name + ' (' + tieRes(fin, ucF) + ')! Die Titelprämie von ' + R.fmtMoney(C.prize[k].title) + ' wurde überwiesen.' });
+      else userMail(st, ucF, k, { tone: 'bad', icon: 'flag', important: true, title: n + ': Erst im Finale gestoppt', text: 'Das Endspiel in ' + v.city + ' gegen ' + w.name + ' geht ' + tieRes(fin, ucF) + ' verloren – trotzdem eine große Reise.' });
+    }
     if (X.defs[fin.winner]) return;
     var club = st.clubs[fin.winner];
     club.titles.euro = (club.titles.euro || 0) + 1;

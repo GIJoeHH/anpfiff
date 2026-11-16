@@ -25,13 +25,16 @@
       if (!m.read) n++;
       var bad = m.tone === 'bad', good = m.tone === 'good';
       h += '<div class="msg' + (m.important ? ' msg-imp' : '') + (m.read ? ' msg-read' : '') + '"><div class="ic-tile ' + (bad ? 'bad' : good ? 'ok' : 'info') + '">' + U.lc(m.icon || 'mail', 20) + '</div><div class="msg-b"><b>' + (m.important ? '<span class="tag imp">Wichtig</span> ' : '') + esc(m.title) + ' <span class="muted small">· ' + esc(when(m)) + '</span></b><span>' + esc(m.text) + '</span></div><div class="row" style="gap:6px">' +
-        (m.kind === 'markt' ? '<button class="sm" data-act="mailMarket" data-id="' + m.id + '">Zur Börse</button>' : '') + '<button class="sm ghost" data-act="mailDel" data-id="' + m.id + '" title="Mail löschen">' + U.lc('x', 14) + '</button></div></div>';
+        (m.kind === 'markt' ? '<button class="sm" data-act="mailMarket" data-id="' + m.id + '">' + (U.mailMarketTab(m) === 'krypto' ? 'Zu den Kryptos' : 'Zur Börse') + '</button>' : '') + (m.kind === 'pokal' ? '<button class="sm" data-act="mailComp" data-id="' + m.id + '">Zum Pokal</button>' : m.kind === 'euro' && U.screens.europa ? '<button class="sm" data-act="mailComp" data-id="' + m.id + '">Zum Europapokal</button>' : '') + '<button class="sm ghost" data-act="mailDel" data-id="' + m.id + '" title="Mail löschen">' + U.lc('x', 14) + '</button></div></div>';
     });
     return { n: n, html: h };
   };
   U.acts.mailEvent = function () { U.showEvent(); };
   U.acts.mailDel = function (d) { var st = U.st; st.inbox = st.inbox.filter(function (m) { return m.id !== d.id; }); U.render(); };
-  U.acts.mailMarket = function (d) { var st = U.st; st.inbox.forEach(function (m) { if (m.id === d.id) m.read = true; }); U.go('bank', { tab: 'aktien' }); };
+  // Sprungziel: Krypto-Meldungen (Crash/Boom/Rekord einer Kryptowährung) führen zu den Kryptowährungen, alles andere zum Aktienmarkt
+  U.mailMarketTab = function (m) { if (!m) return 'aktien'; if (m.mk === 'ccrash' || m.mk === 'cboom') return 'krypto'; return m.sym && D.cryptos.some(function (c) { return c.id === m.sym; }) ? 'krypto' : 'aktien'; };
+  U.acts.mailComp = function (d) { var st = U.st, hit = null; st.inbox.forEach(function (m) { if (m.id === d.id) { m.read = true; hit = m; } }); if (hit && hit.kind === 'euro') U.go('europa'); else U.go('liga', { tab: 'pokal' }); };
+  U.acts.mailMarket = function (d) { var st = U.st, hit = null; st.inbox.forEach(function (m) { if (m.id === d.id) { m.read = true; hit = m; } }); U.go('bank', { tab: U.mailMarketTab(hit) }); };
   // Erledigte Ereigniskarte als (normale) Mail festhalten
   U.mailEventDone = function (st, ev, opt, msg) {
     if (!ev || !R.econ.addMail) return;

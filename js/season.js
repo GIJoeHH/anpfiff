@@ -36,6 +36,37 @@
   S.breakKey = function (st) { return st.phase === 'winter' ? 'w' + (st.winter || 1) : 'p' + (st.prep || 1); };
   S.CUP_NAMES = ['1. Runde', '2. Runde', 'Achtelfinale', 'Viertelfinale', 'Halbfinale', 'Finale'];
   S.CUP_PRIZE = [150000, 300000, 600000, 1200000, 2500000, 5000000];
+  S.CUP_TO = ['die 1. Runde', 'die 2. Runde', 'das Achtelfinale', 'das Viertelfinale', 'das Halbfinale', 'das Finale'];
+  S.CUP_IN = ['in der 1. Runde', 'in der 2. Runde', 'im Achtelfinale', 'im Viertelfinale', 'im Halbfinale', 'im Finale'];
+  // Einnahmen des eigenen Vereins je Wettbewerb und Saison (Prämien und Zuschauereinnahmen) – für die Pokal- und Europapokalmeldungen
+  S.compEarn = function (st, club, kind, what, amount) {
+    if (!club || !club.userControlled || !(amount > 0)) return;
+    var ce = club.compEarn; if (!ce || ce.season !== st.season) ce = club.compEarn = { season: st.season };
+    var k = ce[kind] || (ce[kind] = { prize: 0, gate: 0 }); k[what] += Math.round(amount);
+  };
+  S.compEarned = function (st, club, kind) { var ce = club && club.compEarn; return (ce && ce.season === st.season && ce[kind]) || { prize: 0, gate: 0 }; };
+  S.earnText = function (st, club, kind, label) {
+    var e = S.compEarned(st, club, kind), tot = e.prize + e.gate;
+    if (!tot) return 'Einnahmen hat ' + label + ' in dieser Saison keine gebracht.';
+    return 'Insgesamt hat ' + label + ' in dieser Saison ' + R.fmtMoney(tot) + ' eingebracht (' + [e.prize ? 'Prämien ' + R.fmtMoney(e.prize) : '', e.gate ? 'Zuschauereinnahmen ' + R.fmtMoney(e.gate) : ''].filter(Boolean).join(', ') + ').';
+  };
+  // Zuschauereinnahmen eines Pokal-/Europapokalspiels dem eigenen Verein zurechnen
+  S.trackGate = function (st, fx, home, away, att, homeInc) {
+    var kd = fx.comp === 'euro' ? 'euro' : fx.comp === 'cup' || fx.comp === 'final' ? 'cup' : null; if (!kd || !att) return;
+    if (fx.neutral) { S.compEarn(st, home, kd, 'gate', att.share); S.compEarn(st, away, kd, 'gate', att.share); }
+    else S.compEarn(st, home, kd, 'gate', homeInc);
+  };
+  // Meldung an den eigenen Verein nach einer entschiedenen Pokalpartie
+  S.cupUserNews = function (st, ci, tie) {
+    var uc = S.userClub(st); if (!uc || (tie.h !== uc.id && tie.a !== uc.id)) return;
+    var won = tie.winner === uc.id, home = tie.h === uc.id, opp = st.clubs[home ? tie.a : tie.h], r = tie.r || {};
+    var res = (home ? r.hg + ':' + r.ag : r.ag + ':' + r.hg) + (r.pens ? ' (i. E. ' + (home ? r.pens[0] + ':' + r.pens[1] : r.pens[1] + ':' + r.pens[0]) + ')' : '');
+    var earn = S.earnText(st, uc, 'cup', 'der Pokal'), mail;
+    if (won && ci < 5) mail = { tone: 'good', icon: 'trophy', title: 'Pokal: Wir haben ' + S.CUP_TO[ci + 1] + ' erreicht!', text: 'Mit dem ' + res + ' gegen ' + opp.name + ' zieht ' + uc.name + ' in ' + S.CUP_TO[ci + 1] + ' ein. Die Prämie von ' + R.fmtMoney(S.CUP_PRIZE[ci]) + ' wurde überwiesen. ' + earn };
+    else if (won) mail = { tone: 'good', icon: 'trophy', important: true, title: 'Der Pokal gehört uns!', text: 'Finalsieg gegen ' + opp.name + ' (' + res + ')! Die Siegprämie von ' + R.fmtMoney(S.CUP_PRIZE[ci]) + ' wurde überwiesen. ' + earn };
+    else mail = { tone: 'bad', icon: 'flag', important: true, title: ci === 5 ? 'Pokal: Erst im Finale gestoppt' : 'Pokal: Unsere Reise endet leider ' + S.CUP_IN[ci], text: (ci === 5 ? 'Das Endspiel gegen ' + opp.name + ' geht ' + res + ' verloren – was für eine Pokalsaison trotzdem. ' : 'Nach dem ' + res + ' gegen ' + opp.name + ' ist ' + S.CUP_IN[ci] + ' Schluss. ') + earn };
+    mail.kind = 'pokal'; E.addMail(st, mail);
+  };
   S.LEAGUE_PRIZE = { 1: [12000000, 3000000], 2: [3000000, 800000], 3: [1000000, 200000] };
 
   S.news = function (st, title, text, type) {
@@ -248,7 +279,7 @@
   S.neutralGate = function (st, fx, home, away) {
     var v = fx.venue, N = S.NEUTRAL, cap = v ? v.cap : N.capacity, share = v ? Math.round(cap * D.euro.gatePerSeat / 1000) * 1000 : N.share;
     [home, away].forEach(function (c) { if (c.foreign) return; c.cash += share; E.book(c, 'Eintrittsgelder', share); });
-    return { total: v ? Math.round(cap * 0.97) : N.total, ticket: v ? share * 2 : N.ticket, cater: v ? Math.round(share * 0.22) : N.cater, parking: 0, capacity: cap, parts: {}, venue: v || null };
+    return { share: share, total: v ? Math.round(cap * 0.97) : N.total, ticket: v ? share * 2 : N.ticket, cater: v ? Math.round(share * 0.22) : N.cater, parking: 0, capacity: cap, parts: {}, venue: v || null };
   };
   // Auswärtsspiel im Europapokal: Kulisse des Gastgebers, keine eigenen Einnahmen
   S.awayGate = function (home) { var cap = Math.round((home.fans || 10000) / 100) * 100; return { total: Math.round(cap * 0.93), ticket: 0, cater: 0, parking: 0, capacity: cap, parts: {} }; };
@@ -266,6 +297,7 @@
       if (!m) { m = S.createMatch(st, fx); M.simulate(m); }
       m.st = st;
       var att = S.neutralGate(st, fx, st.clubs[fx.h], st.clubs[fx.a]);
+      S.trackGate(st, fx, st.clubs[fx.h], st.clubs[fx.a], att);
       m.attendance = att.total; m.attInfo = att;
       M.finalize(m);
       var sum = M.summary(m);
@@ -315,7 +347,7 @@
         att = S.awayGate(home);
       } else {
         att = E.attendance(st, home, away, fx.comp);
-        E.matchdayIncome(st, home, att);
+        var homeInc = E.matchdayIncome(st, home, att);
         if (home.userControlled && R.stadium && home.stadium) R.stadium.matchWear(home, att);
         if (home.userControlled) S.guestAftermath(st, home, away, att, fx);
         home.attendanceHist.push(att.total);
@@ -324,6 +356,7 @@
         home.freeTickets = 0; home.blockedArea = 0;
         if (att.total > home.records.attendance) home.records.attendance = att.total;
       }
+      if (fx.comp !== 'friendly') S.trackGate(st, fx, home, away, att, fx.neutral || home.foreign ? 0 : homeInc);
       m.attendance = att.total; m.attInfo = att;
       M.finalize(m);
       var sum = M.summary(m);
@@ -383,6 +416,8 @@
       tie.winner = (sum.pens ? (sum.pens[0] > sum.pens[1]) : (sum.hg > sum.ag)) ? tie.h : tie.a;
       var winner = st.clubs[tie.winner];
       winner.cash += S.CUP_PRIZE[ci] * (ci === 5 ? 1 : 1); E.book(winner, 'Prämien', S.CUP_PRIZE[ci]);
+      S.compEarn(st, winner, 'cup', 'prize', S.CUP_PRIZE[ci]);
+      S.cupUserNews(st, ci, tie);
     } else if (parts[0] === 'R') {
       var rg = st.releg[+parts[1]], leg = rg.legs[+parts[2]];
       leg.r = sum;
