@@ -240,13 +240,14 @@
     else if (st.lastUserMatch && st.lastResults && st.lastResults.some(function (r) { return r.user; })) U.go('bericht');
     else U.go('zentrale');
     if (U.screen !== 'bericht') setTimeout(function () { if (U.afterWeekPopups) U.afterWeekPopups(); }, 300);
+    else if (st.celebrations && st.celebrations.length && U.showCelebration) setTimeout(U.showCelebration, 400); // Titel/Finale: direkt über dem Spielbericht
   };
   U.acts.autoStart = function () {
     U.autoRun = true; U.renderTop();
     (function loop() {
       if (!U.autoRun) return;
       var st = U.st;
-      if (st.pendingEvent || S.planEventOpen(st) || (st.deal && U.can('business')) || st.dealReport || st.phase === 'seasonEnd' || (st.manager.unemployed && st.manager.offers.length) || st.inbox.some(function (o) { return o.type === 'sponsor'; }) && st.manager.role !== 'trainer') {
+      if (st.pendingEvent || (st.celebrations && st.celebrations.length) || S.planEventOpen(st) || (st.deal && U.can('business')) || st.dealReport || st.phase === 'seasonEnd' || (st.manager.unemployed && st.manager.offers.length) || st.inbox.some(function (o) { return o.type === 'sponsor'; }) && st.manager.role !== 'trainer') {
         U.autoRun = false; U.render(); if (U.afterWeekPopups) U.afterWeekPopups(); if (st.phase === 'seasonEnd') U.go('saisonende'); return;
       }
       U.finishWeek({});

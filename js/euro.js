@@ -405,6 +405,8 @@
     if (ucF && (fin.h === ucF.id || fin.a === ucF.id)) {
       if (fin.winner === ucF.id) userMail(st, ucF, k, { tone: 'good', icon: 'trophy', important: true, title: n + ': Der Titel gehört uns!', text: 'Finalsieg in ' + v.city + ' gegen ' + l.name + ' (' + tieRes(fin, ucF) + ')! Die Titelprämie von ' + R.fmtMoney(C.prize[k].title) + ' wurde überwiesen.' });
       else userMail(st, ucF, k, { tone: 'bad', icon: 'flag', important: true, title: n + ': Erst im Finale gestoppt', text: 'Das Endspiel in ' + v.city + ' gegen ' + w.name + ' geht ' + tieRes(fin, ucF) + ' verloren – trotzdem eine große Reise.' });
+      if (S.celebrate) { var won = fin.winner === ucF.id, op = won ? l : w, ce = S.compEarned ? S.compEarned(st, ucF, 'euro') : { prize: X.earned(st, ucF.id), gate: 0 };
+        S.celebrate(st, { kind: k, win: won, club: ucF.id, opp: won ? (fin.winner === fin.h ? fin.a : fin.h) : fin.winner, oppName: op.name, res: tieRes(fin, ucF), city: v.city, prize: won ? C.prize[k].title : 0, earn: ce.prize + ce.gate }); }
     }
     if (X.defs[fin.winner]) return;
     var club = st.clubs[fin.winner];

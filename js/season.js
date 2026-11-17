@@ -66,6 +66,13 @@
     else if (won) mail = { tone: 'good', icon: 'trophy', important: true, title: 'Der Pokal gehört uns!', text: 'Finalsieg gegen ' + opp.name + ' (' + res + ')! Die Siegprämie von ' + R.fmtMoney(S.CUP_PRIZE[ci]) + ' wurde überwiesen. ' + earn };
     else mail = { tone: 'bad', icon: 'flag', important: true, title: ci === 5 ? 'Pokal: Erst im Finale gestoppt' : 'Pokal: Unsere Reise endet leider ' + S.CUP_IN[ci], text: (ci === 5 ? 'Das Endspiel gegen ' + opp.name + ' geht ' + res + ' verloren – was für eine Pokalsaison trotzdem. ' : 'Nach dem ' + res + ' gegen ' + opp.name + ' ist ' + S.CUP_IN[ci] + ' Schluss. ') + earn };
     mail.kind = 'pokal'; E.addMail(st, mail);
+    if (ci === 5) { var ce = S.compEarned(st, uc, 'cup'); S.celebrate(st, { kind: 'cup', win: won, club: uc.id, opp: opp.id, oppName: opp.name, res: res, prize: won ? S.CUP_PRIZE[ci] : 0, earn: ce.prize + ce.gate }); }
+  };
+  // Große Momente (Meisterschaft, Pokal- und Europapokalfinale): eigener Bildschirm (js/ui_celebrate.js)
+  S.celebrate = function (st, o) {
+    o.season = st.season; o.week = st.week;
+    (st.celebrations || (st.celebrations = [])).push(o);
+    var log = st.celebrationLog || (st.celebrationLog = []); log.push(JSON.parse(JSON.stringify(o))); if (log.length > 60) log.shift();
   };
   S.LEAGUE_PRIZE = { 1: [12000000, 3000000], 2: [3000000, 800000], 3: [1000000, 200000] };
 
@@ -1205,6 +1212,12 @@
       { upper: t1[r1].id, lower: t2[2].id, legs: [{ h: t2[2].id, a: t1[r1].id, r: null }, { h: t1[r1].id, a: t2[2].id, r: null }], winner: null, levels: [1, 2] },
       { upper: t2[r2].id, lower: t3[2].id, legs: [{ h: t3[2].id, a: t2[r2].id, r: null }, { h: t2[r2].id, a: t3[2].id, r: null }], winner: null, levels: [2, 3] }
     ];
+    var ucR = S.userClub(st);
+    [t1, t2, t3].forEach(function (t, i) {
+      if (!ucR || !t.length || t[0].id !== ucR.id) return;
+      var a = t[0], b = t[1] || { pts: a.pts };
+      S.celebrate(st, { kind: 'league', win: true, level: i + 1, club: ucR.id, pts: a.pts, w: a.w, d: a.d, l: a.l, gf: a.gf, ga: a.ga, gap: a.pts - b.pts });
+    });
     st.phase = 'releg'; st.relegLeg = 0;
     S.news(st, 'Die Saison ist beendet – jetzt kommt die Relegation!', st.clubs[t1[r1].id].short + ' gegen ' + st.clubs[t2[2].id].short + ' und ' + st.clubs[t2[r2].id].short + ' gegen ' + st.clubs[t3[2].id].short + '.', 'liga');
   };

@@ -1,5 +1,5 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = '36b1252bec';
+const VERSION = '52a6f1e8f8';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
@@ -8,6 +8,17 @@ const CORE = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './img/bank.jpg',
+  './img/cel/finale1.jpg',
+  './img/cel/finale2.jpg',
+  './img/cel/meister1.jpg',
+  './img/cel/meister2.jpg',
+  './img/cel/meister3.jpg',
+  './img/cel/meister4.jpg',
+  './img/cel/meister5.jpg',
+  './img/cel/parade1.jpg',
+  './img/cel/parade2.jpg',
+  './img/cel/parade3.jpg',
+  './img/cel/pokal1.jpg',
   './img/tecis.jpg',
   './index.html',
   './js/crests.js',
@@ -32,6 +43,7 @@ const CORE = [
   './js/touch.js',
   './js/transfers.js',
   './js/ui_art.js',
+  './js/ui_celebrate.js',
   './js/ui_club.js',
   './js/ui_core.js',
   './js/ui_deals.js',
