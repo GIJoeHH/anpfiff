@@ -2,7 +2,7 @@
 // Bei jeder neuen Spielversion RFM.VERSION erhöhen. web/deploy.sh hängt beim Veröffentlichen
 // zusätzlich die Build-Kennung an (RFM.BUILD), damit man auf dem iPad sieht, welcher Stand läuft.
 (function (R) {
-  R.VERSION = '2.6.3';
+  R.VERSION = '2.6.4';
   R.BUILD = R.BUILD || '';
   R.versionText = function (long) {
     var plat = R.save && R.save.platform ? R.save.platform() : '';
@@ -19,4 +19,4 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show); else show();
 })(RFM);
-RFM.BUILD = '52a6f1e8f8';
+RFM.BUILD = '4e5623271c';
