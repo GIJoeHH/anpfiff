@@ -1,5 +1,5 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = '4e5623271c';
+const VERSION = '036ad5cfe6';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
@@ -21,6 +21,7 @@ const CORE = [
   './img/cel/pokal1.jpg',
   './img/tecis.jpg',
   './index.html',
+  './js/clubplus.js',
   './js/crests.js',
   './js/data.js',
   './js/data_euro.js',
@@ -53,6 +54,7 @@ const CORE = [
   './js/ui_mail.js',
   './js/ui_match.js',
   './js/ui_misc.js',
+  './js/ui_plus.js',
   './js/ui_realty.js',
   './js/ui_stadium.js',
   './js/ui_team.js',
