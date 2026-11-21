@@ -150,6 +150,14 @@
     if (!cands.length) return null;
     return R.weighted(cands, function (c) { return wfn(c.p, c.role); }).p;
   }
+  // Spielerkarriere: Abschlüsse, die der Spieler in einer interaktiven Szene schon genommen hat, ersetzen spätere eigene Abschlüsse
+  function pcOwn(m, side, p, wfn) {
+    if (!p || !m.pcOwn || !(m.pcOwn[side] > 0) || !m.pc || p.id !== m.pc.pid) return p;
+    m.pcOwn[side]--;
+    var q = pickPlayer(m, side, function (x, r) { return x.id === p.id ? 0 : wfn(x, r); });
+    return q || p;
+  }
+  M.pcOwn = pcOwn;
   function name(p) { return p ? p.last : 'Unbekannt'; }
   function ev(m, type, side, text, pid, pid2, extra) {
     var e = { min: m.minute, type: type, side: side, text: text, pid: pid || null, pid2: pid2 || null };
@@ -186,9 +194,12 @@
     var etF = m.minute > 90 ? 0.8 : 1;
     var ratio = R.clamp(Math.pow(S[side].att / Math.max(10, S[opp].def), 1.45), 0.4, 2.4);
     var driveF = 1 + (m.drive[side] > 0 ? 0.08 : 0);
-    if (R.rand() < 0.125 * tempoF * ratio * etF * driveF) {
+    var chanceRoll = R.rand() < 0.125 * tempoF * ratio * etF * driveF;
+    if (chanceRoll && m.pcSkip && m.pcSkip[side] > 0) { m.pcSkip[side]--; } // Spielerkarriere: diese Chance wurde bereits als interaktive Szene ausgespielt
+    else if (chanceRoll) {
       m.stats.chances[side]++; m.stats.shots[side]++;
-      var shooter = pickPlayer(m, side, function (p, role) { return ({ TW: 0, ABW: 0.5, MIT: 2, STU: 5 })[role] * Math.pow(p.attr.sho, 1.5); });
+      var shW = function (p, role) { return ({ TW: 0, ABW: 0.5, MIT: 2, STU: 5 })[role] * Math.pow(p.attr.sho, 1.5); };
+      var shooter = pcOwn(m, side, pickPlayer(m, side, shW), shW);
       var assister = R.chance(0.75) ? pickPlayer(m, side, function (p, role) { return p === shooter ? 0 : ({ TW: 0.02, ABW: 0.6, MIT: 2.5, STU: 1.5 })[role] * p.attr.pas; }) : null;
       var gkp = (function () { var slots = D.formations[t[opp].formation]; for (var i = 0; i < 11; i++) if (slots[i][0] === 'TW' && m.onPitch[opp][i]) return st.players[m.onPitch[opp][i]]; return null; })();
       var isPen = R.chance(0.035);
