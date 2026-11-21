@@ -334,7 +334,7 @@
     // Verlängert werden vor allem brauchbare, jüngere Spieler – aber nur bis zu einer Kadergröße von 23 und ohne Gehaltssprung.
     var avg = R.avg(squad, function (x) { return x.ovr; }), LIMIT = 23;
     var keepN = squad.filter(function (p) { return p.contract > 1 || p.youth || p.loan; }).length;
-    squad.filter(function (p) { return p.contract <= 1 && !p.youth && !p.loan; }).sort(function (a, b) { return b.ovr - a.ovr; }).forEach(function (p) {
+    squad.filter(function (p) { return p.contract <= 1 && !p.youth && !p.loan && !(R.pc && R.pc.isPc(st, p)); }).sort(function (a, b) { return b.ovr - a.ovr; }).forEach(function (p) {
       if (keepN >= LIMIT) return;
       var useful = p.ovr >= avg - 5 || p.pot > p.ovr + 6;
       var chance = !useful ? 0.12 : p.age >= 33 ? 0.1 : p.age < 30 ? 0.85 : 0.5;

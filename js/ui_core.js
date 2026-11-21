@@ -247,7 +247,7 @@
     (function loop() {
       if (!U.autoRun) return;
       var st = U.st;
-      if (st.pendingEvent || (st.celebrations && st.celebrations.length) || S.planEventOpen(st) || (st.deal && U.can('business')) || st.dealReport || st.phase === 'seasonEnd' || (st.manager.unemployed && st.manager.offers.length) || st.inbox.some(function (o) { return o.type === 'sponsor'; }) && st.manager.role !== 'trainer') {
+      if (st.pendingEvent || (st.pc && !st.pc.retired && st.pc.offers.length && st.pc.offersSeen !== st.pc.offerSeason) || (st.celebrations && st.celebrations.length) || S.planEventOpen(st) || (st.deal && U.can('business')) || st.dealReport || st.phase === 'seasonEnd' || (st.manager.unemployed && st.manager.offers.length) || st.inbox.some(function (o) { return o.type === 'sponsor'; }) && st.manager.role !== 'trainer') {
         U.autoRun = false; U.render(); if (U.afterWeekPopups) U.afterWeekPopups(); if (st.phase === 'seasonEnd') U.go('saisonende'); return;
       }
       U.finishWeek({});
@@ -374,13 +374,13 @@
   };
   U.screens.wizard = function () {
     var w = U.wiz, h = '';
-    var steps = ['Karrieremodus', 'Verein', w.mode === 'found' ? 'Gründung & Rolle' : 'Rolle', 'Start'];
+    var steps = w.mode === 'player' ? ['Karrieremodus', 'Startverein', 'Dein Spieler', 'Start'] : ['Karrieremodus', 'Verein', w.mode === 'found' ? 'Gründung & Rolle' : 'Rolle', 'Start'];
     h += '<div class="title-screen" style="align-items:flex-start"><div class="title-box" style="width:min(1100px,100%);text-align:left"><h1>Neue Karriere</h1><div class="wiz-step">' + steps.map(function (s, i) { return '<span class="' + (w.step === i + 1 ? 'on' : '') + '">' + (i + 1) + '. ' + s + '</span>'; }).join('') + '</div>';
     if (w.step === 1) {
-      h += '<div class="grid g3">' +
+      h += '<div class="grid ' + (U.pcChoice ? 'g2' : 'g3') + '">' +
         U.choice('mode', 'existing', w.mode, '' + U.lc('stadium', 18) + ' Verein übernehmen', 'Übernehmen Sie einen beliebigen Verein aus allen drei Ligen.') +
         U.choice('mode', 'found', w.mode, '' + U.lc('wrench', 15) + ' Eigenen Verein gründen', 'Präsident + Geschäftsführer + Trainer in einer Person. Start in der 3. Liga, unkündbar.') +
-        U.choice('mode', 'project', w.mode, '' + U.lc('rocket', 15) + ' Vom Drittligisten zum Spitzenclub', 'Schnellstart mit einem schwachen Drittligisten als Aufbauprojekt.') + '</div>';
+        U.choice('mode', 'project', w.mode, '' + U.lc('rocket', 15) + ' Vom Drittligisten zum Spitzenclub', 'Schnellstart mit einem schwachen Drittligisten als Aufbauprojekt.') + (U.pcChoice ? U.pcChoice(w) : '') + '</div>';
       if (W.hasRealWorld()) h += '<div class="panel" style="margin-top:14px"><h2>Spielwelt</h2><div class="grid g2">' +
         U.choice('world', 'real', w.world, '🇩🇪 Echte Vereine 2026/27', '56 Vereine (18/18/20) mit ' + R.fmtNum(D.real.players.length) + ' echten Spielern. Daten: ' + esc(D.real.source) + '.') +
         U.choice('world', 'fiktiv', w.world, '' + U.lc('dices', 15) + ' Fiktive Vereine', '54 erfundene Vereine (18/18/18) mit zufällig erzeugten Spielern.') + '</div></div>';
