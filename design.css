@@ -751,3 +751,6 @@ button.gtier-on { background: rgba(239, 68, 68, .14); border-color: #ef4444; col
 .vg-moment span { display: flex; flex-direction: column; } .vg-moment b { color: var(--text); font-size: 13px; } .vg-moment em { font-style: normal; font-size: 11px; color: var(--muted); }
 .cel-title small { display: block; font-size: .42em; letter-spacing: 1px; margin-bottom: 4px; }
 .cel-card { width: min(580px, calc(100% - 40px)); }
+
+/* Karrieremodus: Vertrags-Chip in der Kopfzeile (auf schmalen Handys steht der Vertrag oben in der Karriere-Zentrale) */
+@media (max-width: 700px) { .tb-chip.tb-con { display: none; } }

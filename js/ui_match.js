@@ -400,6 +400,7 @@
         });
       });
       draw.sort(function (q, r) { return q.y - r.y; }).forEach(function (d) { figure(d.x, d.y, d.s, d.kit, d.gk); });
+      if (L.hl && U.hlDraw) draw.forEach(function (d) { if (d.pid === L.hl) U.hlDraw(ctx, d.x, d.y, d.s, now); });
       // Ball
       if (a.shot && now - a.shot.t < 900) {
         var gy = a.shot.side === 0 ? 0 : 1, gx = a.shot.goal ? 0.5 : (0.5 + (Math.random() < 0.5 ? -0.12 : 0.12));
