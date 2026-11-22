@@ -1,5 +1,5 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = '6c651745e7';
+const VERSION = '23d1dd0f11';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
@@ -35,6 +35,7 @@ const CORE = [
   './img/events/ev_stadium_night_01.jpg',
   './img/tecis.jpg',
   './index.html',
+  './js/career_affairs.js',
   './js/career_agents.js',
   './js/career_core.js',
   './js/career_dialogs.js',
@@ -44,6 +45,9 @@ const CORE = [
   './js/career_life.js',
   './js/career_lifesim.js',
   './js/career_match.js',
+  './js/career_partner.js',
+  './js/career_partner_lib.js',
+  './js/career_partner_lib2.js',
   './js/clubplus.js',
   './js/crests.js',
   './js/data.js',
@@ -81,6 +85,7 @@ const CORE = [
   './js/ui_mail.js',
   './js/ui_match.js',
   './js/ui_misc.js',
+  './js/ui_partner.js',
   './js/ui_pc.js',
   './js/ui_plus.js',
   './js/ui_realty.js',

@@ -407,7 +407,8 @@
     st.euro.hist.push({ season: st.season, comp: k, club: w.name, city: v.city });
     S.news(st, n.toUpperCase() + ': ' + w.name + ' triumphiert in ' + v.city + '!', 'Finale in ' + v.name + ': ' + X.info(st, fin.h).short + ' – ' + X.info(st, fin.a).short + ' ' + r.hg + ':' + r.ag +
       (r.pens ? ' (' + C.shootoutText + ' ' + r.pens[0] + ':' + r.pens[1] + ')' : '') + '. ' + l.name + ' bleibt nur der zweite Platz.', 'titel');
-    var ucF = S.userClub(st);
+    var ucF = S.userClub(st), cF = !ucF && S.celebClub ? S.celebClub(st) : null;
+    if (cF && (fin.h === cF.id || fin.a === cF.id) && S.celebrate) { var wonC = fin.winner === cF.id; S.celebrate(st, { kind: k, win: wonC, club: cF.id, opp: wonC ? (fin.winner === fin.h ? fin.a : fin.h) : fin.winner, oppName: (wonC ? l : w).name, res: tieRes(fin, cF), city: v.city, prize: 0, earn: 0, career: true }); }
     if (ucF && (fin.h === ucF.id || fin.a === ucF.id)) {
       if (fin.winner === ucF.id) userMail(st, ucF, k, { tone: 'good', icon: 'trophy', important: true, title: n + ': Der Titel gehört uns!', text: 'Finalsieg in ' + v.city + ' gegen ' + l.name + ' (' + tieRes(fin, ucF) + ')! Die Titelprämie von ' + R.fmtMoney(C.prize[k].title) + ' wurde überwiesen.' });
       else userMail(st, ucF, k, { tone: 'bad', icon: 'flag', important: true, title: n + ': Erst im Finale gestoppt', text: 'Das Endspiel in ' + v.city + ' gegen ' + w.name + ' geht ' + tieRes(fin, ucF) + ' verloren – trotzdem eine große Reise.' });

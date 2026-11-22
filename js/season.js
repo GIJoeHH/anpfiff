@@ -58,7 +58,9 @@
   };
   // Meldung an den eigenen Verein nach einer entschiedenen Pokalpartie
   S.cupUserNews = function (st, ci, tie) {
-    var uc = S.userClub(st); if (!uc || (tie.h !== uc.id && tie.a !== uc.id)) return;
+    var uc = S.userClub(st);
+    if (!uc) { var cc = S.celebClub(st); if (cc && ci === 5 && (tie.h === cc.id || tie.a === cc.id)) { var hm = tie.h === cc.id, rr = tie.r || {}; S.celebrate(st, { kind: 'cup', win: tie.winner === cc.id, club: cc.id, opp: hm ? tie.a : tie.h, oppName: st.clubs[hm ? tie.a : tie.h].name, res: (hm ? rr.hg + ':' + rr.ag : rr.ag + ':' + rr.hg) + (rr.pens ? ' (i. E. ' + (hm ? rr.pens[0] + ':' + rr.pens[1] : rr.pens[1] + ':' + rr.pens[0]) + ')' : ''), prize: 0, earn: 0, career: true }); } return; }
+    if (tie.h !== uc.id && tie.a !== uc.id) return;
     var won = tie.winner === uc.id, home = tie.h === uc.id, opp = st.clubs[home ? tie.a : tie.h], r = tie.r || {};
     var res = (home ? r.hg + ':' + r.ag : r.ag + ':' + r.hg) + (r.pens ? ' (i. E. ' + (home ? r.pens[0] + ':' + r.pens[1] : r.pens[1] + ':' + r.pens[0]) + ')' : '');
     var earn = S.earnText(st, uc, 'cup', 'der Pokal'), mail;
@@ -68,6 +70,8 @@
     mail.kind = 'pokal'; E.addMail(st, mail);
     if (ci === 5) { var ce = S.compEarned(st, uc, 'cup'); S.celebrate(st, { kind: 'cup', win: won, club: uc.id, opp: opp.id, oppName: opp.name, res: res, prize: won ? S.CUP_PRIZE[ci] : 0, earn: ce.prize + ce.gate }); }
   };
+  // Verein für Titel-Screens: eigener Verein im Manager-Modus, in der Spielerkarriere der Verein des eigenen Spielers
+  S.celebClub = function (st) { var uc = S.userClub(st); if (uc) return uc; var p = R.pc && R.pc.player ? R.pc.player(st) : null; return p && p.clubId && !p.youth && st.pc && !st.pc.retired ? st.clubs[p.clubId] : null; };
   // Große Momente (Meisterschaft, Pokal- und Europapokalfinale): eigener Bildschirm (js/ui_celebrate.js)
   S.celebrate = function (st, o) {
     o.season = st.season; o.week = st.week;
@@ -233,12 +237,13 @@
   // Liefert alle Partien der Woche; Partien mit Beteiligung des Nutzers werden markiert.
   S.prepareWeek = function (st) {
     var list = [], uc = st.manager.unemployed ? null : st.manager.clubId;
+    var pcp = !uc && R.pc && R.pc.player && st.pc && !st.pc.retired ? R.pc.player(st) : null, ec = uc || (pcp && !pcp.youth ? pcp.clubId : null); // Europapokal auch für den Verein des Karrierespielers
     if (R.euro && R.euro.ensure) R.euro.ensure(st);
     if (S.finalDay(st)) {
       // Finaltag des Final 4: nur die Endspiele (Pokal und Europapokal)
       var cfi = S.CUP_FINAL, cfr = st.cup && st.cup.rounds[cfi];
       if (cfr && !st.cup.winner) cfr.ties.forEach(function (t, i) { if (!t.winner) list.push({ key: 'C-' + cfi + '-' + i, comp: 'final', h: t.h, a: t.a, neutral: true, venue: S.cupVenue(), extraTime: true }); });
-      R.euro.weekFixtures(st, true).forEach(function (x) { if (x.h === uc || x.a === uc) list.push(x); });
+      R.euro.weekFixtures(st, true).forEach(function (x) { if (ec && (x.h === ec || x.a === ec)) list.push(x); });
       list.forEach(function (x) { x.user = (x.h === uc || x.a === uc); });
       return { list: list, finalDay: true };
     }
@@ -256,7 +261,7 @@
           list.push({ key: 'F-' + S.breakKey(st), comp: 'friendly', h: pl.home ? uc : pl.opp, a: pl.home ? pl.opp : uc });
       }
       // Europapokal: Spiele des eigenen Vereins (alle übrigen laufen als Schnellergebnis, siehe js/euro.js)
-      if (st.phase === 'season' && R.euro && R.euro.weekFixtures && uc) R.euro.weekFixtures(st).forEach(function (x) { if (x.h === uc || x.a === uc) list.push(x); });
+      if (st.phase === 'season' && R.euro && R.euro.weekFixtures && ec) R.euro.weekFixtures(st).forEach(function (x) { if (x.h === ec || x.a === ec) list.push(x); });
       if (st.phase === 'season') [1, 2, 3].forEach(function (l) {
         S.roundsOf(st, l, week).forEach(function (r) {
           st.leagues[l].fixtures[r].forEach(function (f, i) { list.push({ key: 'L-' + l + '-' + r + '-' + i, comp: 'league', h: f.h, a: f.a }); });
@@ -1217,7 +1222,7 @@
       { upper: t1[r1].id, lower: t2[2].id, legs: [{ h: t2[2].id, a: t1[r1].id, r: null }, { h: t1[r1].id, a: t2[2].id, r: null }], winner: null, levels: [1, 2] },
       { upper: t2[r2].id, lower: t3[2].id, legs: [{ h: t3[2].id, a: t2[r2].id, r: null }, { h: t2[r2].id, a: t3[2].id, r: null }], winner: null, levels: [2, 3] }
     ];
-    var ucR = S.userClub(st);
+    var ucR = S.celebClub(st);
     [t1, t2, t3].forEach(function (t, i) {
       if (!ucR || !t.length || t[0].id !== ucR.id) return;
       var a = t[0], b = t[1] || { pts: a.pts };

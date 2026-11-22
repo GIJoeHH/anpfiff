@@ -216,17 +216,17 @@
     h += '<div class="mc-head panel"><div class="mch-team">' + U.crest(H, 64) + '<div><b>' + esc(H.name) + '</b><span>HEIM · ' + esc(m.neutral ? 'neutral' : H.stadiumName) + '</span></div></div>' +
       '<div class="mc-score"><span class="mc-live" id="mcLive">LIVE · ' + esc(mcTitle(st, m)).toUpperCase() + '</span><b><span id="sbH">0</span><i>:</i><span id="sbA">0</span></b><em id="sbMin">0. Minute</em></div>' +
       '<div class="mch-team r"><div><b>' + esc(A.name) + '</b><span>GAST' + (K[1].alt ? ' · Ausweichtrikot' : '') + '</span></div>' + U.crest(A, 64) + '</div></div>';
-    h += '<div class="mc-grid"><div class="panel tight mc-stage"><div style="position:relative"><canvas id="pitchCv" class="mc-canvas" width="1120" height="600"></canvas><div id="flashBox"></div></div>' + (L.att ? U.attLine(L.att, H, A, 'mc-att') : '') + '</div>';
-    h += '<div class="grid" style="align-content:start"><div class="panel"><h2>Spielstatistik</h2><div class="mc-stats">' +
-      [['stPoss', 'Ballbesitz', '50 : 50'], ['stShots', 'Torschüsse', '0 : 0'], ['stCh', 'Chancen', '0 : 0'], ['stYel', 'Gelbe Karten', '0 : 0']].map(function (x) { return '<div class="mc-stat"><span>' + x[1] + '</span><b id="' + x[0] + '">' + x[2] + '</b><i class="mc-sbar"><em id="' + x[0] + 'B" style="width:50%"></em></i></div>'; }).join('') + '</div></div>' +
-      '<div class="panel"><h2>Stimmen von der Bank</h2><p class="mc-quote" id="benchQ">„Konzentriert bleiben, Jungs!“</p><div class="muted small">Nächste Aktion: Wechsel / Taktik</div>' +
-      '<div class="row" style="margin-top:10px">' + (userC ? '<button class="sm secondary" data-act="liveTactics">' + U.lc('arrow-left-right', 14) + 'Wechsel / Taktik</button>' : '') + '<span class="pill">' + U.crest(mine, 14) + ' ' + esc(mine.short) + '</span></div></div></div></div>';
-    h += '<div class="panel mc-flow"><div class="mc-flow-h"><div><div class="sub-h" style="margin-top:0">Spielverlauf</div><div class="mc-last" id="mcLast"><b>0\'</b><span>Gleich geht es los.</span></div></div>' +
+    var feed = '<div class="panel mc-flow"><div class="mc-flow-h"><div><div class="sub-h" style="margin-top:0">Spielverlauf</div><div class="mc-last" id="mcLast"><b>0\'</b><span>Gleich geht es los.</span></div></div>' +
       '<div class="row" id="liveCtl"><button data-act="matchPause" id="pauseBtn">' + U.lc('pause', 15) + ' Pause</button>' + (userC ? '<button data-act="liveTactics">' + U.lc('sliders-horizontal', 15) + ' Taktik</button>' : '') +
       '<div class="seg">' + [['normal', 'Normal'], ['schnell', 'Schnell'], ['sofort', 'Sofort']].map(function (x) { return '<button class="sm ' + (st.settings.matchSpeed === x[0] ? 'on' : '') + '" data-act="matchSpeed" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       '<button class="ghost" data-act="matchSkip">' + U.lc('fast-forward', 15) + ' Überspringen</button></div></div>' +
       (m.userSide >= 0 && !U.can('sport') ? '<p class="muted small" style="margin:6px 0 0">Als Geschäftsführer verfolgen Sie das Spiel von der Tribüne.</p>' : '') +
       '<div class="ticker mc-ticker" id="ticker"></div></div>';
+    h += '<div class="mc-grid"><div class="mc-left"><div class="panel tight mc-stage"><div style="position:relative"><canvas id="pitchCv" class="mc-canvas" width="1120" height="600"></canvas><div id="flashBox"></div></div>' + (L.att ? U.attLine(L.att, H, A, 'mc-att') : '') + '</div>' + feed + '</div>';
+    h += '<div class="grid" style="align-content:start"><div class="panel"><h2>Spielstatistik</h2><div class="mc-stats">' +
+      [['stPoss', 'Ballbesitz', '50 : 50'], ['stShots', 'Torschüsse', '0 : 0'], ['stCh', 'Chancen', '0 : 0'], ['stYel', 'Gelbe Karten', '0 : 0']].map(function (x) { return '<div class="mc-stat"><span>' + x[1] + '</span><b id="' + x[0] + '">' + x[2] + '</b><i class="mc-sbar"><em id="' + x[0] + 'B" style="width:50%"></em></i></div>'; }).join('') + '</div></div>' +
+      '<div class="panel"><h2>Stimmen von der Bank</h2><p class="mc-quote" id="benchQ">„Konzentriert bleiben, Jungs!“</p><div class="muted small">Nächste Aktion: Wechsel / Taktik</div>' +
+      '<div class="row" style="margin-top:10px">' + (userC ? '<button class="sm secondary" data-act="liveTactics">' + U.lc('arrow-left-right', 14) + 'Wechsel / Taktik</button>' : '') + '<span class="pill">' + U.crest(mine, 14) + ' ' + esc(mine.short) + '</span></div></div></div></div>';
     U.after = function () { U.liveUpdate([], true); U.animLoop(); };
     return h;
   };
@@ -412,7 +412,7 @@
       ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(bp[0] + 2, bp[1] + 1, br, br * 0.45, 0, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(bp[0], bp[1] - br, br, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = '#111'; ctx.stroke();
       ctx.textAlign = 'center';
-      if (L.paused && !m.finished) { ctx.fillStyle = 'rgba(5,10,20,.45)'; ctx.fillRect(0, 0, Wd, Ht); ctx.fillStyle = '#fff'; ctx.font = '800 44px Inter, -apple-system, sans-serif'; ctx.fillText('PAUSE', Wd / 2, Ht / 2 + 14); }
+      if (L.paused && !m.finished && !L.career) { ctx.fillStyle = 'rgba(5,10,20,.45)'; ctx.fillRect(0, 0, Wd, Ht); ctx.fillStyle = '#fff'; ctx.font = '800 44px Inter, -apple-system, sans-serif'; ctx.fillText('PAUSE', Wd / 2, Ht / 2 + 14); }
       if (m.finished) { ctx.fillStyle = 'rgba(5,10,20,.45)'; ctx.fillRect(0, Ht / 2 - 46, Wd, 92); ctx.fillStyle = '#fff'; ctx.font = '800 40px Inter, -apple-system, sans-serif'; ctx.fillText('ABPFIFF  ' + m.score[0] + ' : ' + m.score[1], Wd / 2, Ht / 2 + 14); }
       U._raf = requestAnimationFrame(frame);
     }
