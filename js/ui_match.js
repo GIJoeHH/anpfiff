@@ -273,8 +273,8 @@
     if (la && lastE) la.innerHTML = '<b class="' + (lastE.type === 'goal' ? 'goal' : '') + '">' + lastE.min + '\'</b><span>' + icon(lastE) + esc(lastE.text) + '</span>';
     if (L.flash && Date.now() - L.flash.t < 300) {
       var fb = g('flashBox'); var club = U.st.clubs[m.clubs[L.flash.side]];
-      fb.innerHTML = '<div class="goal-flash">TOR!<br><span style="font-size:22px">' + esc(club.short) + '</span></div>';
-      setTimeout(function () { if (fb) fb.innerHTML = ''; }, 1500);
+      var mineF = L.flash.mine; fb.innerHTML = mineF ? '<div class="goal-flash mine">TOR!<br><span class="gf-name">' + esc(mineF) + '</span><span class="gf-club">' + esc(club.short) + '</span></div>' : '<div class="goal-flash">TOR!<br><span style="font-size:22px">' + esc(club.short) + '</span></div>';
+      setTimeout(function () { if (fb) fb.innerHTML = ''; }, mineF ? 3400 : 1500); // eigenes Tor (Spielerkarriere): länger, mit Namen
     }
   };
   U.showHalftime = function () {
