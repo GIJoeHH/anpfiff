@@ -491,7 +491,7 @@
       '<div class="panel"><h2>Kurzanleitung</h2><p class="small">1. <b>NÄCHSTER SPIELTAG</b> spielt die nächste Runde. 2. <b>Mannschaft</b>: Aufstellung per Klick oder Ziehen. 3. <b>Transfermarkt</b>: Filtern, Spieler anklicken, Angebot abgeben. 4. <b>Stadion / Vereinsstadt</b>: Ausbauen mit Wirtschaftlichkeitsrechnung. 5. <b>Bank</b>: Kredite, Tagesgeld, Aktien &amp; Krypto. ' + U.lc('fast-forward', 14) + ' <b>Auto</b> spielt mehrere Spieltage am Stück. Leertaste pausiert das Live-Spiel.</p></div></div>';
   };
   U.acts.setGfx = function (d) { if (R.s3d) R.s3d.setQuality(d.v); U.render(); };
-  U.acts.setSpeed2 = function (d) { U.st.settings.matchSpeed = d.v; U.render(); };
+  U.acts.setSpeed2 = function (d) { var s = U.st.settings; s.matchSpeed = d.v; if (d.v !== 'sofort') s.cmSpeed = d.v === 'schnell' ? 'fast' : 'normal'; U.render(); };
   U.acts.setOpt = function (d, el) { U.st.settings[d.k] = el.checked; U.render(); };
   U.acts.logosLoad = function (d, el) {
     if (!R.logos) return; if (el) el.disabled = true;
