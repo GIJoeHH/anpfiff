@@ -208,7 +208,9 @@
         var taker = st.players[st.clubs[m.clubs[side]].pen];
         if (taker && m.onPitch[side].indexOf(taker.id) >= 0) shooter = taker;
         assister = null;
-        pGoal = 0.68 + shooter.attr.sho / 1000;
+        // Elfmeter: Grundquote 78 %, Schütze, Torwart, Ermüdung (Spanne ~55–95 %)
+        var pq = shooter.attr.sho * 0.75 + shooter.attr.tec * 0.25;
+        pGoal = R.clamp(0.78 + (pq - 65) / 250 - (S[opp].gk - 65) / 500 - (1 - cond(m, shooter)) * 0.25, 0.55, 0.95);
         ev(m, 'chance', side, 'Elfmeter! ' + name(shooter) + ' tritt an …', shooter.id, null, { pen: true });
       } else {
         var shQ = shooter.attr.sho * 0.7 + shooter.attr.tec * 0.3;
@@ -300,7 +302,7 @@
       [0, 1].forEach(function (s) {
         var shooters = m.onPitch[s].filter(Boolean).map(function (id) { return st.players[id]; }).sort(function (a, b) { return b.attr.sho - a.attr.sho; });
         var sh = shooters[r % Math.max(1, shooters.length)];
-        if (R.rand() < 0.72 + (sh ? sh.attr.sho / 1000 : 0)) p[s]++;
+        if (R.rand() < (sh ? R.clamp(0.76 + (sh.attr.sho * 0.75 + sh.attr.tec * 0.25 - 65) / 250, 0.55, 0.93) : 0.7)) p[s]++; // Elfmeterschießen: etwas mehr Druck als im Spiel
       });
       if (r > 30) { p[0]++; break; }
     }
