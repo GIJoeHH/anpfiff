@@ -823,6 +823,49 @@
         O('Dich für ' + fnm(x) + ' entscheiden', function () { MX.affOfficial(st, x.id); return end('Es ist vorbei mit ' + fnm(pt) + '. Ab jetzt gehört ' + fnm(x) + ' offiziell zu deinem Leben.', fx(st, { stress: 8, media: c.press ? -6 : 0 })); })
       ] } } };
   });
+  // Proaktiv über „Privatleben“: ausgehen oder die Dating-App öffnen (je einmal pro Woche)
+  MEET_TXT.bar = 'An der Bar bestellt {n} denselben Drink wie du – und muss lachen.'; MEET_TXT.wein = 'In der Weinbar teilt ihr euch notgedrungen den letzten freien Tisch.'; MEET_TXT.club = 'Auf der Tanzfläche wirst du angerempelt – {n} entschuldigt sich mit einem Lächeln.';
+  MX.outFree = function (st) { var lf = st.mx.life; return lf.outT == null || tick(st) - lf.outT >= 1; };
+  MX.appFree = function (st) { var lf = st.mx.life; return lf.appT == null || tick(st) - lf.appT >= 1; };
+  add('life_out', function (st, c) {
+    var lf = st.mx.life, pt = lf.partner, l = st.mx.last || {}, bad = (l.streak || 0) <= -2;
+    function out(kind, label) {
+      lf.outT = tick(st); var k = hr('out' + kind + tick(st) + (st.seed || 0), 1), fan = hr('outf' + tick(st) + (st.seed || 0), 2), spec = { stress: kind === 'home' ? -2 : -5 };
+      if (pt && kind !== 'team' && kind !== 'home') spec.partner = -1;
+      if (kind === 'home') return end('Sofa, Tee, eine alte Doku. Auch mal schön.', fx(st, spec));
+      if (kind === 'team') { spec.kab = 1; return end('Ein lockerer Abend mit dem Trainerteam. Gut fürs Klima – geflirtet wird heute nicht.', fx(st, spec)); }
+      if ((bad && fan < 0.4) || (kind === 'club' && fan < 0.15)) { spec.fans = -3; spec.media = -2; return end(bad ? 'Ein Handyvideo macht die Runde: Der Trainer feiert – nach ' + Math.abs(l.streak) + ' Niederlagen in Folge. Die Fans sind nicht amüsiert.' : 'Fotos von dir auf der Tanzfläche landen im Netz. „Hat der Trainer nichts Besseres zu tun?“', fx(st, spec)); }
+      if ((lf.cands || []).length < 4 && k < { bar: 0.5, wein: 0.4, club: 0.6 }[kind] - (pt ? 0.15 : 0)) { var cd = MX.newCand(st, kind); cd.src = 'out'; MX.start(st, 'life_meet', { cand: cd }, { prio: 6 }); return end(label + ' – und dann kommst du mit jemandem ins Gespräch …', fx(st, spec)); }
+      return end(label + '. Heute ohne neue Bekanntschaft, aber der Kopf ist frei.', fx(st, spec));
+    }
+    return { title: 'Ausgehen', cat: 'privat', imp: 'normal', img: 'date', max: 1, ic: '🍸', who: { n: 'Freier Abend', role: pt ? 'ohne ' + fnm(pt) : 'Single', ic: '🍸' },
+      nodes: { start: { say: 'Ein freier Abend. Wohin geht es?' + (pt ? ' ' + fnm(pt) + ' hat heute eigene Pläne.' : '') + (bad ? ' Nach der Niederlagenserie schauen allerdings viele genau hin.' : ''), opts: [
+        O('Mit Freunden in eine Bar', function () { return out('bar', 'Ein langer Abend mit alten Freunden'); }),
+        O('Weinbar in der Altstadt', function () { return out('wein', 'Ruhige Musik, guter Wein'); }),
+        O('In einen Club – mal richtig feiern', function () { return out('club', 'Bis spät in die Nacht auf der Tanzfläche'); }, { hint: 'Fotos und Handyvideos – Fans und Medien könnten es mitbekommen' }),
+        O('Afterwork mit dem Trainerteam', function () { return out('team', ''); }),
+        O('Doch lieber zu Hause bleiben', function () { return out('home', ''); }, { def: true })
+      ] } } };
+  });
+  add('life_app', function (st, c) {
+    var lf = st.mx.life, pt = lf.partner, cs = c.cands || []; if (!cs.length) return null;
+    function like(cd, f) { return hr('app' + cd.id, 9) < clamp(0.35 + (cd.v - 50) / 60 + ((st.manager.reputation || 40) - 40) / 300, 0.1, 0.85) * (f || 1); }
+    function used() { lf.appT = tick(st); if (pt) { lf.suspect = tick(st) + 6; if (hr('appl' + tick(st) + (st.seed || 0), 4) < 0.12 + (st.manager.reputation || 40) / 600) return true; } return false; }
+    function leakEnd(txt) { return end(txt + ' Und dann: Ein Screenshot deines Profils kursiert in einer Fangruppe. ' + fnm(pt) + ' hat ihn auch gesehen.', fx(st, { media: -4, partner: -8, stress: 6 })); }
+    var opts = cs.map(function (cd) {
+      return O('💘 ' + fnm(cd) + ' liken', function () { var leak = used(), txt;
+        if (like(cd)) { keepCand(st, cd, 1, 56); txt = 'Match! ' + fnm(cd) + ' schreibt: „Hey! Dein Profil hat mich neugierig gemacht. Kaffee diese Woche?“'; }
+        else txt = 'Kein Match – ' + fnm(cd) + ' hat weitergewischt.';
+        return leak ? leakEnd(txt) : end(txt, fx(st, { stress: -1 })); }, { hint: pt ? 'Heimlich – Entdeckungsrisiko' : '' });
+    });
+    opts.push(O('Allen dreien ein Like geben', function () { var leak = used(), hit = cs.filter(function (cd) { return like(cd, 0.6); });
+      hit.forEach(function (cd) { keepCand(st, cd, 1, 55); });
+      var txt = hit.length ? 'Match mit ' + hit.map(fnm).join(' und ') + '! Jetzt heißt es: Nachrichten beantworten.' : 'Kein einziges Match. Vielleicht wirkt das Profil zu sehr nach Pressekonferenz.';
+      return leak ? leakEnd(txt) : end(txt, []); }, { hint: pt ? 'Heimlich – Entdeckungsrisiko' : 'Weniger Chancen je Person' }));
+    opts.push(O('App wieder schließen', function () { return end('Du legst das Handy weg.', []); }, { def: true }));
+    return { title: 'Dating-App', cat: 'privat', imp: 'normal', img: 'date', max: 1, ic: '💘', who: { n: 'Dating-App', role: pt ? 'Profil unter anderem Namen' : 'Dein Profil', ic: '💘' },
+      nodes: { start: { say: (pt ? 'Du hast ein Profil unter anderem Namen angelegt – ' + fnm(pt) + ' darf davon nichts wissen. ' : '') + 'Drei Profile in deiner Nähe: ' + cs.map(function (cd) { return cd.name + ' (' + cd.job + ', mag ' + cd.intr.join(' und ') + ')'; }).join(' · ') + '.', opts: opts } } };
+  });
   add('life_partner_talk', function (st, c) {
     var lf = st.mx.life, pt = lf.partner; if (!pt) return null; return { title: 'Gespräch mit ' + pt.name.split(' ')[0], cat: 'privat', imp: 'wichtig', img: 'familie', max: 2, ic: '🏠', who: { n: pt.name, role: MX.LSTAGE[pt.stage] + ' · ' + pt.job, ic: '❤️' },
       nodes: { start: { say: '„Du bist kaum noch da. Und wenn, dann denkst du an den Verein. Ich fühle mich allein.“', opts: [

@@ -412,7 +412,7 @@
   var PJOBS = ['Ärztin/Arzt', 'Architektin/Architekt', 'Lehrerin/Lehrer', 'Journalistin/Journalist (nicht Sport)', 'Physiotherapeutin/Physiotherapeut', 'Unternehmerin/Unternehmer', 'Grafikdesignerin/Grafikdesigner', 'Juristin/Jurist', 'Köchin/Koch', 'Musikerin/Musiker'];
   MX.LSTAGE = ['Kennenlernen', 'Dating', 'Feste Beziehung', 'Zusammengezogen', 'Verlobt', 'Verheiratet'];
   var PINTR = ['Kochen', 'Wandern', 'Musik', 'Kunst', 'Reisen', 'Lesen', 'Tanzen', 'Yoga', 'Filme', 'Laufen'];
-  MX.CSRC = { insta: '📸 Instagram', app: '💘 Dating-App', away: '🧳 Auswärtsfahrt', zufall: '🍀 Zufall', gala: '🥂 Gala', cafe: '☕ Café', freunde: '🍝 Freunde', charity: '🏃 Charity' };
+  MX.CSRC = { insta: '📸 Instagram', app: '💘 Dating-App', out: '🍸 Beim Ausgehen', away: '🧳 Auswärtsfahrt', zufall: '🍀 Zufall', gala: '🥂 Gala', cafe: '☕ Café', freunde: '🍝 Freunde', charity: '🏃 Charity' };
   MX.newCand = function (st, where) {
     var s = 'cand' + tick(st) + where + (st.seed || 0) + (st.mx && st.mx.life ? st.mx.life.uid || 0 : 0), i1 = hash(s + 'i') % PINTR.length, i2 = (i1 + 1 + hash(s + 'k') % (PINTR.length - 1)) % PINTR.length;
     return { id: 'mc' + tick(st) + '_' + (hash(s) % 100000), name: MX.newName(st, s), job: pk(PJOBS, s + 'j'), where: where, met: tick(st), v: 45 + Math.round(hr(s, 1) * 20), humor: Math.round(hr(s, 2) * 10), football: Math.round(hr(s, 3) * 10), intr: [PINTR[i1], PINTR[i2]], stage: 0, dates: 0 };
