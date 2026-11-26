@@ -7,7 +7,7 @@
   M.PRESS = ['Zurückhaltend', 'Normal', 'Hoch'];
   M.TEMPO = ['Ruhig', 'Normal', 'Schnell'];
 
-  function available(p) { return p && !p.inj && p.susp <= 0; }
+  function available(p) { return p && !p.inj && p.susp <= 0 && !p.ntAway; } // ntAway: beim Nationalteam (Turnier)
   M.available = available;
 
   // Automatische beste Elf: berücksichtigt Stärke, Position, Fitness, Verletzungen, Sperren

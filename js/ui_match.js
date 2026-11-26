@@ -207,6 +207,7 @@
   // Kopfkarte mit Spielstand, Arena-Bühne (Ränge + perspektivisches Feld mit Spielerfiguren), Statistik, Stimmen von der Bank, Spielverlauf.
   function mcTitle(st, m) {
     var fx = U.live && U.live.queue[U.live.idx];
+    if (fx && fx.label) return fx.label;
     if (fx && fx.comp && fx.comp !== 'league') return S.fxLabel(st, fx);
     return (st.week + 1) + '. Spieltag';
   }
