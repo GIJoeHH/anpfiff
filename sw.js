@@ -1,5 +1,5 @@
 /* ANPFIFF! – Service Worker für den Offline-Betrieb (automatisch erzeugt von web/deploy.sh, nicht von Hand ändern) */
-const VERSION = 'a4f91b1a30';
+const VERSION = '64598a27a3';
 const CACHE = 'anpfiff-' + VERSION;
 const CORE = [
   './',
@@ -90,6 +90,7 @@ const CORE = [
   './js/ui_life.js',
   './js/ui_mail.js',
   './js/ui_match.js',
+  './js/ui_mgr.js',
   './js/ui_misc.js',
   './js/ui_nt.js',
   './js/ui_partner.js',

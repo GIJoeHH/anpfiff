@@ -305,7 +305,8 @@
   MX.IMP = { status: 0, normal: 1, wichtig: 2, krise: 3, highlight: 3 };
   MX.start = function (st, id, ctx, o) {
     var mx = MX.ensure(st); if (!MX.D[id]) return null; o = o || {};
-    var item = { id: id, ctx: ctx || {}, t0: tick(st), prio: o.prio || 0 };
+    var item = { id: id, ctx: ctx || {}, t0: tick(st), prio: o.prio || 0, manual: !!o.manual };
+    if (o.manual && mx.dlg && !mx.dlg.done) { mx.dq.unshift({ id: mx.dlg.id, ctx: mx.dlg.ctx, t0: tick(st), prio: 9, resume: mx.dlg }); mx.dlg = null; return open(st, item); }
     if (mx.dlg && !mx.dlg.done) { mx.dq.push(item); mx.dq.sort(function (a, b) { return b.prio - a.prio; }); if (mx.dq.length > 8) mx.dq.length = 8; return mx.dlg; }
     return open(st, item);
   };
@@ -335,10 +336,10 @@
     d.log.push({ a: lbl, r: res.r || '', eff: (res.e || []).map(function (c) { return c.t; }).join(', ') });
     if (res.img) d.img = res.img;
     if (res.next && def.nodes[res.next] && !res.end) { d.node = res.next; d.step++; }
-    else { d.done = true; d.sum = res.sum || def.sum && (typeof def.sum === 'function' ? def.sum(st, d.ctx) : def.sum) || (d.log.length ? d.log[d.log.length - 1].r : ''); MX.chron(st, def.ic || '💬', def.title || 'Gespräch', (d.sum || '').slice(0, 220), def.imp === 'krise' || def.imp === 'highlight' ? 3 : def.imp === 'wichtig' ? 2 : 1, def.img); }
+    else { d.done = true; d.sum = res.sum || def.sum && (typeof def.sum === 'function' ? def.sum(st, d.ctx) : def.sum) || (d.log.length ? d.log[d.log.length - 1].r : ''); if (def.imp && def.imp !== 'normal' && !def.noChron) MX.chron(st, def.ic || '💬', def.title || 'Gespräch', (d.sum || '').slice(0, 220), def.imp === 'krise' || def.imp === 'highlight' ? 3 : 2, def.img); }
     return d;
   };
-  MX.close = function (st) { var mx = st.mx; if (!mx) return; mx.dlg = null; while (mx.dq.length && !mx.dlg) { var nx = mx.dq.shift(); if (tick(st) - nx.t0 <= 4) open(st, nx); } };
+  MX.close = function (st) { var mx = st.mx; if (!mx) return; mx.dlg = null; while (mx.dq.length && !mx.dlg) { var nx = mx.dq.shift(); if (nx.resume) { mx.dlg = nx.resume; break; } if (tick(st) - nx.t0 <= 4) open(st, nx); } };
   MX.cancel = function (st) { var mx = st.mx; if (mx) { mx.dlg = null; } };
   MX.defaultPick = function (st) { var d = MX.active(st); if (!d) return 0; var def = MX.D[d.id](st, d.ctx), op = optsOf(st, def, d), df = op.filter(function (x) { return x.o.def; })[0]; return (df || op[0] || {}).i; };
   MX.autoRun = function (st, chooser) { var g = 0, d; while ((d = MX.active(st)) && !d.done && g++ < 14) { var def = MX.D[d.id](st, d.ctx), op = optsOf(st, def, d); if (!op.length) { d.done = true; break; } var i = chooser ? chooser(op.map(function (x) { return { i: x.i, l: typeof x.o.l === 'function' ? x.o.l(st, d.ctx) : x.o.l }; }), st, d) : MX.defaultPick(st); if (MX.pick(st, i) === null) MX.pick(st, op[0].i); } return d; };

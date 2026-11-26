@@ -181,7 +181,8 @@
   add('contract_talk', function (st, c) {
     var p = P(st, c), ag = MX.agentOf(st, p), fair = W.fairWage(p), ask = R.round(Math.max(p.wage * (1.15 + (ag.type === 'hart' ? 0.15 : ag.type === 'top' ? 0.2 : 0)), fair * (ag.type === 'prov' ? 1.15 : 1.05)), 1000);
     c.ask = c.ask || ask;
-    function sign(w, yrs, msg) { var old = p.wage; p.wage = R.round(w, 1000); p.contract = Math.max(p.contract, yrs); ag.deals++; return end(msg + ' Neues Gehalt ' + money(p.wage) + ' (vorher ' + money(old) + '), Vertrag bis ' + (st.season + p.contract) + '.', fx(st, { mor: [p.id, 8], rel: [p.id, 5], agent: [ag.id, 5] }), { img: 'e' }); }
+    function cnt() { if (!c.off) c.off = R.round((p.wage + c.ask) / 2, 1000); return R.round((c.off + c.ask) / 2 + (ag.type === 'hart' ? R.round(c.ask * 0.03, 1000) : 0), 1000); }
+    function sign(w, yrs, msg) { var old = p.wage; if (!isFinite(w) || w <= 0) w = c.ask; p.wage = R.round(w, 1000); p.contract = Math.max(p.contract, yrs); ag.deals++; return end(msg + ' Neues Gehalt ' + money(p.wage) + ' (vorher ' + money(old) + '), Vertrag bis ' + (st.season + p.contract) + '.', fx(st, { mor: [p.id, 8], rel: [p.id, 5], agent: [ag.id, 5] }), { img: 'e' }); }
     return { title: 'Vertragsgespräch: ' + p.last, cat: 'vertrag', imp: 'wichtig', img: 'vertrag', max: 4, ic: '✍️', who: { n: ag.name, role: 'Berater von ' + p.last + ' (' + MX.ATYPES[ag.type] + ')', ic: '🕴️' },
       nodes: {
         start: { img: 'a', say: '„' + (c.why || 'Mein Klient hat sich glänzend entwickelt.') + ' Wir erwarten ' + money(c.ask) + ' pro Saison und vier Jahre Laufzeit.“', opts: [
@@ -189,8 +190,8 @@
           O('Eigenes Angebot machen (' + money(R.round((p.wage + c.ask) / 2, 1000)) + ')', function () { c.off = R.round((p.wage + c.ask) / 2, 1000); return nx('„Das ist ein Anfang …“', [], 'counter', { img: 'b' }); }, { def: true }),
           O('Zunächst ablehnen', function () { return nx('„Dann haben wir ein Problem.“', fx(st, { agent: [ag.id, -5] }), 'conflict', { img: 'd' }); })
         ] },
-        counter: { img: 'c', say: function () { c.cnt = R.round((c.off + c.ask) / 2 + (ag.type === 'hart' ? R.round(c.ask * 0.03, 1000) : 0), 1000); return '„Wir kommen Ihnen entgegen: ' + money(c.cnt) + ', drei Jahre. Das ist unser letztes Wort.“'; }, opts: [
-          O('Einschlagen', function () { return sign(c.cnt, 3, 'Handschlag – Einigung.'); }, { def: true }),
+        counter: { img: 'c', say: function () { return '„Wir kommen Ihnen entgegen: ' + money(cnt()) + ', drei Jahre. Das ist unser letztes Wort.“'; }, opts: [
+          O('Einschlagen', function () { return sign(cnt(), 3, 'Handschlag – Einigung.'); }, { def: true }),
           O('Bei meinem Angebot bleiben', function () { var acc = ag.type === 'lang' || MX.pers(p).loy >= 13 || hr('ct' + p.id + tick(st), 1) < 0.35; return acc ? sign(c.off, 3, '„Mein Klient will bleiben – akzeptiert.“') : nx('„Dann reden wir nicht weiter.“', fx(st, { agent: [ag.id, -6] }), 'conflict', { img: 'd' }); }),
           O('Leistungsbezogene Prämien statt Fixgehalt', function () { p.bonus = (p.bonus || 0) + R.round(c.ask * 0.1, 1000); return sign(c.off, 3, 'Kompromiss mit Prämienmodell.'); })
         ] },
@@ -262,8 +263,8 @@
   add('nt_hero', function (st, c) {
     var p = P(st, c), ag = MX.agentOf(st, p); return { title: 'Der gefeierte Nationalspieler', cat: 'nati', imp: 'wichtig', img: 'ntjubel', max: 2, ic: '🌟', who: who(st, p),
       nodes: { start: { say: p.last + ' kehrt als gefeierter Held zurück. Selbstvertrauen auf dem Höhepunkt – die ersten Vereine fragen an, ' + ag.name + ' ruft bereits an.', opts: [
-        O('Vertragsgespräch vorziehen', function () { MX.start(st, 'contract_talk', { pid: p.id, why: 'Nach den Länderspielen ist mein Klient international gefragt.' }, { prio: 1 }); return end('Das Gespräch mit dem Berater steht an.', fx(st, { rel: [p.id, 4] })); }, { def: true }),
-        O('Ruhe bewahren, Fokus Verein', function () { return end('„Klar, Trainer.“ Der Berater ist weniger begeistert.', fx(st, { agent: [ag.id, -3], mor: [p.id, 2] })); }),
+        O('Vertragsgespräch vorziehen', function () { MX.start(st, 'contract_talk', { pid: p.id, why: 'Nach den Länderspielen ist mein Klient international gefragt.' }, { prio: 1 }); return end('Das Gespräch mit dem Berater steht an.', fx(st, { rel: [p.id, 4] })); }, { req: function () { return p.contract <= 2; } }),
+        O('Ruhe bewahren, Fokus Verein', function () { return end('„Klar, Trainer.“ Der Berater ist weniger begeistert.', fx(st, { agent: [ag.id, -3], mor: [p.id, 2] })); }, { def: true }),
         O('Öffentlich feiern', function () { return end('Ein Fest für die Fans – und ein Schaufenster für Interessenten.', fx(st, { fans: 3, media: 2, mor: [p.id, 4] })); })
       ] } } };
   });
@@ -300,7 +301,7 @@
   // TRAINERSTAB
   // ============================================================================================
   add('staff_offer', function (st, c) {
-    var s = MX.staffP(st, c.k), club = cl(st), cs = club.staff && club.staff[c.k]; return { title: s.name + ' hat ein Angebot', cat: 'stab', imp: 'wichtig', img: 'staff', max: 2, ic: '📋', who: { n: s.name, role: s.role, ic: '📋' },
+    var s = MX.staffP(st, c.k), club = cl(st), cs = club.staff && club.staff[c.k]; if (!s) return null; return { title: s.name + ' hat ein Angebot', cat: 'stab', imp: 'wichtig', img: 'staff', max: 2, ic: '📋', who: { n: s.name, role: s.role, ic: '📋' },
       nodes: { start: { say: '„' + (c.rc || 'Ein anderer Verein') + ' will mich als Cheftrainer. Das reizt mich. Was meinen Sie?“', opts: [
         O('Ziehen lassen', function () { if (cs) delete club.staff[c.k]; st.mx.hist.staff.push({ s: st.season, n: s.name, role: s.role, to: c.rc }); return end(s.name + ' verabschiedet sich mit Dank. Die Stelle ist frei.', fx(st, { kab: -1 }), { img: 'f' }); }),
         O('Über eine Vertragsverlängerung sprechen', function () { if (cs) { cs.wage = R.round(cs.wage * 1.3, 1000); } s.loy = Math.min(20, s.loy + 3); s.yrs = 3; return end('Er bleibt – für 30 % mehr Gehalt.', fx(st, { staff: [c.k, 8] }).concat([{ t: 'Personalkosten +30 %', neg: true }]), { img: 'e' }); }, { def: true }),
@@ -324,7 +325,7 @@
       ] } } };
   });
   add('staff_conflict', function (st, c) {
-    var a = MX.staffP(st, c.a), b = MX.staffP(st, c.b); return { title: 'Streit im Trainerstab', cat: 'stab', imp: 'wichtig', img: 'staff', max: 2, ic: '⚡', who: { n: a.name + ' & ' + b.name, role: a.role + ' / ' + b.role, ic: '📋' },
+    var a = MX.staffP(st, c.a), b = MX.staffP(st, c.b); if (!a || !b) return null; return { title: 'Streit im Trainerstab', cat: 'stab', imp: 'wichtig', img: 'staff', max: 2, ic: '⚡', who: { n: a.name + ' & ' + b.name, role: a.role + ' / ' + b.role, ic: '📋' },
       nodes: { start: { say: a.name + ' (' + a.idea + ') und ' + b.name + ' (' + b.idea + ') geraten über die Ausrichtung aneinander. Die Spieler bekommen es mit.', opts: [
         O('Für ' + a.name.split(' ')[0] + ' entscheiden', function () { return end('Klare Linie – ' + b.name + ' ist verstimmt.', fx(st, { staff: [[c.a, 6], [c.b, -10]][0] }).concat(fx(st, { staff: [c.b, -10] }))); }),
         O('Für ' + b.name.split(' ')[0] + ' entscheiden', function () { return end('Klare Linie – ' + a.name + ' ist verstimmt.', fx(st, { staff: [c.b, 6] }).concat(fx(st, { staff: [c.a, -10] }))); }),
@@ -474,7 +475,7 @@
       m.jrn = [j.id, tone === 'sachlich' ? (ty === 'seriös' ? 4 : 1) : tone === 'ausweichend' ? -3 : tone === 'offensiv' ? (ty === 'Boulevard' ? 3 : -1) : (ty === 'Fan-Podcast' ? 4 : 0)];
       return m;
     }
-    function opt(l, tone, extra, react) { out.push(O(l, function () { var spec = eff(tone); if (extra) for (var k in extra) spec[k] = (spec[k] || 0) + extra[k]; var e = fx(st, spec); c.tones = (c.tones || []).concat([tone]); j.quotes.unshift({ t: tick(st), txt: l, topic: topic }); if (j.quotes.length > 12) j.quotes.length = 12; if (tone === 'ausweichend' && (ty === 'provokant' || ty === 'Boulevard') && c.qs[c.i + 1] !== 'follow' && topic !== 'follow') c.qs.splice(c.i + 1, 0, 'follow'); if (react && react.say) MX.say(st, react.say, l, j.outlet); c.i++; var done = c.i >= c.qs.length; return done ? end(react && react.r || reactTxt(ty, tone), e, { sum: headline(st, c, j) }) : nx(react && react.r || reactTxt(ty, tone), e, 'q'); }, tone === 'sachlich' ? { def: true } : null)); }
+    function opt(l, tone, extra, react) { out.push(O(l, function () { var spec = eff(tone); if (extra) for (var k in extra) spec[k] = (spec[k] || 0) + extra[k]; var e = fx(st, spec); c.tones = (c.tones || []).concat([tone]); j.quotes.unshift({ t: tick(st), txt: l, topic: topic }); if (j.quotes.length > 12) j.quotes.length = 12; if (tone === 'ausweichend' && (ty === 'provokant' || ty === 'Boulevard') && c.qs[c.i + 1] !== 'follow' && topic !== 'follow') c.qs.splice(c.i + 1, 0, 'follow'); if (react && react.say) MX.say(st, react.say, l, j.outlet); c.i++; var done = c.i >= c.qs.length; var rt = j.name.split(' ')[0] + ' (' + j.outlet + '): ' + (react && react.r || reactTxt(ty, tone)); return done ? end(rt, e, { sum: headline(st, c, j) }) : nx(rt, e, 'q'); }, tone === 'sachlich' ? { def: true } : null)); }
     if (topic === 'goal') { opt('„Wir denken von Spiel zu Spiel.“', 'sachlich'); opt('„Wir wollen ganz nach oben – Punkt.“', 'offensiv', { fans: 2, board: -0.5 }, { say: 'press_goal_high' }); opt('„Fragen Sie den Vorstand.“', 'ausweichend', { pres: -2 }); opt('„Ich träume von diesem Verein ganz oben.“', 'emotional', null, { say: 'press_goal_dream' }); }
     else if (topic === 'crisis') { opt('„Ich spüre das Vertrauen und arbeite jeden Tag hart.“', 'sachlich'); opt('„Die Mannschaft lebt, das sieht jeder, der hinschaut.“', 'offensiv', { kab: 1 }); opt('„Dazu sage ich nichts.“', 'ausweichend'); opt('„Ich lasse mich hier nicht kaputtschreiben!“', 'emotional', { media: -2, fans: 1 }, { say: 'press_outburst' }); }
     else if (topic === 'player') { var p = st.players[c.pid]; opt('„Er ist auf einem guten Weg.“', 'sachlich', p ? null : null); opt('„Er ist einer der Besten der Liga.“', 'offensiv'); opt('„Ich spreche nicht über Einzelne.“', 'ausweichend'); opt('„Ich erwarte von ihm deutlich mehr.“', 'emotional', null, { say: p ? 'press_crit_' + p.id : 'press_crit' }); if (p) { var last = out.length; out[last - 3].go = wrapGo(out[last - 3].go, function () { fx(st, { mor: [p.id, 3] }); }); out[last - 1].go = wrapGo(out[last - 1].go, function () { fx(st, { mor: [p.id, -6], rel: [p.id, -5] }); MX.reveal(st, p, 'conf', 'reagiert auf öffentliche Kritik'); }); } }
@@ -500,12 +501,13 @@
     return 'Schlagzeile (' + j.outlet + '): „' + h + '“. ' + t.length + ' Fragen beantwortet.';
   }
   add('press', function (st, c) {
-    var j = jrn(st, c), big = !!c.big; if (!c.qs) c.qs = ['form']; if (c.i == null) c.i = 0;
-    var topic = c.qs[Math.min(c.i, c.qs.length - 1)];
-    return { title: big ? 'Pressekonferenz' + (c.why ? ': ' + c.why : '') : 'Interview', cat: 'medien', imp: big ? 'wichtig' : 'normal', img: 'presse', max: c.qs.length, ic: '🎤',
-      who: function () { var jj = jrn(st, c); if (big) { var rot = st.mx.people.jrn[(c.i + hash(c.jid)) % st.mx.people.jrn.length]; return { n: rot.name, role: rot.outlet + ' (' + rot.type + ')', ic: '🎤' }; } return { n: jj.name, role: jj.outlet + ' (' + jj.type + ')', ic: '🎤' }; },
-      nodes: { start: { say: function () { return QT[c.qs[c.i]] ? QT[c.qs[c.i]](st, c) : QT.form(st, c); }, opts: function () { if (big) c.jid = st.mx.people.jrn[(c.i + hash(c.jid || 'j0')) % st.mx.people.jrn.length].id; return tones(st, c, c.qs[c.i]); } },
-        q: { say: function () { return QT[c.qs[c.i]] ? QT[c.qs[c.i]](st, c) : QT.form(st, c); }, opts: function () { if (big) c.jid = st.mx.people.jrn[(c.i + 1 + hash('j')) % st.mx.people.jrn.length].id; return tones(st, c, c.qs[c.i]); } } } };
+    var big = !!c.big, js = st.mx.people.jrn; if (!c.qs) c.qs = ['form']; if (c.i == null) c.i = 0; if (c.j0 == null) c.j0 = hash(String(c.jid || 'j0')) % js.length;
+    if (big) c.jid = js[(c.j0 + c.i) % js.length].id; // Pressekonferenz: Reporter wechseln sich ab
+    function q() { var t = c.qs[Math.min(c.i, c.qs.length - 1)]; return QT[t] ? QT[t](st, c) : QT.form(st, c); }
+    function op() { return tones(st, c, c.qs[Math.min(c.i, c.qs.length - 1)]); }
+    return { title: big ? 'Pressekonferenz' + (c.why ? ': ' + c.why : '') : 'Interview', cat: 'medien', imp: big ? 'wichtig' : 'normal', img: 'presse', max: c.qs.length, ic: '🎤', noChron: true,
+      who: function () { var jj = jrn(st, c); return { n: jj.name, role: jj.outlet + ' (' + jj.type + ')', ic: '🎤' }; },
+      nodes: { start: { say: q, opts: op }, q: { say: q, opts: op } } };
   });
   MX.pressTopics = function (st, big, why) {
     var l = st.mx.last || {}, ps = pos(st), qs = ['form'], club = cl(st);
@@ -544,6 +546,7 @@
   add('board_goals', function (st, c) {
     var mg = st.manager, b = mg.boardTarget || { pos: 9, text: 'Mittelfeld' }, mx = st.mx, pres = mx.people.pres, club = cl(st), id = MX.ident(st, club) || {};
     if (c.dem == null) c.dem = Math.max(1, b.pos - (pres.style === 'ungeduldig' || id.ambition >= 75 ? 2 : 0));
+    function grant() { if (c.grant == null) { var ok = club.cash > 0 && (st.mx.people.ceo.style !== 'kaufmännisch vorsichtig' || club.cash > E.revenueEstimate(st, club) * 0.3); c.grant = ok ? cash(st, 2500000) : 0; } return c.grant; }
     function agree(posv, txt, extra) { mg.boardTarget = { pos: posv, text: txt }; mx.mem.agree.unshift({ k: 'target', s: st.season, pos: posv, txt: txt, extra: extra || null, t: tick(st) }); }
     return { title: 'Saisonzielgespräch mit dem Vorstand', cat: 'vorstand', imp: 'wichtig', img: 'vorstand', max: 3, ic: '🎯', who: person(st, 'pres'),
       nodes: {
@@ -554,8 +557,8 @@
           O('Auf Nachwuchsspieler setzen', function () { var np = c.dem + 2; agree(np, 'Platz ' + np + ' + Nachwuchs', { youth: 2 }); MX.say(st, 'board_youth', 'Vereinbarung: Nachwuchs einbauen'); return end('„Ein mutiger Weg. Mindestens zwei Eigengewächse sollen regelmäßig spielen.“', fx(st, { pres: 1, sd: 4, fans: { long: 2 } })); }),
           O('Konflikt riskieren: Ziel ist unrealistisch', function () { agree(c.dem, b.text, { conflict: 1 }); mx.mem.conf.push({ id: 'cfb' + tick(st), k: 'board', t: tick(st), txt: 'Streit um das Saisonziel', done: false }); return end('„Dann sind wir uns uneinig. Das Ziel bleibt bestehen.“', fx(st, { pres: -8, board: -4 }), { img: 'd' }); })
         ] },
-        money: { who: person(st, 'ceo'), say: function () { var ok = club.cash > 0 && (st.mx.people.ceo.style !== 'kaufmännisch vorsichtig' || club.cash > E.revenueEstimate(st, club) * 0.3); c.grant = ok ? cash(st, 2500000) : 0; return ok ? '„Wir könnten ' + money(c.grant) + ' zusätzlich bereitstellen. Dann erwarten wir aber Platz ' + Math.max(1, c.dem - 1) + '.“' : '„Die Kassenlage gibt das nicht her. Tut mir leid.“'; }, opts: [
-          O('Annehmen – mit höherem Ziel', function () { if (!c.grant) return end('Ohne Mittel bleibt das Ziel bestehen.', [], {}); var np = Math.max(1, c.dem - 1); mg.boardTarget = { pos: np, text: 'Platz ' + np + ' (mit Zusatzmitteln)' }; mx.mem.agree.unshift({ k: 'target', s: st.season, pos: np, txt: mg.boardTarget.text, extra: { grant: c.grant }, t: tick(st) }); return end('Zusätzliches Budget gebucht. Die Erwartungen steigen.', fx(st, { cash: [c.grant, 'Zuschuss Gesellschafter'], ceo: 2 }), { img: 'e' }); }, { req: function () { return c.grant !== 0; }, def: true }),
+        money: { who: person(st, 'ceo'), say: function () { var ok = grant() > 0; return ok ? '„Wir könnten ' + money(c.grant) + ' zusätzlich bereitstellen. Dann erwarten wir aber Platz ' + Math.max(1, c.dem - 1) + '.“' : '„Die Kassenlage gibt das nicht her. Tut mir leid.“'; }, opts: [
+          O('Annehmen – mit höherem Ziel', function () { if (!grant()) return end('Ohne Mittel bleibt das Ziel bestehen.', [], {}); var np = Math.max(1, c.dem - 1); mg.boardTarget = { pos: np, text: 'Platz ' + np + ' (mit Zusatzmitteln)' }; mx.mem.agree.unshift({ k: 'target', s: st.season, pos: np, txt: mg.boardTarget.text, extra: { grant: c.grant }, t: tick(st) }); return end('Zusätzliches Budget gebucht. Die Erwartungen steigen.', fx(st, { cash: [c.grant, 'Zuschuss Gesellschafter'], ceo: 2 }), { img: 'e' }); }, { req: function () { return grant() > 0; }, def: true }),
           O('Verzichten – Ziel wie besprochen', function () { mg.boardTarget = { pos: c.dem, text: b.text }; mx.mem.agree.unshift({ k: 'target', s: st.season, pos: c.dem, txt: b.text, t: tick(st) }); return end('„In Ordnung.“', fx(st, { ceo: 1 })); })
         ] }
       } };
@@ -808,7 +811,7 @@
   ev('youth_breakthrough', 'nachwuchs', 60, 6, function (st) { var y = sq(st).filter(function (p) { return p.age <= 21 && p.stats.apps >= 6 && p.stats.rsum / p.stats.apps >= (HB ? 7.3 : 6.9) && !st.mx.cd['bt' + p.id]; })[0]; if (y) { st.mx.cd['bt' + y.id] = tick(st); return { pid: y.id }; } return null; });
   ev('youth_leave', 'nachwuchs', 20, 1.5, function (st) { var y = sq(st).filter(function (p) { return p.homegrown && p.age <= 22 && MX.pl(st, p).bench >= 6 && !p.listed && !MX.openPromises(st, p.id).length; })[0]; return y ? { pid: y.id } : null; });
   ev('youth_return', 'transfer', 40, 2, function (st) { var club = cl(st); if (!T.windowOpen(st)) return null; var f = T.freeAgents(st).filter(function (p) { var h = st.mx.hist.pl[p.id]; return h && h.hg && h.cid === club.id && p.age <= 33; })[0]; return f ? { pid: f.id } : null; });
-  ev('contract_talk', 'vertrag', 8, 3, function (st) { var c = sq(st).filter(function (p) { return p.contract <= 1 && p.ovr >= MX.starters(st).slice(-1)[0].ovr && !MX.recent(st, 'contract_fail', 12).some(function (e) { return e.d.pid === p.id; }); })[0]; return c && st.week >= 6 ? { pid: c.id, why: 'Der Vertrag meines Klienten läuft aus.' } : null; });
+  ev('contract_talk', 'vertrag', 12, 2, function (st) { var c = sq(st).filter(function (p) { return p.contract <= 1 && p.ovr >= MX.starters(st).slice(-1)[0].ovr && !MX.recent(st, 'contract_fail', 12).some(function (e) { return e.d.pid === p.id; }); })[0]; return c && st.week >= 6 ? { pid: c.id, why: 'Der Vertrag meines Klienten läuft aus.' } : null; });
   ev('poach', 'transfer', 14, 1.5, function (st) { var top = MX.starters(st)[hash('po' + tick(st)) % 4]; if (!top) return null; var rivals = (cl(st).rivals || []).filter(function (id) { return st.clubs[id] && !st.clubs[id].userControlled; }); var rc = rivals[0] || Object.keys(st.clubs).filter(function (k) { var c = st.clubs[k]; return !c.userControlled && !c.foreign && c.league <= cl(st).league; })[hash('pc' + tick(st)) % 10]; return rc ? { pid: top.id, cid: rc } : null; });
   ev('agent_offer', 'transfer', 10, 1.5, function (st) { if (!T.windowOpen(st)) return null; var club = cl(st), worst = MX.starters(st).slice(-1)[0], f = T.freeAgents(st).filter(function (p) { return p.age <= 31 && worst && p.ovr >= worst.ovr - 4; }).sort(function (a, b) { return b.ovr - a.ovr; })[0]; return f ? { pid: f.id, aid: st.mx.agents[hash('ao' + f.id) % st.mx.agents.length].id } : null; });
   ev('staff_offer', 'stab', 40, 1.5, function (st) { var club = cl(st); var k = club.staff && club.staff.co && club.staff.co.lvl >= 2 ? 'co' : null; if (!k) return null; var s = MX.staffP(st, k); if (!s || s.amb < 12) return null; var rc = Object.keys(st.clubs).filter(function (x) { var c = st.clubs[x]; return !c.userControlled && !c.foreign && c.league >= club.league; })[hash('so' + st.season) % 12]; return { k: k, rc: rc ? st.clubs[rc].name : 'Ein Zweitligist' }; });
@@ -856,7 +859,7 @@
     MX.recent(st, 'nt_hero', 3).concat(MX.recent(st, 'nt_title', 3)).forEach(function (e) { var p = st.players[e.d.pid]; if (!p || !T.windowOpen(st) || !MX.cool(st, 'os' + p.id, 20)) return; var rich = Object.keys(st.clubs).map(function (k) { return st.clubs[k]; }).filter(function (c) { return !c.userControlled && !c.foreign && c.league === 1 && c.cash > p.value * 1.4 && c.reputation >= (cl(st).reputation || 50); }).sort(function (a, b) { return b.reputation - a.reputation; })[0]; if (!rich) return; var amt = R.round(p.value * 1.35, 50000); st.inbox.unshift({ id: W.nextId(st, 'offer'), type: 'offer', listed: false, pid: p.id, from: rich.id, amount: amt, week: st.week, season: st.season, tick: tick(st) }); out.push({ id: 'offer_star', ctx: { pid: p.id, cid: rich.id, amount: amt }, key: 'os' + p.id, prio: 2 }); });
     // Fertiggestellte Bauprojekte
     (mx.ev || []).filter(function (e) { return e.k === 'built' && tick(st) - e.t <= 1; }).forEach(function (e) { out.push({ id: 'build_done', ctx: { n: e.d.n }, key: 'bd' + e.d.n + e.t, prio: 1 }); });
-    return out.filter(function (x) { return MX.cool(st, x.key, x.cd || 999); });
+    var seen = {}; return out.filter(function (x) { var ok = MX.cool(st, x.key, x.cd || 999) && MX.cool(st, 'ev:' + x.id, x.id === 'nt_bench' ? 10 : x.id === 'nt_hero' ? 12 : x.id === 'offer_star' ? 10 : x.id === 'nt_first_call' || x.id === 'nt_injury_conflict' ? 0 : 3) && !seen[x.id]; if (ok) seen[x.id] = 1; return ok; });
   }
   MX.reactive = reactive;
 
@@ -906,7 +909,8 @@
     if (mine.length) {
       l.streak = w && !lo ? Math.max(0, l.streak || 0) + w : lo && !w ? Math.min(0, l.streak || 0) - lo : 0;
       l.winless = w ? 0 : (l.winless || 0) + mine.length; l.wins2 = (l.prevWin && w > 0) || w >= 2; l.prevWin = w > 0;
-      l.unbeaten = lo ? 0 : (l.unbeaten || 0) + mine.length;
+      var prevU = l.unbeaten || 0; l.unbeaten = lo ? 0 : prevU + mine.length;
+      if (lo && prevU >= 8 && prevU > ((mx.hist.records.unbeaten || {}).v || 0)) { mx.hist.records.unbeaten = { v: prevU, s: st.season }; MX.chron(st, '📜', 'Vereinsrekord', prevU + ' Pflichtspiele in Folge ungeschlagen.', 2, 'meister'); }
       MX.fanWeek(st, { w: w, d: d, l: lo });
       // Social Media: Reaktionen auf das Spiel (aus echten Ergebnissen)
       var r0 = mine[0], opp = st.clubs[r0.h === club.id ? r0.a : r0.h], derby = opp && club.rivals && club.rivals.indexOf(opp.id) >= 0;
@@ -914,7 +918,6 @@
       else if (l.streak <= -3) MX.feedAdd(st, { who: 'Fan-Forum', txt: Math.abs(l.streak) + ' Niederlagen am Stück. Wie lange noch?', kind: 'fan', hot: l.streak <= -4 });
       else if (l.streak >= 3) MX.feedAdd(st, { who: 'Fans', txt: l.streak + ' Siege in Folge! Wo soll das noch hinführen? 🔥', kind: 'fan' });
       if (l.streak === 5 || l.streak === 8) MX.start(st, 'win_streak', { n: l.streak }, { prio: 2 });
-      if (l.unbeaten > 0 && l.unbeaten > ((mx.hist.records.unbeaten || {}).v || 0) && l.unbeaten >= 8) { mx.hist.records.unbeaten = { v: l.unbeaten, s: st.season }; MX.chron(st, '📜', 'Vereinsrekord', l.unbeaten + ' Pflichtspiele ungeschlagen.', 2, 'meister'); }
     } else l.wins2 = false;
     // Einsatzzeiten → Ersatzbank-Zähler
     var sqd = MX.squad(st);
@@ -961,19 +964,20 @@
     // Nationaltrainer-Angebot (optionaler Karriereweg)
     if (MN && !mx.ntJob && hr('njo' + st.season + (st.seed || 0), 1) < 0.35) { var code = MN.offerJob(st); if (code) MX.start(st, 'nt_job_offer', { code: code }, { prio: 1 }); }
   };
+  MX.goalTalk = function (st) { var mx = st.mx; if (mx.goalS === st.season || !st.manager.boardTarget || !cl(st)) return; mx.goalS = st.season; MX.start(st, 'board_goals', {}, { prio: 2 }); };
   MX.seasonStart = function (st) { // nach dem Saisonwechsel
     var mx = MX.ensure(st); if (!cl(st)) return;
     mx.last = { pen: mx.last.pen }; mx.ptsLog = [];
     MX.squad(st).forEach(function (p) { var r = MX.pl(st, p); r.apps0 = p.stats.apps; r.bench = 0; });
     MX.sponsorGoals(st);
-    if (st.manager.boardTarget) MX.start(st, 'board_goals', {}, { prio: 2 });
+    MX.goalTalk(st);
   };
 
   // --- Einhängen in den vorhandenen Spielablauf ---
   var baseComplete = S.completeWeek;
   S.completeWeek = function (st, played) {
     var on = MX.on(st), clubBefore = on ? cl(st) : null, cons = clubBefore ? (clubBefore.construction || []).map(function (c) { return c.key + c.to; }) : [];
-    if (on) { MX.ensure(st); if (MN) MN.preWeek(st); }
+    if (on) { MX.ensure(st); if (st.phase === 'preseason' || st.week <= 2) MX.goalTalk(st); if (MN) MN.preWeek(st); }
     var res = baseComplete.apply(this, arguments);
     try {
       if (MX.on(st)) {

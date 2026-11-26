@@ -77,10 +77,10 @@
       });
       if (out.A.length || Object.keys(out).length > 1) sq[code] = out;
     });
-    m.sq = sq; m.sqT = tick(st); m.sqWhy = why || '';
+    var firstEver = m.sqT == null; m.sq = sq; m.sqT = tick(st); m.sqWhy = why || '';
     // Erstnominierungen merken (für Ereignisse/Berichte)
     var uc = S.userClub(st);
-    Object.keys(sq).forEach(function (code) { Object.keys(sq[code]).forEach(function (lvl) { sq[code][lvl].forEach(function (pid) { var pr = MN.P(st, pid); pr.code = code; if (lvl === 'A' && !pr.ms.call) { pr.ms.call = { s: st.season, t: tick(st) }; var p = st.players[pid]; if (uc && p && p.clubId === uc.id && st.mx) { MX.event(st, 'nt_first', { pid: pid, code: code }); MX.chron(st, '📨', 'Erstmals Nationalspieler', pname(p) + ' wird erstmals für ' + MN.natName(code) + ' nominiert.', 2, 'nominierung'); } } if (lvl !== 'A' && !pr.y[lvl]) { pr.y[lvl] = { caps: 0, goals: 0, s: st.season }; var py = st.players[pid]; if (uc && py && py.clubId === uc.id && st.mx) MX.event(st, 'nt_youth', { pid: pid, code: code, lvl: lvl }); } }); }); });
+    Object.keys(sq).forEach(function (code) { Object.keys(sq[code]).forEach(function (lvl) { sq[code][lvl].forEach(function (pid) { var pr = MN.P(st, pid); pr.code = code; if (lvl === 'A' && !pr.ms.call) { pr.ms.call = { s: st.season, t: tick(st) }; if (firstEver) pr.ms.est = 1; var p = st.players[pid]; if (!firstEver && uc && p && p.clubId === uc.id && st.mx) { MX.event(st, 'nt_first', { pid: pid, code: code }); MX.chron(st, '📨', 'Erstmals Nationalspieler', pname(p) + ' wird erstmals für ' + MN.natName(code) + ' nominiert.', 2, 'nominierung'); } } if (lvl !== 'A' && !pr.y[lvl]) { pr.y[lvl] = { caps: 0, goals: 0, s: st.season }; var py = st.players[pid]; if (uc && py && py.clubId === uc.id && st.mx) MX.event(st, 'nt_youth', { pid: pid, code: code, lvl: lvl }); } }); }); });
     return sq;
   };
   MN.mine = function (st) { // eigene Nominierte: [{ p, code, lvl }]
@@ -98,7 +98,7 @@
     if (tourNext) return 'qual';
     return tourThis ? 'league' : 'league';
   };
-  function opp(st, code, salt) { var own = MN.nat(code) || { conf: 'EU' }, l = NT.NATIONS.filter(function (n) { return n.code !== code && (n.conf === own.conf || hr(salt, 9) < 0.25); }); return l[hash(salt + code + st.season) % l.length].code; }
+  function opp(st, code, salt) { var own = MN.nat(code) || { conf: 'EU' }, l = NT.NATIONS.filter(function (n) { return n.code !== code && (n.conf === own.conf || hr(salt, 9) < 0.25); }); if (!l.length) l = NT.NATIONS.filter(function (n) { return n.code !== code; }); return l[hash(salt + code + st.season) % l.length].code; }
   function qsim(qa, qb, home, salt) { // Schnellsimulation (Verbände ohne eigene Spieler)
     var d = qa - qb + (home ? 0.03 : 0), r1 = hr(salt, 1), r2 = hr(salt, 2);
     if (HB) { var base = 27, ga = Math.round(base + d * 30 + (r1 - 0.5) * 8), gb = Math.round(base - d * 30 + (r2 - 0.5) * 8); return [Math.max(15, ga), Math.max(15, gb)]; }
@@ -184,7 +184,7 @@
       if (!r.played) { if (x.lvl === 'A') pr.bench++; p.morale = clamp(p.morale - 1.5, 0, 100); return; }
       it.apps++; if (r.start) it.starts++;
       var mins = r.start ? MX.TERM.min : Math.round(MX.TERM.min * (HB ? 0.4 : 0.25)); it.mins += mins; it.goals += r.g; it.assists += r.a; if (r.rt) it.rts.push(r.rt);
-      if (x.lvl === 'A') { pr.caps++; pr.goals += r.g; pr.assists += r.a; pr.rsum += r.rt || 6.5; if (r.start) pr.starts++; pr.bench = 0; st.mnt.seasonCaps += mineClub ? 1 : 0; if (!pr.ms.debut) { pr.ms.debut = { s: st.season, t: tick(st), opp: x.opp }; if (mineClub && st.mx) { MX.chron(st, '🎶', 'Länderspieldebüt', pname(p) + ' debütiert für ' + MN.natName(x.code) + ' gegen ' + MN.natName(x.opp) + '.', 2, 'nominierung'); MX.event(st, 'nt_debut', { pid: pid }); } } }
+      if (x.lvl === 'A') { pr.caps++; pr.goals += r.g; pr.assists += r.a; pr.rsum += r.rt || 6.5; if (r.start) pr.starts++; pr.bench = 0; st.mnt.seasonCaps += mineClub ? 1 : 0; if (!pr.ms.debut) { pr.ms.debut = { s: st.season, t: tick(st), opp: x.opp }; if (mineClub && st.mx && !pr.ms.est) { MX.chron(st, '🎶', 'Länderspieldebüt', pname(p) + ' debütiert für ' + MN.natName(x.code) + ' gegen ' + MN.natName(x.opp) + '.', 2, 'nominierung'); MX.event(st, 'nt_debut', { pid: pid }); } } }
       else { var y = pr.y[x.lvl] = pr.y[x.lvl] || { caps: 0, goals: 0, s: st.season }; y.caps++; y.goals += r.g; pr.ycaps++; }
       pr.hist.unshift({ s: st.season, t: tick(st), lvl: x.lvl, opp: x.opp, res: x.res, rt: r.rt, g: r.g }); if (pr.hist.length > 40) pr.hist.length = 40;
       // Belastung: Spiel + Reise; kurzfristige Form und Moral
